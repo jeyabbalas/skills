@@ -1,0 +1,17 @@
+{
+  "name": "jeyabbalas",
+  "description": "Jeya Balaji Balasubramanian's agent skills as an installable Claude Code plugin.",
+  "owner": {
+    "name": "Jeya Balaji Balasubramanian",
+    "url": "https://github.com/jeyabbalas"
+  },
+  "plugins": [
+    {
+      "name": "jeyabbalas-skills",
+      "source": "./",
+      "description": "Guided three-pass deep reading of academic papers, producing an interactive, printable reading library.",
+      "category": "learning",
+      "keywords": ["papers", "reading", "research"]
+    }
+  ]
+}

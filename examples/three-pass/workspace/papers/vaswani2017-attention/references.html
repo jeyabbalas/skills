@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Attention Is All You Need — key references</title>
+<!-- failsafe: keeps a stray single-file copy readable; the real stylesheet below overrides it -->
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../assets/paper-reader.css">
+<script defer src="../../assets/paper-reader.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../index.html">Library</a> › <a href="index.html">vaswani2017-attention</a> › <span>Key references</span></nav>
+    <span class="chip">Pass 2</span>
+  </header>
+
+  <h1>Attention Is All You Need — key references</h1>
+  <p class="subtitle">What this paper leans on, and why — six works from SKELETON.md's key-references list, each grounded in where the paper cites it (§/p.). Citations are transcribed verbatim from the reference list (p.10–12).</p>
+
+  <section class="print-urls">
+    <h2>The references that matter</h2>
+
+    <p>The paper's story runs through three groups: the <strong>recurrent lineage it replaces</strong> ([13], [35], [38]), the <strong>attention it keeps</strong> ([2]), and the <strong>convolutional rivals it out-parallelizes</strong> ([18], [9]).</p>
+
+    <h3>[2] Bahdanau 2014 — the attention it keeps</h3>
+    <blockquote><p>“Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio. Neural machine translation by jointly learning to align and translate. CoRR, abs/1409.0473, 2014.”</p></blockquote>
+    <ul>
+      <li><strong>What it is</strong>: the paper that introduced attention for neural machine translation — a decoder that soft-searches the source sentence, weighting every source position, instead of decoding from one fixed-length vector. (It is in our library: <a href="../bahdanau2014-nmt-attention/profile.html">profile</a> · <a href="../bahdanau2014-nmt-attention/index.html">hub</a>.)</li>
+      <li><strong>Why this paper leans on it</strong>: three distinct debts. (1) Attention itself — the mechanism “allowing modeling of dependencies without regard to their distance in the input or output sequences [2, 19]” that the Transformer promotes from add-on to entire architecture (§1, p.2). (2) The contrast case: Bahdanau's mechanism is the “additive attention” that “computes the compatibility function using a feed-forward network with a single hidden layer,” against which scaled dot-product attention is defined and justified (§3.2.1, p.4). (3) The encoder-decoder attention pattern the Transformer's decoder “mimics” — queries from the decoder, keys and values from the encoder, “such as [38, 2, 9]” (§3.2.3, p.5).</li>
+      <li><strong>Link</strong>: <a href="https://arxiv.org/abs/1409.0473">arXiv:1409.0473</a> (id from the citation itself).</li>
+    </ul>
+    <aside class="beyond" data-kind="personal">
+      <p class="beyond-kicker">◆ Beyond the paper · Personal</p>
+      <p>For your goal this is the ancestral thread: the “weighted averaging where the weights are computed on the fly” you already unpacked in Bahdanau's setting is exactly what this paper keeps when it throws the recurrence away.</p>
+    </aside>
+
+    <h3>[13] Hochreiter 1997 — the recurrence being replaced</h3>
+    <blockquote><p>“Sepp Hochreiter and Jürgen Schmidhuber. Long short-term memory. Neural computation, 9(8):1735–1780, 1997.”</p></blockquote>
+    <ul>
+      <li><strong>What it is</strong>: the LSTM — the long short-term memory recurrent network.</li>
+      <li><strong>Why this paper leans on it</strong>: it names the incumbent. LSTM is cited first in the paper's first sentence as what has “been firmly established as state of the art approaches in sequence modeling and transduction problems” (§1, p.2) — the recurrent world whose “inherently sequential nature precludes parallelization” (§1, p.2) and which the Transformer is built to replace.</li>
+      <li><strong>Link</strong> (located via web lookup): <a href="https://doi.org/10.1162/neco.1997.9.8.1735">doi:10.1162/neco.1997.9.8.1735</a>.</li>
+    </ul>
+
+    <h3>[35] Sutskever 2014 — the encoder-decoder shape it keeps</h3>
+    <blockquote><p>“Ilya Sutskever, Oriol Vinyals, and Quoc VV Le. Sequence to sequence learning with neural networks. In Advances in Neural Information Processing Systems, pages 3104–3112, 2014.”</p></blockquote>
+    <ul>
+      <li><strong>What it is</strong>: the sequence-to-sequence learning paradigm with neural networks (per its title) — one of the encoder-decoder models the paper treats as the field's standard shape.</li>
+      <li><strong>Why this paper leans on it</strong>: the Transformer keeps this paradigm's skeleton while changing everything inside it. It is cited among the state-of-the-art transduction approaches (§1, p.2) and again for the structure the Transformer inherits: “Most competitive neural sequence transduction models have an encoder-decoder structure [5, 2, 35]” — encoder to continuous representations, auto-regressive decoder (§3, p.2).</li>
+      <li><strong>Link</strong> (located via web lookup): <a href="https://arxiv.org/abs/1409.3215">arXiv:1409.3215</a>.</li>
+    </ul>
+
+    <h3>[38] Wu 2016 — the recurrent state of the art it beats</h3>
+    <blockquote><p>“Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V Le, Mohammad Norouzi, Wolfgang Macherey, Maxim Krikun, Yuan Cao, Qin Gao, Klaus Macherey, et al. Google's neural machine translation system: Bridging the gap between human and machine translation. arXiv preprint arXiv:1609.08144, 2016.”</p></blockquote>
+    <ul>
+      <li><strong>What it is</strong>: GNMT — Google's recurrent neural machine translation system (per its title), cited as recent work pushing “the boundaries of recurrent language models and encoder-decoder architectures” (§1, p.2).</li>
+      <li><strong>Why this paper leans on it</strong>: it is both the benchmark and a parts supplier. Benchmark: “GNMT + RL” is the strongest recurrent baseline in Table 2 (24.6 / 39.92 BLEU vs the big Transformer's 28.4 / 41.8; p.8). Parts: the English-French “32000 word-piece vocabulary [38]” (§5.1, p.7), word-piece sentence representations in the complexity argument (§4, p.7), and the inference settings — “beam search with a beam size of 4 and length penalty α = 0.6 [38]”, early termination (§6.1, p.8).</li>
+      <li><strong>Link</strong>: <a href="https://arxiv.org/abs/1609.08144">arXiv:1609.08144</a> (id from the citation itself).</li>
+    </ul>
+
+    <h3>[18] Kalchbrenner 2017 — convolutional rival, logarithmic paths</h3>
+    <blockquote><p>“Nal Kalchbrenner, Lasse Espeholt, Karen Simonyan, Aaron van den Oord, Alex Graves, and Koray Kavukcuoglu. Neural machine translation in linear time. arXiv preprint arXiv:1610.10099v2, 2017.”</p></blockquote>
+    <ul>
+      <li><strong>What it is</strong>: ByteNet — a convolutional model that shares the Transformer's motivation, “reducing sequential computation,” computing “hidden representations in parallel for all input and output positions” (§2, p.2).</li>
+      <li><strong>Why this paper leans on it</strong>: it sets up the path-length argument. In ByteNet the number of operations relating two positions grows “logarithmically” with their distance — via “O(log<sub>k</sub>(n)) in the case of dilated convolutions [18]” — which “makes it more difficult to learn dependencies between distant positions”; the Transformer reduces this to a constant (§2, p.2; §4, p.7). It also appears as a Table 2 baseline (23.75 BLEU EN-DE, p.8).</li>
+      <li><strong>Link</strong>: <a href="https://arxiv.org/abs/1610.10099">arXiv:1610.10099</a> (id from the citation itself).</li>
+    </ul>
+
+    <h3>[9] Gehring 2017 — convolutional rival, linear paths</h3>
+    <blockquote><p>“Jonas Gehring, Michael Auli, David Grangier, Denis Yarats, and Yann N. Dauphin. Convolutional sequence to sequence learning. arXiv preprint arXiv:1705.03122v2, 2017.”</p></blockquote>
+    <ul>
+      <li><strong>What it is</strong>: ConvS2S — the other convolutional sequence-to-sequence rival built on the same goal of parallel computation (§2, p.2).</li>
+      <li><strong>Why this paper leans on it</strong>: the same distance argument, worse case — operations grow “linearly for ConvS2S” (§2, p.2) — plus two borrowings: it is one of the models whose encoder-decoder attention the Transformer mimics (“such as [38, 2, 9]”, §3.2.3, p.5), and it is the source of the “learned positional embeddings [9]” the paper tests against its sinusoids, with “nearly identical results” (§3.5, p.6). Also a Table 2 baseline (25.16 / 40.46 BLEU, p.8).</li>
+      <li><strong>Link</strong>: <a href="https://arxiv.org/abs/1705.03122">arXiv:1705.03122</a> (id from the citation itself).</li>
+    </ul>
+  </section>
+
+  <h2>Reference map</h2>
+  <p>Layout logic: the Transformer sits center; the recurrent lineage it replaces runs down the left column (time flowing top to bottom), the convolutional rivals it out-parallelizes down the right. Every edge points from this paper to a work it cites.</p>
+  <p class="chrome">Click a reference node to see its card below the map; the center node opens the paper hub.</p>
+
+  <div class="map wide">
+    <script type="application/json" class="map-data">
+{
+  "nodes": [
+    {"id": "hochreiter1997-lstm", "label": "LSTM", "sub": "Hochreiter · 1997",
+     "title": "Long short-term memory", "col": 0, "row": 0},
+    {"id": "sutskever2014-seq2seq", "label": "Seq2Seq Learning", "sub": "Sutskever · 2014",
+     "title": "Sequence to sequence learning with neural networks", "col": 0, "row": 1},
+    {"id": "bahdanau2014-nmt-attention", "label": "Jointly Align & Translate", "sub": "Bahdanau · 2014",
+     "title": "Neural machine translation by jointly learning to align and translate", "col": 0, "row": 2,
+     "href": "../bahdanau2014-nmt-attention/index.html"},
+    {"id": "wu2016-gnmt", "label": "GNMT", "sub": "Wu · 2016",
+     "title": "Google's neural machine translation system", "col": 0, "row": 3},
+    {"id": "vaswani2017-attention", "label": "Attention Is All You Need", "sub": "Vaswani · 2017",
+     "title": "Attention Is All You Need", "col": 1, "row": 2, "href": "index.html"},
+    {"id": "kalchbrenner2017-bytenet", "label": "ByteNet", "sub": "Kalchbrenner · 2017",
+     "title": "Neural machine translation in linear time", "col": 2, "row": 1},
+    {"id": "gehring2017-convs2s", "label": "ConvS2S", "sub": "Gehring · 2017",
+     "title": "Convolutional sequence to sequence learning", "col": 2, "row": 2}
+  ],
+  "edges": [
+    {"from": "vaswani2017-attention", "to": "hochreiter1997-lstm", "label": "recurrence it replaces", "kind": "contrasts"},
+    {"from": "vaswani2017-attention", "to": "sutskever2014-seq2seq", "label": "encoder-decoder shape kept", "kind": "builds-on"},
+    {"from": "vaswani2017-attention", "to": "bahdanau2014-nmt-attention", "label": "attention it keeps", "kind": "builds-on"},
+    {"from": "vaswani2017-attention", "to": "wu2016-gnmt", "label": "recurrent SOTA beaten", "kind": "contrasts"},
+    {"from": "vaswani2017-attention", "to": "kalchbrenner2017-bytenet", "label": "conv rival, log paths", "kind": "contrasts"},
+    {"from": "vaswani2017-attention", "to": "gehring2017-convs2s", "label": "conv rival, linear paths", "kind": "contrasts"}
+  ]
+}
+    </script>
+  </div>
+
+  <section class="map-profile print-urls" id="panel-hochreiter1997-lstm" hidden>
+    <h2>[13] Long short-term memory</h2>
+    <p class="subtitle">Hochreiter · Schmidhuber · Neural Computation 1997</p>
+    <blockquote><p>“Sepp Hochreiter and Jürgen Schmidhuber. Long short-term memory. Neural computation, 9(8):1735–1780, 1997.”</p></blockquote>
+    <p>The LSTM — the long short-term memory recurrent network. In this paper's telling it is the incumbent: cited in the opening sentence as “firmly established as state of the art approaches in sequence modeling and transduction problems” (§1, p.2), and the recurrence whose “inherently sequential nature precludes parallelization” (§1, p.2) the Transformer removes.</p>
+    <p><strong>Link</strong> (located via web lookup): <a href="https://doi.org/10.1162/neco.1997.9.8.1735">doi:10.1162/neco.1997.9.8.1735</a></p>
+  </section>
+
+  <section class="map-profile print-urls" id="panel-sutskever2014-seq2seq" hidden>
+    <h2>[35] Sequence to sequence learning with neural networks</h2>
+    <p class="subtitle">Sutskever · Vinyals · Le · NeurIPS 2014</p>
+    <blockquote><p>“Ilya Sutskever, Oriol Vinyals, and Quoc VV Le. Sequence to sequence learning with neural networks. In Advances in Neural Information Processing Systems, pages 3104–3112, 2014.”</p></blockquote>
+    <p>The sequence-to-sequence paradigm (per its title); cited among the state-of-the-art transduction approaches (§1, p.2) and for the encoder-decoder structure “most competitive neural sequence transduction models have” (§3, p.2) — the skeleton the Transformer keeps while replacing everything recurrent inside it.</p>
+    <p><strong>Link</strong> (located via web lookup): <a href="https://arxiv.org/abs/1409.3215">arXiv:1409.3215</a></p>
+  </section>
+
+  <section class="map-profile print-urls" id="panel-bahdanau2014-nmt-attention" hidden>
+    <h2>[2] Neural machine translation by jointly learning to align and translate</h2>
+    <p class="subtitle">Bahdanau · Cho · Bengio · 2014 — in our library</p>
+    <blockquote><p>“Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio. Neural machine translation by jointly learning to align and translate. CoRR, abs/1409.0473, 2014.”</p></blockquote>
+    <p>Introduced attention for neural machine translation — the decoder soft-searches the source sentence instead of relying on one fixed-length encoded vector. This paper's three debts to it: attention as the distance-free dependency mechanism (§1, p.2); “additive attention” as the contrast case for scaled dot-product attention (§3.2.1, p.4); and the encoder-decoder attention pattern the decoder mimics (§3.2.3, p.5).</p>
+    <p><strong>In the library</strong>: <a href="../bahdanau2014-nmt-attention/profile.html">paper profile</a> · <a href="../bahdanau2014-nmt-attention/index.html">paper hub</a></p>
+    <p><strong>Link</strong>: <a href="https://arxiv.org/abs/1409.0473">arXiv:1409.0473</a> (id from the citation itself)</p>
+  </section>
+
+  <section class="map-profile print-urls" id="panel-wu2016-gnmt" hidden>
+    <h2>[38] Google's neural machine translation system</h2>
+    <p class="subtitle">Wu et al. · 2016</p>
+    <blockquote><p>“Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V Le, Mohammad Norouzi, Wolfgang Macherey, Maxim Krikun, Yuan Cao, Qin Gao, Klaus Macherey, et al. Google's neural machine translation system: Bridging the gap between human and machine translation. arXiv preprint arXiv:1609.08144, 2016.”</p></blockquote>
+    <p>GNMT — the recurrent translation system that is both benchmark and parts supplier here: strongest recurrent baseline in Table 2 (24.6 / 39.92 BLEU; p.8), source of the 32000 word-piece vocabulary (§5.1, p.7) and of the beam-search settings (beam 4, length penalty α = 0.6; §6.1, p.8).</p>
+    <p><strong>Link</strong>: <a href="https://arxiv.org/abs/1609.08144">arXiv:1609.08144</a> (id from the citation itself)</p>
+  </section>
+
+  <section class="map-profile print-urls" id="panel-kalchbrenner2017-bytenet" hidden>
+    <h2>[18] Neural machine translation in linear time</h2>
+    <p class="subtitle">Kalchbrenner et al. · 2017</p>
+    <blockquote><p>“Nal Kalchbrenner, Lasse Espeholt, Karen Simonyan, Aaron van den Oord, Alex Graves, and Koray Kavukcuoglu. Neural machine translation in linear time. arXiv preprint arXiv:1610.10099v2, 2017.”</p></blockquote>
+    <p>ByteNet — convolutional, parallel across positions, sharing the goal of “reducing sequential computation” (§2, p.2). Its operations between two positions grow logarithmically with distance (dilated convolutions; §2, p.2; §4, p.7), the cost the Transformer's constant-path attention is built to beat. Table 2 baseline: 23.75 BLEU EN-DE (p.8).</p>
+    <p><strong>Link</strong>: <a href="https://arxiv.org/abs/1610.10099">arXiv:1610.10099</a> (id from the citation itself)</p>
+  </section>
+
+  <section class="map-profile print-urls" id="panel-gehring2017-convs2s" hidden>
+    <h2>[9] Convolutional sequence to sequence learning</h2>
+    <p class="subtitle">Gehring et al. · 2017</p>
+    <blockquote><p>“Jonas Gehring, Michael Auli, David Grangier, Denis Yarats, and Yann N. Dauphin. Convolutional sequence to sequence learning. arXiv preprint arXiv:1705.03122v2, 2017.”</p></blockquote>
+    <p>ConvS2S — the other parallel convolutional rival; its position-relating cost grows linearly with distance (§2, p.2). Two borrowings: its encoder-decoder attention is among those the Transformer mimics (§3.2.3, p.5), and its learned positional embeddings are the alternative tested against the sinusoids, with “nearly identical results” (§3.5, p.6). Table 2 baseline: 25.16 / 40.46 BLEU (p.8).</p>
+    <p><strong>Link</strong>: <a href="https://arxiv.org/abs/1705.03122">arXiv:1705.03122</a> (id from the citation itself)</p>
+  </section>
+
+  <footer class="colophon">Generated by three-pass · Pass 2 artifact · 2026-08-10. Written by an AI reading companion. Unmarked content restates the paper; anything marked “Beyond the paper” is added interpretation. Verify against the original PDF before citing. · <a href="references.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Attention Is All You Need — Equation (1): Scaled Dot-Product Attention</title>
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../../assets/paper-reader.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/paper-reader.js"></script>
+</head>
+<body data-math>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Library</a> › <a href="../index.html">vaswani2017-attention</a> › <span>Equation (1)</span></nav>
+    <span class="chip">Pass 2</span>
+  </header>
+
+  <h1>Attention Is All You Need — Equation (1): Scaled Dot-Product Attention</h1>
+  <p class="subtitle">Equation (1) · §3.2.1 · p.4 of paper.pdf</p>
+
+  <div class="eq">
+
+    <div class="eq-statement">
+      \[ \mathrm{Attention}(\htmlClass{term t1 term-q}{Q}, \htmlClass{term t2 term-k}{K}, \htmlClass{term t3 term-v}{V}) = \htmlClass{term t4 term-softmax}{\mathrm{softmax}}\left(\frac{\htmlClass{term t1 term-q}{Q}\htmlClass{term t2 term-k}{K^{\top}}}{\htmlClass{term t5 term-scale}{\sqrt{d_k}}}\right)\htmlClass{term t3 term-v}{V} \]
+    </div>
+
+    <h2>What it says</h2>
+    <p>Every query is scored against every key by dot product; the scores are divided by \(\sqrt{d_k}\); a softmax turns each query’s scores into weights; the output for each query is the weight-averaged sum of the values. The matrix form processes “a set of queries simultaneously” (§3.2.1, p.4): with \(n\) queries and \(m\) key–value pairs, \(QK^{\top}\) is the \(n \times m\) score table, and the result is one \(d_v\)-dimensional output row per query.</p>
+
+    <h2>Intuition</h2>
+    <p>A learned kernel smoother. For each position, prediction = weighted average of other positions’ values, weights = normalized similarity between this position’s query and the others’ keys. Nothing in the weights is a fitted constant — they are recomputed from the data every time; what training fits are the projections that produce \(Q\), \(K\), \(V\) (§3.2.2, p.5).</p>
+
+    <h2>Term by term</h2>
+    <div class="legend">
+      <div class="legend-row t1" data-term="q" tabindex="0">
+        <span class="swatch" aria-hidden="true"></span>
+        <span class="meaning">\(Q\) — the queries, “packed together into a matrix Q”; queries and keys have dimension \(d_k\) (§3.2.1, p.4).
+          <span class="intuition">One row per position that is asking for information — the profile it wants matched.</span></span>
+      </div>
+      <div class="legend-row t2" data-term="k" tabindex="0">
+        <span class="swatch" aria-hidden="true"></span>
+        <span class="meaning">\(K^{\top}\) — the keys, packed into matrix \(K\); \(QK^{\top}\) computes “the dot products of the query with all keys” (§3.2.1, p.4).
+          <span class="intuition">What every position advertises about itself; a big dot product with a query means “relevant to that query.”</span></span>
+      </div>
+      <div class="legend-row t3" data-term="v" tabindex="0">
+        <span class="swatch" aria-hidden="true"></span>
+        <span class="meaning">\(V\) — the values, packed into matrix \(V\), of dimension \(d_v\); the output is “a weighted sum of the values” (§3.2, p.3–4).
+          <span class="intuition">The content that actually gets averaged — keys decide how much, values decide of what.</span></span>
+      </div>
+      <div class="legend-row t4" data-term="softmax" tabindex="0">
+        <span class="swatch" aria-hidden="true"></span>
+        <span class="meaning">\(\mathrm{softmax}\) — applied to the scaled scores “to obtain the weights on the values” (§3.2.1, p.4).
+          <span class="intuition">The multinomial-logit link: real-valued scores in, positive weights that sum to 1 out — turning scores into an averaging scheme.</span></span>
+      </div>
+      <div class="legend-row t5" data-term="scale" tabindex="0">
+        <span class="swatch" aria-hidden="true"></span>
+        <span class="meaning">\(\sqrt{d_k}\) — “divide each by \(\sqrt{d_k}\)” (§3.2.1, p.4); footnote 4: with independent mean-0, variance-1 components, \(q \cdot k\) has mean 0 and variance \(d_k\) (p.4).
+          <span class="intuition">A z-score: the raw dot product’s spread grows like \(\sqrt{d_k}\), so dividing by \(\sqrt{d_k}\) keeps scores at unit variance no matter how wide the keys are.</span></span>
+      </div>
+    </div>
+
+    <h2>Where it’s used</h2>
+    <ul>
+      <li>Inside every head of multi-head attention: \(\mathrm{head}_i = \mathrm{Attention}(QW_i^Q, KW_i^K, VW_i^V)\) (§3.2.2, p.5).</li>
+      <li>All three attention sites of the model — encoder-decoder attention, encoder self-attention, decoder self-attention (§3.2.3, p.5).</li>
+      <li>The decoder’s masking lives inside this equation: illegal connections are set to \(-\infty\) “in the input of the softmax” so their weights vanish (§3.2.3, p.5).</li>
+    </ul>
+    <p><a href="../figures/fig-02.html">Figure 2</a> draws this pipeline.</p>
+
+    <aside class="beyond" data-kind="context">
+      <p class="beyond-kicker">◆ Beyond the paper · Context</p>
+      <p>Dot-product (multiplicative) attention predates this paper [2, 3 cited §3.2.1, p.4]; the contribution named here is the \(1/\sqrt{d_k}\) scaling. The variance argument for it is a footnote-level heuristic, not a theorem — the reader has pinned verifying it by hand: margin note <a href="../notes.html#note-N0002">N0002</a>; the weights-vs-coefficients bridge is <a href="../notes.html#note-N0001">N0001</a>.</p>
+    </aside>
+
+  </div>
+
+  <nav class="pager chrome"></nav>
+
+  <footer class="colophon">Generated by three-pass · Pass 2 artifact · 2026-08-10. Written by an AI reading companion. Unmarked content restates the paper; anything marked “Beyond the paper” is added interpretation. Verify against the original PDF before citing. · <a href="eq-01-scaled-dot-product.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

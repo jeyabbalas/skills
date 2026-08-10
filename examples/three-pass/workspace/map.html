@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Reading room — relationship map</title>
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="assets/paper-reader.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/paper-reader.js"></script>
+</head>
+<body data-math>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Library</a> › <span>Relationship map</span></nav>
+    <span class="chip">Pass 1</span>
+  </header>
+
+  <h1>Reading room — relationship map</h1>
+  <p class="subtitle">How the library's papers relate. Time flows left to right; the edge points from the later paper to the earlier one it builds on.</p>
+  <p class="chrome">Click a node to see its details below the map.</p>
+
+  <div class="map wide">
+    <script type="application/json" class="map-data">
+{
+  "nodes": [
+    {"id": "bahdanau2014-nmt-attention", "label": "Jointly Align & Translate", "sub": "Bahdanau · 2014",
+     "title": "Neural Machine Translation by Jointly Learning to Align and Translate", "col": 0, "row": 0,
+     "href": "papers/bahdanau2014-nmt-attention/index.html"},
+    {"id": "vaswani2017-attention", "label": "Attention Is All You Need", "sub": "Vaswani · 2017",
+     "title": "Attention Is All You Need", "col": 1, "row": 0,
+     "href": "papers/vaswani2017-attention/index.html"}
+  ],
+  "edges": [
+    {"from": "vaswani2017-attention", "to": "bahdanau2014-nmt-attention", "label": "keeps attention, drops RNN", "kind": "builds-on"}
+  ]
+}
+    </script>
+  </div>
+
+  <section class="map-profile print-urls" id="panel-bahdanau2014-nmt-attention" hidden>
+    <h2>Neural Machine Translation by Jointly Learning to Align and Translate — paper profile</h2>
+    <p class="subtitle">Bahdanau, Cho, Bengio · ICLR 2015</p>
+
+    <p><strong>Paper type</strong>: empirical — proposes a model extension and validates it on WMT '14 English-to-French translation (Abstract p.1; §4–5 p.4–8)</p>
+    <p><strong>In brief</strong>: Adds a learned soft-search — the mechanism soon named attention — to the RNN encoder–decoder: instead of decoding from one fixed-length sentence vector, the decoder builds, for every output word, a weighted average over per-word source annotations, with weights from a jointly trained alignment network. This removes the collapse on long sentences and reaches quality comparable to the phrase-based state of the art. (Abstract p.1; §3 p.3–4; §5 p.5–8)</p>
+
+    <h3>Title, decoded</h3>
+    <ul>
+      <li><strong>Neural Machine Translation</strong> — translating with "a single, large neural network that reads a sentence and outputs a correct translation", trained end to end — versus the then-dominant phrase-based systems built of "many small sub-components that are tuned separately" (§1, p.1).</li>
+      <li><strong>Jointly Learning</strong> — the alignment part is not a separate pipeline stage: it is a small feedforward network "jointly trained with all the other components", possible because the soft alignment lets gradients flow through it (§3.1, p.3–4).</li>
+      <li><strong>to Align and Translate</strong> — align = decide, for the word being produced, which source words matter right now (the weights); translate = produce the word. One model does both simultaneously (§3.1, p.3–4; §5.2.1, p.7).</li>
+    </ul>
+    <aside class="beyond" data-kind="personal">
+      <p class="beyond-kicker">◆ Beyond the paper · Personal</p>
+      <p>This is the paper where your "weighted averaging where the weights are computed on the fly" picture enters translation: eq. (5) is exactly a Nadaraya–Watson-style weighted mean of source-word summaries, and eq. (6)'s weights are recomputed for every output word from a learned score — no fixed kernel, no fixed bandwidth.</p>
+    </aside>
+
+    <h3>Abstract, unpacked</h3>
+    <ul>
+      <li>Neural machine translation builds "a single neural network that can be jointly tuned to maximize the translation performance", unlike traditional statistical MT. (p.1)</li>
+      <li>Recent NMT models are encoder–decoders that "encode a source sentence into a fixed-length vector from which a decoder generates a translation". (p.1)</li>
+      <li>Conjecture: "the use of a fixed-length vector is a bottleneck" for this architecture. (p.1)</li>
+      <li>Proposal: let the model "automatically (soft-)search for parts of a source sentence that are relevant to predicting a target word", with no explicit hard segmentation. (p.1)</li>
+      <li>Result: translation "comparable to the existing state-of-the-art phrase-based system" on English-to-French. (p.1)</li>
+      <li>The learned (soft-)alignments "agree well with our intuition". (p.1)</li>
+    </ul>
+
+    <h3>Outline</h3>
+    <ul>
+      <li>1 Introduction — the fixed-length-vector bottleneck; the proposed joint align-and-translate fix (p.1–2)</li>
+      <li>2 Background: Neural Machine Translation — translation as probability maximization; the RNN Encoder–Decoder being extended (p.2–3)</li>
+      <li>3 Learning to Align and Translate — the new decoder (per-word context vectors, softmax weights) and the bidirectional-RNN encoder (p.3–4)</li>
+      <li>4 Experiment Settings — WMT '14 En→Fr; RNNencdec vs RNNsearch, trained at lengths 30 and 50 (p.4–5)</li>
+      <li>5 Results — BLEU vs baseline and Moses; alignment visualizations; long-sentence behavior (p.5–8)</li>
+      <li>6 Related Work — Graves's monotonic alignment; neural add-ons to statistical MT (p.8–9)</li>
+      <li>7 Conclusion — soft-search fixes the bottleneck; comparable to phrase-based SMT (p.9)</li>
+      <li>A–C Appendices — gated units, the alignment MLP, full architecture, training procedure, long-sentence samples (p.12–15)</li>
+    </ul>
+
+    <h3>Problem &amp; background</h3>
+    <p>An encoder–decoder "needs to be able to compress all the necessary information of a source sentence into a fixed-length vector", which makes long sentences hard — especially ones longer than those in training — and prior work showed performance "deteriorates rapidly" as input length grows (§1, p.1). Background an outsider needs: translation is choosing the target sentence maximizing \(p(\mathbf{y} \mid \mathbf{x})\); an encoder RNN reads the source into hidden states, and a decoder RNN emits the translation one word at a time, conditioned on the words it already produced (§2–2.1, p.2–3).</p>
+
+    <h3>Authors</h3>
+    <ul>
+      <li>Dzmitry Bahdanau (first) — then at Jacobs University Bremen, Germany (p.1); later PhD at Mila under Yoshua Bengio; credits the ICLR 2015 paper with inventing "the content-based neural attention" now core to NLP; today research scientist at Element AI (acquired by ServiceNow), core industry member of Mila, adjunct professor at McGill (<a href="https://rizar.github.io/">source</a>)</li>
+      <li>Yoshua Bengio (last) — professor, Université de Montréal; founder of Mila and its scientific director until 2025; co-director of CIFAR's Learning in Machines &amp; Brains program — the paper marks him "CIFAR Senior Fellow" (p.1, footnote); introduced the neural probabilistic language model; 2018 Turing Award with Hinton and LeCun (<a href="https://en.wikipedia.org/wiki/Yoshua_Bengio">source</a>)</li>
+    </ul>
+
+    <h3>Related work that matters</h3>
+    <p>(The paper cites author–year, with no bracket numbers.)</p>
+    <ul>
+      <li>Cho et al. 2014a — the RNN Encoder–Decoder this paper extends; also supplies the RNNencdec baseline and the gated hidden unit used in both models. (§1 p.1; §2.1 p.2; §4 p.4)</li>
+      <li>Sutskever et al. 2014 — the LSTM sequence-to-sequence model, the other pillar of the encoder–decoder family, near phrase-based-level on En→Fr. (§1 p.1; §2 p.2)</li>
+      <li>Cho et al. 2014b — the motivating evidence: a basic encoder–decoder's performance "deteriorates rapidly" as sentence length grows. (§1 p.1; §7 p.9)</li>
+      <li>Graves 2013 — closest prior for learned alignment (handwriting synthesis), but its alignment moves only monotonically — a "severe limitation" for translation, where reordering is needed. (§6.1 p.8)</li>
+      <li>Koehn et al. 2003 — the phrase-based statistical MT tradition (Moses) that sets the bar the model is measured against. (§1 p.1; §5.1 p.5)</li>
+    </ul>
+
+    <h3>Hypothesis &amp; claims</h3>
+    <p>The conjecture: the single fixed-length vector is the bottleneck (Abstract p.1). The proposal: encode the source with a bidirectional RNN into one annotation per word, and have the decoder form a fresh context vector for every output word — a weighted sum whose weights come from a jointly trained feedforward alignment model — which "implements a mechanism of attention in the decoder" (§3.1–3.2, p.3–4). Claims: this beats the basic encoder–decoder at every sentence length, most visibly on long sentences, and reaches phrase-based-comparable quality with a single model (§1, p.2). A stated design assumption: each annotation carries the whole sentence but with "a strong focus on the parts surrounding" its word (§3.1, p.3).</p>
+
+    <h3>Main results</h3>
+    <p>RNNsearch outperforms RNNencdec in every configuration; the long-trained RNNsearch-50⋆ reaches 28.45 BLEU on the full test set vs 33.30 for Moses — and on sentences without unknown words it scores 36.15, above Moses's 35.63 (Table 1, p.7; §5.1 p.5). RNNsearch-50 shows "no performance deterioration even with sentences of length 50 or more", while RNNencdec drops sharply with length (Fig. 2, §5.1, p.5–6). The learned weight matrices show largely monotonic, linguistically plausible alignments that handle reordering, e.g. [zone] ↔ [Area] (§5.2.1, Fig. 3, p.6–7).</p>
+
+    <h3>Conclusions</h3>
+    <p>The fixed-length vector is problematic for long sentences; letting the model (soft-)search the source while generating each target word fixes this, with every part — alignment included — trained jointly (§7, p.9). Reaching quality comparable to phrase-based SMT is "a striking result" for an approach the authors note "has only been proposed as recently as this year"; the challenge left is rare and unknown words (§7, p.9).</p>
+
+    <aside class="beyond" data-kind="context">
+      <p class="beyond-kicker">◆ Beyond the paper · Context</p>
+      <p>For your goal — attention before Vaswani dropped the recurrence: here attention lives <em>inside</em> a recurrent model. The thing asking is the decoder RNN's previous state \(s_{i-1}\); the things attended to are BiRNN annotations \(h_j\) (playing both the key and value roles, undivided); the score is a small feedforward net (Appendix A.1.2, p.12) — the "additive attention" that Vaswani et al. later name and contrast with their scaled dot product (their §3.2.1). What the Transformer keeps: softmax-weighted averaging of vectors. What it drops: the RNNs that produce \(s\) and \(h\). See <a href="papers/vaswani2017-attention/profile.html">Attention Is All You Need — profile</a>.</p>
+    </aside>
+  </section>
+
+  <section class="map-profile print-urls" id="panel-vaswani2017-attention" hidden>
+    <h2>Attention Is All You Need — paper profile</h2>
+    <p class="subtitle">Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin · NeurIPS 2017</p>
+
+    <p><strong>Paper type</strong>: empirical — proposes a new architecture and validates it on machine-translation and parsing benchmarks (Abstract p.1; §6 p.8–10)</p>
+    <p><strong>In brief</strong>: Introduces the Transformer, the first sequence-to-sequence model built entirely on attention — no recurrence, no convolutions. It beats the state of the art on two WMT 2014 translation benchmarks while training in a fraction of the time, and generalizes to English constituency parsing. (Abstract p.1; §7 p.10)</p>
+
+    <h3>Title, decoded</h3>
+    <ul>
+      <li><strong>Attention</strong> — the paper's core operation: "mapping a query and a set of key-value pairs to an output", where "the output is computed as a weighted sum of the values" and each weight comes from how compatible the query is with that value's key (§3.2, p.3–4).</li>
+      <li><strong>Is All You Need</strong> — the claim: the "complex recurrent or convolutional neural networks" that dominated sequence modeling can be dispensed with "entirely"; attention alone carries the model (Abstract p.1; §1 p.2).</li>
+    </ul>
+    <aside class="beyond" data-kind="personal">
+      <p class="beyond-kicker">◆ Beyond the paper · Personal</p>
+      <p>Bridge from your world: attention is close in spirit to kernel smoothing (Nadaraya–Watson): predict for a point by taking a weighted average of other points' values, weights set by similarity. Here the "similarity" is learned, and everything is vectors — but "data-dependent weighted average" is the right first mental model, before any neural-network machinery.</p>
+    </aside>
+
+    <h3>Abstract, unpacked</h3>
+    <ul>
+      <li>Dominant sequence transduction (sequence-to-sequence) models are "complex recurrent or convolutional neural networks" with an encoder and a decoder; the best also connect the two through attention. (p.1)</li>
+      <li>Proposes the Transformer, "based solely on attention mechanisms, dispensing with recurrence and convolutions entirely". (p.1)</li>
+      <li>On two machine-translation tasks: superior quality, more parallelizable, "significantly less time to train". (p.1)</li>
+      <li>WMT 2014 English→German: 28.4 BLEU, over 2 BLEU above the previous best including ensembles. (p.1)</li>
+      <li>WMT 2014 English→French: 41.8 BLEU, a new single-model state of the art, after 3.5 days on eight GPUs — "a small fraction of the training costs of the best models". (p.1)</li>
+      <li>Also generalizes to English constituency parsing, with large and limited training data. (p.1)</li>
+    </ul>
+
+    <h3>Outline</h3>
+    <ul>
+      <li><a href="papers/vaswani2017-attention/summary.html#sec-1">1 Introduction</a> — RNNs are state of the art but inherently sequential; the Transformer drops recurrence for attention (p.2)</li>
+      <li><a href="papers/vaswani2017-attention/summary.html#sec-2">2 Background</a> — convolutional attempts (ByteNet, ConvS2S) and self-attention precedents (p.2)</li>
+      <li><a href="papers/vaswani2017-attention/summary.html#sec-3">3 Model Architecture</a> — encoder-decoder stacks; attention (scaled dot-product, multi-head, its three uses); feed-forward layers; embeddings; positional encoding (p.2–6)</li>
+      <li><a href="papers/vaswani2017-attention/summary.html#sec-4">4 Why Self-Attention</a> — complexity, parallelism, and path-length comparison vs recurrent and convolutional layers (p.6–7)</li>
+      <li><a href="papers/vaswani2017-attention/summary.html#sec-5">5 Training</a> — data, hardware, Adam schedule, regularization (p.7–8)</li>
+      <li><a href="papers/vaswani2017-attention/summary.html#sec-6">6 Results</a> — translation records, ablations, parsing transfer (p.8–10)</li>
+      <li><a href="papers/vaswani2017-attention/summary.html#sec-7">7 Conclusion</a> — first all-attention transduction model; future directions (p.10)</li>
+      <li><a href="papers/vaswani2017-attention/summary.html#sec-appendix">Appendix: Attention Visualizations</a> — example attention patterns (p.13–15)</li>
+    </ul>
+
+    <h3>Problem &amp; background</h3>
+    <p>Recurrent sequence models compute a hidden state \(h_t\) from \(h_{t-1}\), so computation cannot be parallelized within a training example — "critical at longer sequence lengths" (§1, p.2). Attention already let models relate positions "without regard to their distance", but was almost always bolted onto a recurrent network (§1, p.2). Background an outsider needs: sequence transduction = mapping an input sequence to an output sequence (e.g. translation); the standard shape is an encoder (input → continuous representations) and an auto-regressive decoder (one output symbol at a time, feeding on its own previous outputs) (§3, p.2).</p>
+
+    <h3>Authors</h3>
+    <ul>
+      <li>Ashish Vaswani (first listed) — Google Brain (p.1); PhD in computer science at the University of Southern California, previously at USC's Information Sciences Institute; later co-founded Adept AI and Essential AI (<a href="https://en.wikipedia.org/wiki/Ashish_Vaswani">source</a>)</li>
+      <li>Illia Polosukhin (last listed) — engineering manager at Google Research at the time (p.1, mark ‡); left to co-found NEAR (initially Near.ai, a program-synthesis startup) in 2017 (<a href="https://en.wikipedia.org/wiki/Illia_Polosukhin">source</a>)</li>
+      <li>The paper states: "Equal contribution. Listing order is random." (p.1, footnote)</li>
+    </ul>
+    <aside class="beyond" data-kind="personal">
+      <p class="beyond-kicker">◆ Beyond the paper · Personal</p>
+      <p>So unlike author lists in epidemiology, first/last position here signals nothing about seniority or contribution.</p>
+    </aside>
+
+    <h3>Related work that matters</h3>
+    <ul>
+      <li>Bahdanau 2014 [2] — introduced attention in neural machine translation (jointly with an RNN), letting models link positions regardless of distance; the Transformer keeps the attention and drops the RNN, and its "additive attention" is the contrast case for scaled dot-product attention. (§1 p.2; §3.2.1 p.4)</li>
+      <li>Sutskever 2014 [35] — RNN encoder-decoder sequence-to-sequence learning; the paradigm whose overall shape the Transformer inherits. (§1 p.2; §3 p.2)</li>
+      <li>Wu 2016 (GNMT) [38] — Google's recurrent translation system, the strongest recurrent baseline in Table 2; also the source of the word-piece vocabulary and beam-search settings used here. (§5.1 p.7; §6.1 p.8)</li>
+      <li>Gehring 2017 (ConvS2S) [9] — convolutional sequence-to-sequence model: parallel like the Transformer, but relating two positions costs a number of operations growing linearly with their distance. (§2 p.2)</li>
+      <li>Kalchbrenner 2017 (ByteNet) [18] — convolutional predecessor where that cost grows logarithmically; both motivate the Transformer's constant number of operations between any two positions. (§2 p.2)</li>
+    </ul>
+
+    <h3>Hypothesis &amp; claims</h3>
+    <p>The authors propose that recurrence is unnecessary: an architecture "relying entirely on an attention mechanism to draw global dependencies between input and output" can beat recurrent and convolutional encoder-decoders while parallelizing far better (§1, p.2). The key design bets: short, constant-length paths between any pair of positions make long-range dependencies easier to learn (§4, Table 1, p.6), and multi-head attention counteracts the "reduced effective resolution" that plain attention averaging causes (§2, p.2).</p>
+
+    <h3>Main results</h3>
+    <p>The big Transformer sets a new WMT 2014 English→German state of the art at 28.4 BLEU, over 2.0 BLEU above all previous models including ensembles, and reaches 41.8 BLEU on English→French (Table 2) at less than 1/4 the training cost of the previous best single model; even the base model beats all previously published models at a fraction of the cost (§6.1, Table 2, p.8). A 4-layer Transformer also reaches 92.7 F1 on WSJ constituency parsing (semi-supervised), above all previously reported models except one (§6.3, Table 4, p.9–10).</p>
+    <aside class="beyond" data-kind="critique">
+      <p class="beyond-kicker">◆ Beyond the paper · Critique</p>
+      <p>Small internal inconsistency: §6.1's prose reports the English→French big model at "a BLEU score of 41.0" (p.8), while the abstract (p.1) and Table 2 (p.8) both say 41.8.</p>
+    </aside>
+
+    <h3>Conclusions</h3>
+    <p>The Transformer is "the first sequence transduction model based entirely on attention"; for translation it trains "significantly faster than architectures based on recurrent or convolutional layers" and sets a new state of the art on both WMT 2014 tasks (§7, p.10). The authors plan to extend it to other modalities (images, audio, video), investigate local restricted attention, and make generation less sequential; code is at github.com/tensorflow/tensor2tensor (§7, p.10).</p>
+  </section>
+
+  <footer class="colophon">Generated by three-pass · Pass 1 artifact · 2026-08-10. Written by an AI reading companion. Unmarked content restates the paper; anything marked “Beyond the paper” is added interpretation. Verify against the original PDF before citing. · <a href="map.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

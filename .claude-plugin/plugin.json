@@ -1,0 +1,14 @@
+{
+  "name": "jeyabbalas-skills",
+  "version": "0.1.0",
+  "description": "Jeya Balaji Balasubramanian's agent skills. First up: three-pass — a guided three-pass deep read of academic papers that builds an interactive, printable reading library.",
+  "author": {
+    "name": "Jeya Balaji Balasubramanian",
+    "url": "https://github.com/jeyabbalas"
+  },
+  "homepage": "https://github.com/jeyabbalas/skills",
+  "repository": "https://github.com/jeyabbalas/skills",
+  "license": "MIT",
+  "keywords": ["reading", "papers", "research", "three-pass", "learning"],
+  "skills": ["./skills/three-pass"]
+}

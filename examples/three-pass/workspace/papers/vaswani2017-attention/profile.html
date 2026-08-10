@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Attention Is All You Need — paper profile</title>
+<!-- failsafe: keeps a stray single-file copy readable; the real stylesheet below overrides it -->
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../assets/paper-reader.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/paper-reader.js"></script>
+</head>
+<body data-math>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../index.html">Library</a> › <a href="index.html">vaswani2017-attention</a> › <span>Paper profile</span></nav>
+    <span class="chip">Pass 1</span>
+  </header>
+
+  <h1>Attention Is All You Need — paper profile</h1>
+  <p class="subtitle">Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin · NeurIPS 2017</p>
+
+  <p><strong>Paper type</strong>: empirical — proposes a new architecture and validates it on machine-translation and parsing benchmarks (Abstract p.1; §6 p.8–10)</p>
+  <p><strong>In brief</strong>: Introduces the Transformer, the first sequence-to-sequence model built entirely on attention — no recurrence, no convolutions. It beats the state of the art on two WMT 2014 translation benchmarks while training in a fraction of the time, and generalizes to English constituency parsing. (Abstract p.1; §7 p.10)</p>
+
+  <h2>Title, decoded</h2>
+  <ul>
+    <li><strong>Attention</strong> — the paper's core operation: "mapping a query and a set of key-value pairs to an output", where "the output is computed as a weighted sum of the values" and each weight comes from how compatible the query is with that value's key (§3.2, p.3–4).</li>
+    <li><strong>Is All You Need</strong> — the claim: the "complex recurrent or convolutional neural networks" that dominated sequence modeling can be dispensed with "entirely"; attention alone carries the model (Abstract p.1; §1 p.2).</li>
+  </ul>
+  <aside class="beyond" data-kind="personal">
+    <p class="beyond-kicker">◆ Beyond the paper · Personal</p>
+    <p>Bridge from your world: attention is close in spirit to kernel smoothing (Nadaraya–Watson): predict for a point by taking a weighted average of other points' values, weights set by similarity. Here the "similarity" is learned, and everything is vectors — but "data-dependent weighted average" is the right first mental model, before any neural-network machinery.</p>
+  </aside>
+
+  <h2>Abstract, unpacked</h2>
+  <ul>
+    <li>Dominant sequence transduction (sequence-to-sequence) models are "complex recurrent or convolutional neural networks" with an encoder and a decoder; the best also connect the two through attention. (p.1)</li>
+    <li>Proposes the Transformer, "based solely on attention mechanisms, dispensing with recurrence and convolutions entirely". (p.1)</li>
+    <li>On two machine-translation tasks: superior quality, more parallelizable, "significantly less time to train". (p.1)</li>
+    <li>WMT 2014 English→German: 28.4 BLEU, over 2 BLEU above the previous best including ensembles. (p.1)</li>
+    <li>WMT 2014 English→French: 41.8 BLEU, a new single-model state of the art, after 3.5 days on eight GPUs — "a small fraction of the training costs of the best models". (p.1)</li>
+    <li>Also generalizes to English constituency parsing, with large and limited training data. (p.1)</li>
+  </ul>
+
+  <h2>Outline</h2>
+  <ul>
+    <li><a href="summary.html#sec-1">1 Introduction</a> — RNNs are state of the art but inherently sequential; the Transformer drops recurrence for attention (p.2)</li>
+    <li><a href="summary.html#sec-2">2 Background</a> — convolutional attempts (ByteNet, ConvS2S) and self-attention precedents (p.2)</li>
+    <li><a href="summary.html#sec-3">3 Model Architecture</a> — encoder-decoder stacks; attention (scaled dot-product, multi-head, its three uses); feed-forward layers; embeddings; positional encoding (p.2–6)</li>
+    <li><a href="summary.html#sec-4">4 Why Self-Attention</a> — complexity, parallelism, and path-length comparison vs recurrent and convolutional layers (p.6–7)</li>
+    <li><a href="summary.html#sec-5">5 Training</a> — data, hardware, Adam schedule, regularization (p.7–8)</li>
+    <li><a href="summary.html#sec-6">6 Results</a> — translation records, ablations, parsing transfer (p.8–10)</li>
+    <li><a href="summary.html#sec-7">7 Conclusion</a> — first all-attention transduction model; future directions (p.10)</li>
+    <li><a href="summary.html#sec-appendix">Appendix: Attention Visualizations</a> — example attention patterns (p.13–15)</li>
+  </ul>
+
+  <h2>Problem &amp; background</h2>
+  <p>Recurrent sequence models compute a hidden state \(h_t\) from \(h_{t-1}\), so computation cannot be parallelized within a training example — "critical at longer sequence lengths" (§1, p.2). Attention already let models relate positions "without regard to their distance", but was almost always bolted onto a recurrent network (§1, p.2). Background an outsider needs: sequence transduction = mapping an input sequence to an output sequence (e.g. translation); the standard shape is an encoder (input → continuous representations) and an auto-regressive decoder (one output symbol at a time, feeding on its own previous outputs) (§3, p.2).</p>
+
+  <h2>Authors</h2>
+  <ul>
+    <li>Ashish Vaswani (first listed) — Google Brain (p.1); PhD in computer science at the University of Southern California, previously at USC's Information Sciences Institute; later co-founded Adept AI and Essential AI (<a href="https://en.wikipedia.org/wiki/Ashish_Vaswani">source</a>)</li>
+    <li>Illia Polosukhin (last listed) — engineering manager at Google Research at the time (p.1, mark ‡); left to co-found NEAR (initially Near.ai, a program-synthesis startup) in 2017 (<a href="https://en.wikipedia.org/wiki/Illia_Polosukhin">source</a>)</li>
+    <li>The paper states: "Equal contribution. Listing order is random." (p.1, footnote)</li>
+  </ul>
+  <aside class="beyond" data-kind="personal">
+    <p class="beyond-kicker">◆ Beyond the paper · Personal</p>
+    <p>So unlike author lists in epidemiology, first/last position here signals nothing about seniority or contribution.</p>
+  </aside>
+
+  <h2>Related work that matters</h2>
+  <ul>
+    <li>Bahdanau 2014 [2] — introduced attention in neural machine translation (jointly with an RNN), letting models link positions regardless of distance; the Transformer keeps the attention and drops the RNN, and its "additive attention" is the contrast case for scaled dot-product attention. (§1 p.2; §3.2.1 p.4)</li>
+    <li>Sutskever 2014 [35] — RNN encoder-decoder sequence-to-sequence learning; the paradigm whose overall shape the Transformer inherits. (§1 p.2; §3 p.2)</li>
+    <li>Wu 2016 (GNMT) [38] — Google's recurrent translation system, the strongest recurrent baseline in Table 2; also the source of the word-piece vocabulary and beam-search settings used here. (§5.1 p.7; §6.1 p.8)</li>
+    <li>Gehring 2017 (ConvS2S) [9] — convolutional sequence-to-sequence model: parallel like the Transformer, but relating two positions costs a number of operations growing linearly with their distance. (§2 p.2)</li>
+    <li>Kalchbrenner 2017 (ByteNet) [18] — convolutional predecessor where that cost grows logarithmically; both motivate the Transformer's constant number of operations between any two positions. (§2 p.2)</li>
+  </ul>
+
+  <h2>Hypothesis &amp; claims</h2>
+  <p>The authors propose that recurrence is unnecessary: an architecture "relying entirely on an attention mechanism to draw global dependencies between input and output" can beat recurrent and convolutional encoder-decoders while parallelizing far better (§1, p.2). The key design bets: short, constant-length paths between any pair of positions make long-range dependencies easier to learn (§4, Table 1, p.6), and multi-head attention counteracts the "reduced effective resolution" that plain attention averaging causes (§2, p.2).</p>
+
+  <h2>Main results</h2>
+  <p>The big Transformer sets a new WMT 2014 English→German state of the art at 28.4 BLEU, over 2.0 BLEU above all previous models including ensembles, and reaches 41.8 BLEU on English→French (Table 2) at less than 1/4 the training cost of the previous best single model; even the base model beats all previously published models at a fraction of the cost (§6.1, Table 2, p.8). A 4-layer Transformer also reaches 92.7 F1 on WSJ constituency parsing (semi-supervised), above all previously reported models except one (§6.3, Table 4, p.9–10).</p>
+  <aside class="beyond" data-kind="critique">
+    <p class="beyond-kicker">◆ Beyond the paper · Critique</p>
+    <p>Small internal inconsistency: §6.1's prose reports the English→French big model at "a BLEU score of 41.0" (p.8), while the abstract (p.1) and Table 2 (p.8) both say 41.8.</p>
+  </aside>
+
+  <h2>Conclusions</h2>
+  <p>The Transformer is "the first sequence transduction model based entirely on attention"; for translation it trains "significantly faster than architectures based on recurrent or convolutional layers" and sets a new state of the art on both WMT 2014 tasks (§7, p.10). The authors plan to extend it to other modalities (images, audio, video), investigate local restricted attention, and make generation less sequential; code is at <a href="https://github.com/tensorflow/tensor2tensor">github.com/tensorflow/tensor2tensor</a> (§7, p.10).</p>
+
+  <footer class="colophon">Generated by three-pass · Pass 1 artifact · 2026-08-10. Written by an AI reading companion. Unmarked content restates the paper; anything marked “Beyond the paper” is added interpretation. Verify against the original PDF before citing. · <a href="profile.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

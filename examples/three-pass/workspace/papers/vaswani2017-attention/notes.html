@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Attention Is All You Need — margin notes</title>
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../assets/paper-reader.css">
+<script defer src="../../assets/paper-reader.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../index.html">Library</a> › <a href="index.html">vaswani2017-attention</a> › <span>Margin notes</span></nav>
+    <span class="chip">Pass 3</span>
+  </header>
+
+  <h1>Attention Is All You Need — margin notes</h1>
+  <p class="subtitle">The durable record of what our conversation changed — newest first; nothing is ever deleted.</p>
+
+  <input class="filter chrome" type="search" placeholder="Filter…" data-filter="#entries" aria-label="Filter entries">
+  <p class="filter-count" aria-live="polite"></p>
+
+  <div class="entries print-urls" id="entries">
+
+    <article class="entry" data-tags="todo, scaling, softmax, gradients, derivation-gap" id="note-N0005">
+      <p class="entry-meta"><span>N0005</span><span>2026-08-10</span>
+        <span>§3.2.1 · p.4</span><span class="tag">todo</span></p>
+      <h3>Derive the second link: why large-magnitude logits give the softmax “extremely small gradients”</h3>
+      <blockquote><p>“We suspect that for large values of d<sub>k</sub>, the dot products grow large in magnitude, pushing the softmax function into regions where it has extremely small gradients.”</p></blockquote>
+      <p><a href="derivations/deriv-01-sqrt-dk-scaling.html">deriv-01</a> verified footnote 4’s half of the chain: unscaled scores have sd √d<sub>k</sub>, and dividing by √d<sub>k</sub> restores unit variance. This half — large logits ⇒ vanishing softmax gradients — the paper hedges as “We suspect” and never derives; we recorded it as deriv-01’s open gap rather than deriving it (the reader was satisfied stopping at the variance level, 2026-08-10). To close: compute the softmax Jacobian diag(p) − pp<sup>T</sup> and show it vanishes as one logit dominates.</p>
+    </article>
+
+    <article class="entry" data-tags="question, kernels, multi-head, regression-bridge" id="note-N0004">
+      <p class="entry-meta"><span>N0004</span><span>2026-08-09</span>
+        <span>§3.2.1 · p.4</span><span class="tag">question</span></p>
+      <h3>Is QK<sup>T</sup> a kernel matrix as in GP regression — and does each head learn a different kernel?</h3>
+      <p>I re-read 3.2 on paper. The QK<sup>T</sup> matrix is basically a similarity matrix between all positions - like a kernel matrix in GP regression?? check this against multi-head: does each head learn a different kernel?</p>
+      <p><em>(The reader’s own words, hand-added at the bottom of the note stream the night before 2026-08-10; formalized into the note schema on 2026-08-10 — wording untouched.)</em></p>
+    </article>
+
+    <article class="entry" data-tags="critique, positional-encoding, revisit" id="note-N0003">
+      <p class="entry-meta"><span>N0003</span><span>2026-08-10</span>
+        <span>§3.5 · p.6</span><span class="tag">critique</span></p>
+      <h3>Not sold on the sinusoidal positional-encoding justification</h3>
+      <blockquote><p>“We chose this function because we hypothesized it would allow the model to easily learn to attend by relative positions, since for any fixed offset k, PE<sub>pos+k</sub> can be represented as a linear function of PE<sub>pos</sub>.”</p></blockquote>
+      <p>The reader finds the sinusoid choice arbitrary and does not buy §3.5’s justification yet. The paper offers a hypothesis (relative positions become a linear function, quoted above), a second speculation that sinusoids “may allow the model to extrapolate to sequence lengths longer than the ones encountered during training” (§3.5, p.6), and reports that learned embeddings “produced nearly identical results (see Table 3 row (E))” (§3.5, p.6). Pinned to revisit when §3.5 gets its planned read — queued for next session.</p>
+    </article>
+
+    <article class="entry superseded" data-tags="todo, scaling, variance, derivation" id="note-N0002">
+      <p class="entry-meta"><span>N0002</span><span>2026-08-10</span>
+        <span>§3.2.1 · p.4</span><span class="tag">todo</span><span>closed — <a href="derivations/deriv-01-sqrt-dk-scaling.html">deriv-01</a></span></p>
+      <h3>Verify footnote 4’s variance argument by hand</h3>
+      <blockquote><p>“assume that the components of q and k are independent random variables with mean 0 and variance 1. Then their dot product, q · k = Σ<sub>i=1</sub><sup>d<sub>k</sub></sup> q<sub>i</sub>k<sub>i</sub>, has mean 0 and variance d<sub>k</sub>.”</p></blockquote>
+      <p>Why √d<sub>k</sub> and not d<sub>k</sub>: the dot product’s standard deviation — its typical magnitude — is √d<sub>k</sub> under footnote 4’s assumptions, so dividing by √d<sub>k</sub> standardizes the scores back to variance 1 (a z-score); dividing by d<sub>k</sub> would shrink variance to 1/d<sub>k</sub> and flatten the softmax toward uniform. The paper’s stated concern is the unscaled direction: large-magnitude scores push the softmax where gradients are “extremely small” (§3.2.1, p.4). The reader wants to verify the mean/variance computation themselves — a natural first derivation if the paper goes to pass 3.</p>
+    </article>
+
+    <article class="entry" data-tags="insight, attention, regression-bridge" id="note-N0001">
+      <p class="entry-meta"><span>N0001</span><span>2026-08-10</span>
+        <span>§3.2 · p.3</span><span class="tag">insight</span></p>
+      <h3>Attention weights are computed, not fitted — kernel smoothing, not regression coefficients</h3>
+      <blockquote><p>“The output is computed as a weighted sum of the values, where the weight assigned to each value is computed by a compatibility function of the query with the corresponding key.”</p></blockquote>
+      <p>The reader asked whether attention weights are like regression coefficients. Resolution: a coefficient is a parameter — estimated once, fixed for all new observations; an attention weight is data-dependent — recomputed for every query from query–key compatibility (§3.2, p.3–4) and softmax-normalized to sum to 1. Closest classical relative: Nadaraya–Watson kernel-smoothing weights. What is learned are the projections defining the similarity (W<sub>i</sub><sup>Q</sup>, W<sub>i</sub><sup>K</sup>, W<sub>i</sub><sup>V</sup>, §3.2.2, p.5), not the weights. The reader’s own formulation, verbatim: “Weighted averaging where the weights are computed on the fly.”</p>
+    </article>
+
+  </div>
+
+  <footer class="colophon">Generated by three-pass · Pass 3 artifact · 2026-08-10. Written by an AI reading companion. Unmarked content restates the paper; anything marked “Beyond the paper” is added interpretation. Verify against the original PDF before citing. · <a href="notes.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

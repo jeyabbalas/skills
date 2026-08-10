@@ -1,0 +1,12 @@
+.idea/
+.DS_Store
+
+# examples/: paper PDFs are under arXiv's non-exclusive license (no third-party
+# redistribution) and reproduction fixtures regenerate byte-identically —
+# each example's README says how to restore both.
+examples/**/paper.pdf
+examples/**/reproduction/code/data/
+node_modules/
+__pycache__/
+*.pyc
+.venv/

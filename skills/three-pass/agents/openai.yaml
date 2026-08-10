@@ -1,0 +1,5 @@
+interface:
+  display_name: "Three-Pass"
+  short_description: "Read an academic paper deeply in three guided passes"
+policy:
+  allow_implicit_invocation: false

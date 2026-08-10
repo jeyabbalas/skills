@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Attention Is All You Need — glossary</title>
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../assets/paper-reader.css">
+<script defer src="../../assets/paper-reader.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../index.html">Library</a> › <a href="index.html">vaswani2017-attention</a> › <span>Glossary</span></nav>
+    <span class="chip">Pass 2</span>
+  </header>
+
+  <h1>Attention Is All You Need — glossary</h1>
+  <p class="subtitle">Terms that were load-bearing while reading, defined for a regression modeler; each links to an authoritative outside source.</p>
+
+  <input class="filter chrome" type="search" placeholder="Filter…" data-filter="#entries" aria-label="Filter entries">
+  <p class="filter-count" aria-live="polite"></p>
+
+  <div class="entries print-urls" id="entries">
+
+    <article class="entry" data-tags="sequence-modeling, decoding" id="term-auto-regressive">
+      <h3>Auto-regressive</h3>
+      <p>Generating a sequence one element at a time while feeding the model’s own previous outputs back in as inputs: “consuming the previously generated symbols as additional input when generating the next” (§3, p.2). Same idea as an AR time-series model — past values of the outcome enter as covariates for the next value — except here the “past values” are the words the decoder has already emitted.</p>
+      <p class="entry-meta"><span>first needed: §3</span>
+        <a href="https://otexts.com/fpp3/AR.html">External: Hyndman &amp; Athanasopoulos, Forecasting: Principles and Practice — autoregressive models</a></p>
+    </article>
+
+    <article class="entry" data-tags="attention, architecture" id="term-multi-head-attention">
+      <h3>Multi-head attention</h3>
+      <p>Running several attention functions (“heads”) in parallel — here \(h = 8\) — each on its own learned low-dimensional projection of the queries, keys, and values, then concatenating and re-projecting the outputs. Lets the model “jointly attend to information from different representation subspaces at different positions,” which a single averaged head inhibits (§3.2.2, p.5). Like fitting several small smoothers on different learned covariate projections and combining them, rather than one smoother on everything.</p>
+      <p class="entry-meta"><span>first needed: §3.2.2</span>
+        <a href="https://d2l.ai/chapter_attention-mechanisms-and-transformers/multihead-attention.html">External: Dive into Deep Learning — multi-head attention</a></p>
+    </article>
+
+    <article class="entry" data-tags="attention" id="term-query-key-value">
+      <h3>Query, key, value (Q, K, V)</h3>
+      <p>The three vector roles in an attention function: the query is the position asking for information; each candidate position offers a key (used to score how relevant it is to the query) and a value (the content that gets averaged). The output is a weighted sum of values, weights from query–key compatibility (§3.2, p.3–4). Think of predicting for a new observation by averaging outcomes (values) of past observations, weighted by how similar their profiles (keys) are to the new one’s profile (query).</p>
+      <p class="entry-meta"><span>first needed: §3.2</span>
+        <a href="https://d2l.ai/chapter_attention-mechanisms-and-transformers/queries-keys-values.html">External: Dive into Deep Learning — queries, keys, and values</a></p>
+    </article>
+
+    <article class="entry" data-tags="attention, equations" id="term-scaled-dot-product-attention">
+      <h3>Scaled dot-product attention</h3>
+      <p>This paper’s attention function: score each query against all keys by dot product, divide by \(\sqrt{d_k}\), softmax the scores into weights, and take the weighted sum of values — \(\mathrm{Attention}(Q, K, V) = \mathrm{softmax}(QK^{\top}/\sqrt{d_k})V\) (§3.2.1, p.4, eq. 1). The \(\sqrt{d_k}\) divisor standardizes the scores so large key dimensions do not saturate the softmax.</p>
+      <p class="entry-meta"><span>first needed: §3.2.1</span>
+        <a href="https://arxiv.org/abs/1706.03762">External: Vaswani et al. 2017, arXiv:1706.03762 — the term’s original paper</a></p>
+    </article>
+
+    <article class="entry" data-tags="attention" id="term-self-attention">
+      <h3>Self-attention</h3>
+      <p>“an attention mechanism relating different positions of a single sequence in order to compute a representation of the sequence” (§2, p.2) — the sequence attends to itself: every position builds its representation as a weighted average over (projections of) all positions of the same sequence, rather than over a separate input sequence.</p>
+      <p class="entry-meta"><span>first needed: §3</span>
+        <a href="https://d2l.ai/chapter_attention-mechanisms-and-transformers/self-attention-and-positional-encoding.html">External: Dive into Deep Learning — self-attention</a></p>
+    </article>
+
+    <article class="entry" data-tags="functions" id="term-softmax">
+      <h3>Softmax</h3>
+      <p>The function that turns a vector of real-valued scores into positive weights summing to 1: exponentiate each score, divide by the sum of exponentials. You know it as the link function of multinomial logistic regression, turning linear predictors into class probabilities; here it turns scaled query–key scores into the weights on the values (§3.2.1, p.4).</p>
+      <p class="entry-meta"><span>first needed: §3.2.1</span>
+        <a href="https://www.deeplearningbook.org/contents/mlp.html">External: Goodfellow, Bengio &amp; Courville, Deep Learning, §6.2.2 — softmax units</a></p>
+    </article>
+
+  </div>
+
+  <footer class="colophon">Generated by three-pass · Pass 2 artifact · 2026-08-10. Written by an AI reading companion. Unmarked content restates the paper; anything marked “Beyond the paper” is added interpretation. Verify against the original PDF before citing. · <a href="GLOSSARY.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

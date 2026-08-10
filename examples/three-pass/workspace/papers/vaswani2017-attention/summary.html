@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Attention Is All You Need — detailed summary</title>
+<!-- failsafe: keeps a stray single-file copy readable; the real stylesheet below overrides it -->
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../assets/paper-reader.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.18.4/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/paper-reader.js"></script>
+</head>
+<body data-math>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../index.html">Library</a> › <a href="index.html">vaswani2017-attention</a> › <span>Detailed summary</span></nav>
+    <span class="chip">Pass 2</span>
+  </header>
+
+  <h1>Attention Is All You Need — detailed summary</h1>
+  <p class="subtitle">Section-by-section close reading; this page grows as we read together. Sections marked “not yet read together” are unvisited. Unmarked bullets restate the paper, anchored (§/p.); amber asides are beyond the paper.</p>
+
+  <div class="sec-tools chrome"><button class="btn" data-details="open">Expand all</button>
+  <button class="btn" data-details="close">Collapse all</button></div>
+
+  <details class="sec" open id="sec-1">
+    <summary>1 · Introduction</summary>
+    <ul>
+      <li>Recurrent neural networks — LSTM [13] and gated recurrent [7] networks in particular — are “firmly established as state of the art approaches in sequence modeling and transduction problems” such as language modeling and machine translation [35, 2, 5] (§1, p.2).</li>
+      <li>Recurrent models factor computation along the symbol positions of the sequences: they generate hidden states \(h_t\) as a function of the previous hidden state \(h_{t-1}\) and the input for position \(t\). “This inherently sequential nature precludes parallelization within training examples,” which becomes critical at longer sequence lengths, since memory constraints limit batching across examples (§1, p.2).</li>
+      <li>Factorization tricks [21] and conditional computation [32] have improved computational efficiency, but “The fundamental constraint of sequential computation, however, remains.” (§1, p.2)</li>
+      <li>Attention mechanisms are already integral to strong sequence models because they allow “modeling of dependencies without regard to their distance in the input or output sequences” [2, 19] — yet in all but a few cases [27] they are used <em>in conjunction with</em> a recurrent network (§1, p.2).</li>
+      <li>The contribution: “the Transformer, a model architecture eschewing recurrence and instead relying entirely on an attention mechanism to draw global dependencies between input and output.” It “allows for significantly more parallelization” and reaches a new state of the art in translation quality “after being trained for as little as twelve hours on eight P100 GPUs” (§1, p.2).</li>
+    </ul>
+    <aside class="beyond" data-kind="personal">
+      <p class="beyond-kicker">◆ Beyond the paper · Personal</p>
+      <p>In your terms: a recurrent model is an iterative fit — position \(t\)’s state needs position \(t-1\)’s state, so the computation cannot be vectorized across the sequence, the way a GEE fit with a serial working correlation must sweep observation by observation. The Transformer’s bet is that you can delete that chain and let every position consult every other position directly, so the whole sequence is processed at once, like one matrix operation on a full design matrix.</p>
+    </aside>
+  </details>
+
+  <details class="sec" open id="sec-2">
+    <summary>2 · Background</summary>
+    <p><em>(not yet read together)</em></p>
+  </details>
+
+  <details class="sec" open id="sec-3">
+    <summary>3 · Model Architecture</summary>
+    <ul>
+      <li>Most competitive neural sequence transduction models share an <strong>encoder-decoder</strong> structure [5, 2, 35]: the encoder maps an input sequence of symbol representations \((x_1, ..., x_n)\) to continuous representations \(z = (z_1, ..., z_n)\); given \(z\), the decoder generates the output sequence \((y_1, ..., y_m)\) one element at a time (§3, p.2).</li>
+      <li>“At each step the model is auto-regressive [10], consuming the previously generated symbols as additional input when generating the next.” (§3, p.2)</li>
+      <li>The Transformer keeps this overall shape, “using stacked self-attention and point-wise, fully connected layers for both the encoder and decoder” — the left (encoder) and right (decoder) halves of <a href="figures/fig-01.html">Figure 1</a> (§3, p.3).</li>
+    </ul>
+
+    <h3 id="sec-3-1">3.1 Encoder and Decoder Stacks</h3>
+    <p><em>(not yet read together)</em></p>
+
+    <h3 id="sec-3-2">3.2 Attention</h3>
+    <ul>
+      <li>“An attention function can be described as mapping a query and a set of key-value pairs to an output, where the query, keys, values, and output are all vectors.” (§3.2, p.3)</li>
+      <li>“The output is computed as a weighted sum of the values, where the weight assigned to each value is computed by a compatibility function of the query with the corresponding key.” (§3.2, p.3–4)</li>
+      <li>Both attention variants used here are drawn in <a href="figures/fig-02.html">Figure 2</a>.</li>
+    </ul>
+    <aside class="beyond" data-kind="personal">
+      <p class="beyond-kicker">◆ Beyond the paper · Personal</p>
+      <p>The weights in that weighted sum are not regression coefficients. A fitted coefficient is a parameter: estimated once, then fixed for every new observation. An attention weight is computed fresh for every query from query–key similarity, and the weights across values sum to 1 (the softmax). The nearest older relative in your toolkit is kernel smoothing — Nadaraya–Watson — where each prediction is a weighted average of observed values and the weights come from similarity, not from fitting. Attention is that, with the similarity function itself learned. (Margin note <a href="notes.html#note-N0001">N0001</a>.)</p>
+    </aside>
+
+    <h4 id="sec-3-2-1">3.2.1 Scaled Dot-Product Attention</h4>
+    <ul>
+      <li>The paper’s variant is named “Scaled Dot-Product Attention” (Figure 2, left). Queries and keys have dimension \(d_k\), values dimension \(d_v\). “We compute the dot products of the query with all keys, divide each by \(\sqrt{d_k}\), and apply a softmax function to obtain the weights on the values.” (§3.2.1, p.4)</li>
+      <li>In practice queries are processed as a batch, packed into a matrix \(Q\), with keys and values packed into \(K\) and \(V\):
+        \[ \mathrm{Attention}(Q, K, V) = \mathrm{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V \qquad \text{(1)} \]
+        (§3.2.1, p.4, eq. (1) — term-by-term on the <a href="equations/eq-01-scaled-dot-product.html">equation page</a>.)</li>
+      <li>The two common attention families: <strong>additive attention</strong> [2], which scores query–key compatibility with a one-hidden-layer feed-forward network, and <strong>dot-product (multiplicative) attention</strong>, identical to this algorithm except for the \(1/\sqrt{d_k}\) scaling. They are “similar in theoretical complexity,” but dot-product attention “is much faster and more space-efficient in practice” because it can use highly optimized matrix-multiplication code (§3.2.1, p.4).</li>
+      <li>Why scale at all: for small \(d_k\) the two families perform similarly, but “additive attention outperforms dot product attention without scaling for larger values of \(d_k\)” [3]. “We suspect that for large values of \(d_k\), the dot products grow large in magnitude, pushing the softmax function into regions where it has extremely small gradients.” The \(1/\sqrt{d_k}\) scaling counteracts this (§3.2.1, p.4).</li>
+      <li>Footnote 4 (p.4) carries the variance argument: assume the components of \(q\) and \(k\) are independent random variables with mean 0 and variance 1; then \(q \cdot k = \sum_{i=1}^{d_k} q_i k_i\) has mean 0 and variance \(d_k\) — so the typical size of an unscaled dot product grows like \(\sqrt{d_k}\), and dividing by \(\sqrt{d_k}\) brings the variance back to 1. (Verified by hand in <a href="derivations/deriv-01-sqrt-dk-scaling.html">deriv-01</a>; pin <a href="notes.html#note-N0002">N0002</a> closed, gap <a href="notes.html#note-N0005">N0005</a> open.)</li>
+    </ul>
+
+    <h4 id="sec-3-2-2">3.2.2 Multi-Head Attention</h4>
+    <ul>
+      <li>Rather than one attention function over \(d_{model}\)-dimensional queries, keys, and values, the paper projects them \(h\) times “with different, learned linear projections” to \(d_k\), \(d_k\), and \(d_v\) dimensions, runs the attention function on each projected version in parallel, concatenates the \(d_v\)-dimensional outputs, and projects once more (§3.2.2, p.4–5; Figure 2, right).</li>
+      <li>“Multi-head attention allows the model to jointly attend to information from different representation subspaces at different positions. With a single attention head, averaging inhibits this.” (§3.2.2, p.5)</li>
+      <li>Formally: \(\mathrm{MultiHead}(Q, K, V) = \mathrm{Concat}(\mathrm{head}_1, ..., \mathrm{head}_h)W^O\) with \(\mathrm{head}_i = \mathrm{Attention}(QW_i^Q, KW_i^K, VW_i^V)\), where \(W_i^Q \in \mathbb{R}^{d_{model} \times d_k}\), \(W_i^K \in \mathbb{R}^{d_{model} \times d_k}\), \(W_i^V \in \mathbb{R}^{d_{model} \times d_v}\), and \(W^O \in \mathbb{R}^{h d_v \times d_{model}}\) (§3.2.2, p.5).</li>
+      <li>Settings: \(h = 8\) parallel heads, \(d_k = d_v = d_{model}/h = 64\). “Due to the reduced dimension of each head, the total computational cost is similar to that of single-head attention with full dimensionality.” (§3.2.2, p.5)</li>
+    </ul>
+
+    <h4 id="sec-3-2-3">3.2.3 Applications of Attention in our Model</h4>
+    <p>The Transformer uses multi-head attention in three ways (§3.2.3, p.5):</p>
+    <ul>
+      <li><strong>Encoder-decoder attention</strong>: the queries come from the previous decoder layer, and “the memory keys and values come from the output of the encoder,” so every decoder position can attend over all input positions — mimicking the typical encoder-decoder attention of sequence-to-sequence models [38, 2, 9].</li>
+      <li><strong>Encoder self-attention</strong>: all of the keys, values, and queries come from the same place — the output of the previous encoder layer; each position attends to all positions of the previous layer.</li>
+      <li><strong>Decoder self-attention</strong>: each decoder position attends to all decoder positions up to and including itself. “We need to prevent leftward information flow in the decoder to preserve the auto-regressive property.” Implemented inside scaled dot-product attention “by masking out (setting to \(-\infty\)) all values in the input of the softmax which correspond to illegal connections.”</li>
+    </ul>
+
+    <h3 id="sec-3-3">3.3 Position-wise Feed-Forward Networks</h3>
+    <p><em>(not yet read together)</em></p>
+
+    <h3 id="sec-3-4">3.4 Embeddings and Softmax</h3>
+    <p><em>(not yet read together)</em></p>
+
+    <h3 id="sec-3-5">3.5 Positional Encoding</h3>
+    <p><em>(not yet read together)</em></p>
+
+    <p class="entry-meta"><a href="notes.html#note-N0001">N0001 — attention weights are computed, not fitted</a> · <a href="notes.html#note-N0002">N0002 — verify the variance-\(d_k\) argument</a> · <a href="notes.html#note-N0003">N0003 — not sold on the sinusoidal justification (§3.5)</a> · <a href="notes.html#note-N0004">N0004 — is QK<sup>T</sup> a kernel matrix as in GP regression? (§3.2.1)</a> · <a href="notes.html#note-N0005">N0005 — derive the large-logits ⇒ small-softmax-gradients link (§3.2.1)</a></p>
+  </details>
+
+  <details class="sec" open id="sec-4">
+    <summary>4 · Why Self-Attention</summary>
+    <p><em>(not yet read together)</em></p>
+  </details>
+
+  <details class="sec" open id="sec-5">
+    <summary>5 · Training</summary>
+    <p><em>(not yet read together)</em></p>
+  </details>
+
+  <details class="sec" open id="sec-6">
+    <summary>6 · Results</summary>
+    <p><em>(not yet read together)</em></p>
+  </details>
+
+  <details class="sec" open id="sec-7">
+    <summary>7 · Conclusion</summary>
+    <p><em>(not yet read together)</em></p>
+  </details>
+
+  <details class="sec" open id="sec-appendix">
+    <summary>Attention Visualizations (appendix)</summary>
+    <p><em>(not yet read together)</em></p>
+  </details>
+
+  <footer class="colophon">Generated by three-pass · Pass 2 artifact · 2026-08-10. Written by an AI reading companion. Unmarked content restates the paper; anything marked “Beyond the paper” is added interpretation. Verify against the original PDF before citing. · <a href="summary.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>
