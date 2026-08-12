@@ -9,9 +9,9 @@
     {
       "name": "jeyabbalas-skills",
       "source": "./",
-      "description": "Guided three-pass deep reading of academic papers, producing an interactive, printable reading library.",
+      "description": "Guided three-pass deep reading of academic papers, producing an interactive, printable reading library — plus a handoff skill that makes a conversation portable to another agent.",
       "category": "learning",
-      "keywords": ["papers", "reading", "research"]
+      "keywords": ["papers", "reading", "research", "handoff"]
     }
   ]
 }
