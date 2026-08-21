@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lark/common/defs.json",
+  "title": "LARK — shared definitions",
+  "description": "Only invariant tokens are centralised here; context-specific sentinels are inlined per field because their meanings differ by variable.",
+  "$defs": {
+    "not_applicable": {
+      "const": -666,
+      "title": "Not applicable / structural skip",
+      "description": "The diary routing determined that the variable was outside the respondent universe."
+    },
+    "dont_know": {
+      "const": -888,
+      "title": "Don't know",
+      "description": "The respondent did not know the value or it could not be determined."
+    },
+    "participant_id": {
+      "type": "string",
+      "pattern": "^P[0-9]{4}$",
+      "title": "Participant identifier"
+    },
+    "date_iso": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+      "title": "Calendar date",
+      "description": "Calendar date in YYYY-MM-DD form. Calendar-day validity beyond the regular expression is an application-level check."
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "$comment": "Ground truth for toy_invalid.json. Row indexes are 0-based array positions. One seeded violation per row; tools/validate.py fixtures asserts each row FAILS with an error pointer on the named column.",
+  "rowIndexBase": 0,
+  "violations": [
+    {
+      "row": 0,
+      "column": "sleep_minutes",
+      "kind": "range-break",
+      "value": 1500,
+      "reason": "above plausibility max 960"
+    },
+    {
+      "row": 1,
+      "column": "chronotype",
+      "kind": "unknown-level",
+      "value": 9,
+      "reason": "9 is not a declared code"
+    },
+    {
+      "row": 2,
+      "column": "nap_minutes",
+      "kind": "skip-break",
+      "value": 45,
+      "reason": "nap_yesterday=0 but a real duration is present (must be -666)"
+    },
+    {
+      "row": 3,
+      "column": "nap_minutes",
+      "kind": "applicability-break",
+      "value": -666,
+      "reason": "nap_yesterday=1 but the structural-NA code is recorded"
+    },
+    {
+      "row": 4,
+      "column": "sleep_minutes",
+      "kind": "invented-sentinel",
+      "value": -999,
+      "reason": "-999 is not a code this source defines"
+    },
+    {
+      "row": 5,
+      "column": "participant_id",
+      "kind": "pattern-break",
+      "value": "P12",
+      "reason": "must match ^P[0-9]{4}$"
+    },
+    {
+      "row": 6,
+      "column": "site_id",
+      "kind": "wrong-type",
+      "value": 1,
+      "reason": "site codes are strings with leading zeros"
+    },
+    {
+      "row": 7,
+      "column": "age",
+      "kind": "missing-key",
+      "reason": "column omitted — missingness must be in-band"
+    },
+    {
+      "row": 8,
+      "column": "shoe_size",
+      "kind": "undeclared-column",
+      "reason": "not in the dictionary; rejected by unevaluatedProperties"
+    }
+  ]
+}

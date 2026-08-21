@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lark/sleep_diary/sleep_diary.schema.json",
+  "title": "LARK — SLEEP_DIARY table",
+  "description": "Array of diary records. One element is one participant-night. Structurally skipped values remain as reserved sentinel codes so the dataset stays rectangular; the routing rules are enforced below.",
+  "$comment": "Standard JSON Schema cannot enforce uniqueness of participant_id + diary_date across rows (D011). See the README's 'Documented but not enforced' section.",
+  "type": "array",
+  "minItems": 1,
+  "uniqueItems": true,
+  "items": {
+    "type": "object",
+    "title": "SLEEP_DIARY record",
+    "allOf": [
+      {
+        "$ref": "categories/participant.json"
+      },
+      {
+        "$ref": "categories/sleep.json"
+      },
+      {
+        "$comment": "Skip pattern: no nap yesterday means nap duration is structurally not applicable.",
+        "if": {
+          "required": [
+            "nap_yesterday"
+          ],
+          "properties": {
+            "nap_yesterday": {
+              "const": 0
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "nap_minutes": {
+              "const": -666
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Applicability: a reported nap must have a duration or an item-missing code — never the structural-NA code.",
+        "if": {
+          "required": [
+            "nap_yesterday"
+          ],
+          "properties": {
+            "nap_yesterday": {
+              "const": 1
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "nap_minutes": {
+              "not": {
+                "const": -666
+              }
+            }
+          }
+        }
+      }
+    ],
+    "unevaluatedProperties": false
+  }
+}

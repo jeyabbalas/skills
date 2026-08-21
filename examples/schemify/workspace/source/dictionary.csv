@@ -1,0 +1,12 @@
+#,Variable,Label,Type,Coding / Values,Notes
+1,participant_id,Participant identifier,text,P#### (P followed by 4 digits),Assigned at enrollment
+2,age,Age at enrollment,integer,18-90 years; -888=Don't know,Self-reported
+3,chronotype,Self-described chronotype,integer,1=Morning lark; 2=Night owl; 3=Neither; -888=Don't know,
+4,diary_date,Diary date,date,YYYY-MM-DD,One row per participant per night
+5,bedtime,Bedtime,time,hh:mm 24-hour clock,
+6,sleep_minutes,Total sleep last night,integer,minutes; -666=N/A (no diary entry); -888=Don't know,From morning diary
+7,awakenings,Number of night awakenings,integer,count 0-20; -888=Don't know,
+8,nap_yesterday,Napped yesterday,integer,0=No; 1=Yes; -888=Don't know,
+9,nap_minutes,Nap duration yesterday,integer,minutes; -666=N/A (no nap); -888=Don't know,Asked only if nap_yesterday=1
+10,caffeine_after_noon,Caffeine after noon,integer,0=No; 1=Yes; -888=Don't know,
+11,melatonin_use,Melatonin use,integer,see supplement coding sheet,Coding sheet missing from this version of the dictionary

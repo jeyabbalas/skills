@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lark/sleep_diary/categories/participant.json",
+  "title": "SLEEP_DIARY — Participant",
+  "description": "Who the diary row belongs to: identifier, site, and baseline traits.",
+  "type": "object",
+  "x-variable-group": "participant",
+  "properties": {
+    "participant_id": {
+      "$ref": "../../common/defs.json#/$defs/participant_id",
+      "title": "Participant identifier",
+      "$comment": "Source coding: P#### (P followed by 4 digits).",
+      "x-role": "entity key"
+    },
+    "site_id": {
+      "title": "Recruitment site",
+      "$comment": "Not in the source dictionary; added on the steward's instruction (D004). String-coded to preserve the leading zero.",
+      "oneOf": [
+        {
+          "const": "01",
+          "title": "Northside clinic"
+        },
+        {
+          "const": "02",
+          "title": "Riverside clinic"
+        },
+        {
+          "const": "03",
+          "title": "University campus"
+        },
+        {
+          "const": "04",
+          "title": "East community center"
+        },
+        {
+          "const": "05",
+          "title": "West community center"
+        }
+      ],
+      "x-role": "sample key"
+    },
+    "age": {
+      "title": "Age at enrollment (years)",
+      "$comment": "Source coding: 18-90 years; -888 - Don't know.",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 18,
+          "maximum": 90
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ],
+      "x-unit": "years"
+    },
+    "chronotype": {
+      "title": "Self-described chronotype",
+      "$comment": "Source coding: 1 - Morning lark; 2 - Night owl; 3 - Neither; -888 - Don't know.",
+      "oneOf": [
+        {
+          "const": 1,
+          "title": "Morning lark"
+        },
+        {
+          "const": 2,
+          "title": "Night owl"
+        },
+        {
+          "const": 3,
+          "title": "Neither"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    }
+  },
+  "required": [
+    "participant_id",
+    "site_id",
+    "age",
+    "chronotype"
+  ]
+}

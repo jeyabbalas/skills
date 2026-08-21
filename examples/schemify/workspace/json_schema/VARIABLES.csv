@@ -1,0 +1,13 @@
+variable,table,category,status,source,notes
+participant_id,,participant,converted,source/dictionary.csv row 1,pattern ^P[0-9]{4}$
+age,,participant,converted,source/dictionary.csv row 2,
+chronotype,,participant,converted,source/dictionary.csv row 3,
+site_id,,participant,added,steward interview 2026-08-21,link key; not in source dictionary (D004)
+diary_date,,sleep,converted,source/dictionary.csv row 4,
+bedtime,,sleep,converted,source/dictionary.csv row 5,anchored HH:MM pattern (D009)
+sleep_minutes,,sleep,converted,source/dictionary.csv row 6,bounds 0-960 agent-chosen (D005)
+awakenings,,sleep,converted,source/dictionary.csv row 7,
+nap_yesterday,,sleep,converted,source/dictionary.csv row 8,
+nap_minutes,,sleep,converted,source/dictionary.csv row 9,skip/applicability pair (D010)
+caffeine_after_noon,,sleep,converted,source/dictionary.csv row 10,
+melatonin_use,,sleep,deferred,source/dictionary.csv row 11,supplement coding sheet missing (D013)

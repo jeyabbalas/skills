@@ -8,6 +8,7 @@ Agent skills I use for my own work, shared so you (or your agent) can install th
 |---|---|---|
 | [`three-pass`](./skills/three-pass/SKILL.md) | Read an academic paper together in three passes of increasing depth — a bird's-eye profile, an interactive close reading, and a line-by-line derivation or reproduction — building a reading workspace that remembers you and your papers across sessions. | User-invoked |
 | [`handoff`](./skills/handoff/SKILL.md) | Compact the current conversation into a portable handoff document, so a fresh agent — in another harness, another directory, or another person's hands — can pick the work up without you re-explaining it. | User-invoked |
+| [`schemify`](./skills/schemify/SKILL.md) | Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: interviews for what the files don't say, toy-data unit tests for every rule (skip patterns and sentinel codes included), browsable web pages for feedback, and progress that persists across sessions. | User-invoked |
 
 ## Install
 
@@ -25,7 +26,7 @@ Update later with `/plugin marketplace update jeyabbalas`.
 ### Any agent (Claude Code, Codex, Cursor, …) — via skills.sh
 
 ```bash
-npx skills@latest add jeyabbalas/skills --skill three-pass handoff
+npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify
 ```
 
 Names are space-separated after one `--skill`; drop the ones you don't want. This copies the skills into your project as files you own. Pull updates with `npx skills@latest update`.
@@ -34,7 +35,7 @@ Names are space-separated after one `--skill`; drop the ones you don't want. Thi
 
 Paste this to any coding agent and it will install the skills itself:
 
-> Install the agent skills `three-pass` and `handoff` from the GitHub repo `jeyabbalas/skills`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill three-pass handoff` and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy the folders `skills/three-pass/` (including its `scripts/`, `templates/`, and `assets/`) and `skills/handoff/` into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying both skills are listed as available and telling me the exact phrase to invoke each one.
+> Install the agent skills `three-pass`, `handoff`, and `schemify` from the GitHub repo `jeyabbalas/skills`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify` and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy the folders `skills/three-pass/` (including its `scripts/`, `templates/`, and `assets/`), `skills/handoff/`, and `skills/schemify/` (including its `scripts/`, `templates/`, and `assets/`) into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying all three skills are listed as available and telling me the exact phrase to invoke each one.
 
 ## Using `three-pass`
 
@@ -62,6 +63,21 @@ Invoke it at the moment the work has to travel, optionally naming what the next 
 It writes one markdown file to your OS's temporary directory: the live thread — what's in flight, why, what's next — plus a *suggested skills* section for the next agent. Secrets are redacted, and anything already written down (specs, plans, ADRs, issues, commits, diffs) is referenced by path or URL rather than copied.
 
 Reach for it only when something is moving: a different harness, a different directory, a colleague, or a side task you want a second agent to fork off while your own session stays open. If nothing is moving, `/compact` is the cheaper move. Ask for the path back and copy the file somewhere durable — temp directories get cleared between sessions and on reboot.
+
+## Using `schemify`
+
+Invoke it in the repository where the JSON Schema package should live, pointing at your data dictionary — however bespoke its format:
+
+```
+/schemify path/to/data_dictionary.xlsx
+/schemify metadata/                      (a directory of dictionary files)
+/schemify                                (resume — it proposes the next step from its notes)
+/schemify review the sentinel decisions
+```
+
+The first run inventories the dictionary, interviews you about the study — what is one row? which codes mean missing or not-applicable? — proposes topic categories for you to approve, then converts category by category, validating each against toy PASS/FAIL data (survey skip patterns and sentinel codes included) and re-rendering two web pages for your review: `dictionary.html`, a searchable, printable data dictionary that opens by double-click, and `playground.html`, a live validator you can drop your own JSON or CSV into, entirely in your browser. Large dictionaries deliberately run over several sittings: progress, every judgment call, and every source live as markdown beside the schemas, so any later `/schemify` picks up exactly where the last session stopped, and the closing review walks each decision with you before the working files are cleaned away. The finished package stands alone — schemas, toy data, a bundled validator, and the pages — usable by collaborators and CI without this skill installed.
+
+A complete example package — a small synthetic sleep-diary study, source dictionary included — lives in [`examples/schemify/`](./examples/schemify/), with a README of copy-able prompts.
 
 ## Credits
 

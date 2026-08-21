@@ -1,0 +1,26 @@
+{
+  "package": "json_schema",
+  "study": "LARK — a two-week community sleep-diary study (synthetic)",
+  "generated": "2026-08-21",
+  "tables": [
+    {
+      "table": "sleep_diary",
+      "mother": "sleep_diary/sleep_diary.schema.json",
+      "grain": "one participant-night",
+      "variables": 11,
+      "categories": [
+        "participant",
+        "sleep"
+      ]
+    }
+  ],
+  "sentinels": {
+    "-666": "Not applicable / structural skip",
+    "-888": "Don't know"
+  },
+  "entrypoints": {
+    "validate": "python3 tools/validate.py summary .",
+    "browse": "dictionary.html (double-click)",
+    "playground": "python3 -m http.server 8000, then playground.html"
+  }
+}

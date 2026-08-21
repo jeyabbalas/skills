@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{TITLE}} — validation playground</title>
+<!-- failsafe: keeps the shell readable if stylesheets fail to load -->
+<style>
+  body{margin:0;font:1rem/1.5 system-ui,sans-serif;color:#1F2328;background:#FAF9F6}
+  .banner{border:1px solid #C99A2E;background:#FBF4E1;padding:.6rem 1rem;border-radius:8px;margin:1rem 0}
+</style>
+<link rel="stylesheet" href="https://esm.sh/@jeyabbalas/data-table@0.7.0/styles">
+<link rel="stylesheet" href="assets/schema-pages.css">
+</head>
+<body class="playground" data-fingerprint="{{PAGE_FINGERPRINT}}">
+<main class="page app">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="dictionary.html">{{PACKAGE_NAME}}</a> · playground</nav>
+    <span class="chip">{{TABLE_LABEL}}</span>
+  </header>
+
+  <div class="toolbar chrome">
+    <button class="btn" type="button" data-dataset="toy_valid">Toy PASS data</button>
+    <button class="btn" type="button" data-dataset="toy_invalid">Toy FAIL data</button>
+    <label class="btn">Check your own file (.json / .csv)
+      <input type="file" id="upload" accept=".json,.csv" hidden>
+    </label>
+    <span class="dataset-name" id="dataset-name"></span>
+  </div>
+
+  <section class="panel summary" id="summary" aria-live="polite"></section>
+
+  <!-- bounded height is load-bearing: .table-shell is a flex child with min-height:0;
+       an unbounded container silently defeats the table's virtualization -->
+  <div class="table-shell"><div id="table"></div></div>
+
+  <script type="application/json" class="schema-documents">{{SCHEMA_DOCUMENTS_JSON}}</script>
+  <script type="application/json" class="datasets">{{DATASETS_JSON}}</script>
+  <script type="application/json" class="page-config">{{PAGE_CONFIG_JSON}}</script>
+
+  <script>
+  /* classic guard script — runs even where module scripts cannot */
+  (function () {
+    if (location.protocol === 'file:') {
+      document.querySelector('.app').innerHTML =
+        '<div class="banner"><strong>This page needs a local server</strong> — it loads a ' +
+        'database engine that browsers block on file://.<br>In a terminal, from this folder, run: ' +
+        '<code>python3 -m http.server 8000</code><br>then open ' +
+        '<a href="http://localhost:8000/">http://localhost:8000/</a> and click this page. ' +
+        '(<a href="dictionary.html">dictionary.html</a> works straight from disk.)</div>';
+      return;
+    }
+    setTimeout(function () {
+      if (!window.__pgBooted) {
+        var b = document.createElement('div');
+        b.className = 'banner chrome';
+        b.textContent = 'Could not load the table libraries from the CDN (offline or blocked ' +
+          'network). The dictionary page (dictionary.html) works fully offline, and ' +
+          'tools/validate.py validates without any network.';
+        document.querySelector('.app').prepend(b);
+      }
+    }, 8000);
+  })();
+  </script>
+
+  <script type="module">
+  import { createDataTable, checkBrowserSupport } from "https://esm.sh/@jeyabbalas/data-table@0.7.0";
+  import { schemaDocumentsToTable } from "https://esm.sh/json-schema-data-dictionary@0.1.0";
+  import Ajv2020 from "https://esm.sh/ajv@8.17.1/dist/2020";
+  import addFormats from "https://esm.sh/ajv-formats@3.0.1";
+  window.__pgBooted = true;
+  if (location.protocol === 'file:') throw new Error('file:// — the guard banner is already shown');
+
+  const docs     = JSON.parse(document.querySelector('.schema-documents').textContent);
+  const datasets = JSON.parse(document.querySelector('.datasets').textContent);
+  const config   = JSON.parse(document.querySelector('.page-config').textContent);
+  const summaryEl = document.getElementById('summary');
+  const app = document.querySelector('.app');
+
+  function banner(text) {
+    const b = document.createElement('div');
+    b.className = 'banner chrome';
+    b.textContent = text;
+    app.insertBefore(b, summaryEl);
+  }
+
+  /* ---------- schema registry: resolve $refs by retrieval URI and by $id ---------- */
+  const uriMap = new Map();
+  for (const d of docs) {
+    uriMap.set(d.uri, d.schema);
+    if (d.schema && typeof d.schema.$id === 'string') uriMap.set(d.schema.$id, d.schema);
+  }
+  function lookup(uri) {
+    const [base, frag] = uri.split('#');
+    let node = uriMap.get(base);
+    if (!node) return null;
+    if (frag) {
+      for (const tok of frag.split('/').filter(Boolean)) {
+        const t = tok.replace(/~1/g, '/').replace(/~0/g, '~');
+        if (node && typeof node === 'object' && t in node) node = node[t]; else return null;
+      }
+    }
+    return node;
+  }
+  function deref(node, baseUri) {
+    let depth = 0;
+    while (node && typeof node === 'object' && node.$ref && depth < 8) {
+      const target = new URL(node.$ref, baseUri).href;
+      const resolved = lookup(target);
+      if (!resolved) return node;
+      baseUri = target.split('#')[0];
+      node = resolved;
+      depth += 1;
+    }
+    return node;
+  }
+  const root = docs.find(d => d.uri === config.rootUri);
+  const rootBase = (root.schema && root.schema.$id) || config.rootUri;
+  const rowProps = {};
+  for (const entry of (root.schema.items && root.schema.items.allOf) || []) {
+    if (entry && entry.$ref && !entry.if) {
+      const target = new URL(entry.$ref, rootBase).href;
+      const cat = lookup(target);
+      if (cat && cat.properties) {
+        for (const [name, sub] of Object.entries(cat.properties)) {
+          rowProps[name] = { schema: sub, base: target.split('#')[0] };
+        }
+      }
+    }
+  }
+
+  /* ---------- validator ---------- */
+  const ajv = new Ajv2020({ allErrors: true, strict: false });
+  addFormats(ajv);
+  for (const d of docs) if (d.uri !== config.rootUri) ajv.addSchema(d.schema, d.uri);
+  const validate = ajv.compile(root.schema);
+
+  /* ---------- dictionary metadata for header tooltips ---------- */
+  const dict = schemaDocumentsToTable(docs, { rootUri: config.rootUri, splitAllOfObjectCategories: true });
+
+  /* ---------- table ---------- */
+  let table = null;
+  const support = checkBrowserSupport();
+  if (!support.supported) {
+    banner('This browser is missing: ' + support.missing.join(', ') + ' — the data grid is ' +
+      'disabled, but validation summaries below still work.');
+  } else {
+    /* The table's web worker lives cross-origin on the CDN, and the Worker
+       constructor rejects cross-origin URLs (esm.sh also doesn't serve the raw
+       dist asset at all). Self-healing fallback: learn the worker's hashed
+       filename from the first failure, then retry through a same-origin Blob
+       trampoline module that imports the real dist asset from jsDelivr —
+       imports may cross origins; constructors may not. */
+    const DT_DIST_ASSETS = 'https://cdn.jsdelivr.net/npm/@jeyabbalas/data-table@0.7.0/dist/assets/';
+    async function makeTable() {
+      const base = {
+        container: document.getElementById('table'),
+        colorScheme: 'auto',
+        persistence: false
+      };
+      try {
+        return await createDataTable(base);
+      } catch (err) {
+        const m = String(err && err.message || err).match(/worker[\w.-]*\.js/);
+        if (!m) throw err;
+        const workerUrl = DT_DIST_ASSETS + m[0];
+        return await createDataTable({ ...base, bridgeOptions: {
+          workerFactory: () => new Worker(
+            URL.createObjectURL(new Blob(['import ' + JSON.stringify(workerUrl) + ';'],
+              { type: 'text/javascript' })),
+            { type: 'module' })
+        } });
+      }
+    }
+    try {
+      table = await makeTable();
+      for (const r of dict.rows) {
+        const items = [{ label: 'Type', value: String(r['Data type'] || '—') }];
+        const extra = r['Additional information'] || {};
+        if (extra['x-unit']) items.push({ label: 'Units', value: String(extra['x-unit']) });
+        if (extra['x-universe']) items.push({ label: 'Universe', value: String(extra['x-universe']) });
+        const codes = (r['Valid values'] || [])
+          .filter(v => v && v.value !== null && v.value !== undefined)
+          .map(v => String(v.value) + (v.label ? ' = ' + v.label : ''));
+        if (codes.length) {
+          items.push({ label: 'Codes', value: codes.slice(0, 12).concat(codes.length > 12 ? ['…'] : []) });
+        }
+        table.actions.setColumnHeaderTooltip(r['Variable name'], {
+          title: r['Variable name'],
+          description: r['Description'] || undefined,
+          items
+        });
+      }
+    } catch (err) {
+      banner('The table engine failed to start (' + (err && err.message || err) + '). ' +
+        'Validation summaries below still work; tools/validate.py gives the same verdicts.');
+      table = null;
+    }
+  }
+
+  /* ---------- error mapping ---------- */
+  const KEYWORD_RANK = { const: 1, not: 1, enum: 1, pattern: 2, type: 2, minimum: 2, maximum: 2,
+    exclusiveMinimum: 2, exclusiveMaximum: 2, required: 3, unevaluatedProperties: 3 };
+  function unescapePointer(tok) { return tok.replace(/~1/g, '/').replace(/~0/g, '~'); }
+  function mapErrors(errors) {
+    const allOf = (root.schema.items && root.schema.items.allOf) || [];
+    const cells = new Map();
+    const rowLevel = [];
+    for (const e of errors || []) {
+      /* allErrors yields every failing anyOf/oneOf branch plus the combinator
+         itself, and an `if` echo for every fired conditional — keep one honest
+         finding per cell: the combinator (with a friendlier message) and the
+         conditional's own then-side errors. */
+      if (e.keyword === 'if') continue;
+      if (/\/(anyOf|oneOf)\/\d+\//.test(e.schemaPath) && !/\/then\//.test(e.schemaPath)) continue;
+      const parts = e.instancePath.split('/');
+      const row = parts.length > 1 && parts[1] !== '' ? Number(parts[1]) : null;
+      let col = parts.length > 2 ? unescapePointer(parts[2]) : null;
+      if (!col && e.params) col = e.params.missingProperty || e.params.unevaluatedProperty || null;
+      const m = e.schemaPath.match(/\/allOf\/(\d+)\/then\//);
+      const rule = m && allOf[Number(m[1])] ? allOf[Number(m[1])].$comment || null : null;
+      const rank = rule ? 0 : (KEYWORD_RANK[e.keyword] !== undefined ? KEYWORD_RANK[e.keyword] : 4);
+      const message =
+        e.keyword === 'anyOf' ? 'outside the plausible range and not a declared code' :
+        e.keyword === 'oneOf' ? 'not one of the declared codes' : e.message;
+      const entry = { row, col, rule, rank, keyword: e.keyword, message };
+      if (row === null) { rowLevel.push(entry); continue; }
+      const key = row + ' ' + (col === null ? '' : col);
+      const seen = cells.get(key);
+      if (!seen) cells.set(key, { row, col, entries: [entry] });
+      else seen.entries.push(entry);
+    }
+    /* One verdict per cell. A $ref'd branch error loses its /anyOf/ marker
+       (schemaPath resets into the target document), so branch noise can leak
+       past the prefilter — the honest verdict order is: the routing rule if
+       one fired, else the field's combinator, else the most specific keyword. */
+    const out = [];
+    for (const c of cells.values()) {
+      const ruled = c.entries.find(x => x.rule);
+      const comb = c.entries.find(x => x.keyword === 'anyOf' || x.keyword === 'oneOf');
+      c.best = ruled || comb || c.entries.slice().sort((a, b) => a.rank - b.rank)[0];
+      out.push(c);
+    }
+    return { cells: out, rowLevel };
+  }
+
+  /* ---------- summary panel ---------- */
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function renderSummary(label, rowsCount, cells, rowLevel, note) {
+    summaryEl.replaceChildren();
+    const bad = cells.length + rowLevel.length;
+    const head = el('div', 'summary-stats');
+    head.append(
+      el('span', 'chip ' + (bad ? 'fail' : 'ok'), bad ? 'FAIL' : 'PASS'),
+      el('span', null, label + ' — ' + rowsCount + ' row' + (rowsCount === 1 ? '' : 's') +
+        (bad ? ' · ' + bad + ' finding' + (bad === 1 ? '' : 's') : ' · every rule holds'))
+    );
+    summaryEl.append(head);
+    if (note) summaryEl.append(el('div', 'banner', note));
+    if (!bad) return;
+    const byCol = new Map();
+    const byRule = new Map();
+    for (const c of cells) {
+      const colKey = c.col === null ? '(row)' : c.col;
+      const agg = byCol.get(colKey) || { count: 0, first: c.best };
+      agg.count += 1;
+      byCol.set(colKey, agg);
+      if (c.best.rule) byRule.set(c.best.rule, (byRule.get(c.best.rule) || 0) + 1);
+    }
+    const issues = el('div', 'issue-list');
+    [...byCol.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 10).forEach(([colKey, agg]) => {
+      const line = el('div', 'issue');
+      line.append(
+        el('span', 'issue-col', colKey),
+        el('span', 'issue-count', '×' + agg.count),
+        el('span', 'issue-msg', (agg.first.rule ? agg.first.rule + ' — ' : '') + agg.first.message)
+      );
+      issues.append(line);
+    });
+    summaryEl.append(issues);
+    for (const [rule, count] of byRule) summaryEl.append(el('div', 'rule', rule + '  ×' + count));
+    for (const r of rowLevel.slice(0, 3)) summaryEl.append(el('div', 'rule', r.message));
+  }
+  function summaryEmpty(label, extra) {
+    summaryEl.replaceChildren();
+    summaryEl.append(el('div', 'summary-stats', label + ' — no rows to validate.' +
+      (extra ? ' ' + extra : '')));
+  }
+
+  /* ---------- load + validate ---------- */
+  async function loadAndValidate(rows, label, note) {
+    document.getElementById('dataset-name').textContent = label;
+    for (const b of document.querySelectorAll('.toolbar [data-dataset]')) {
+      b.setAttribute('aria-pressed', String(b.dataset.label === label));
+    }
+    if (!Array.isArray(rows) || rows.length === 0) {
+      summaryEmpty(label, 'Author toy fixtures per the package README, or upload a file.');
+      return;
+    }
+    if (table) {
+      await table.loadData(JSON.stringify(rows), { sourceFormat: 'json' });
+      table.annotations.clear();
+    }
+    const ok = validate(rows);
+    const { cells, rowLevel } = mapErrors(ok ? [] : validate.errors);
+    if (table && cells.length) {
+      table.annotations.addMany(cells.filter(c => c.col !== null).map(c => ({
+        scope: 'cell',
+        rowId: c.row,
+        column: c.col,
+        severity: 'error',
+        message: (c.best.rule ? c.best.rule + ' — ' : '') + c.best.message,
+        code: 'JSON_SCHEMA_' + c.best.keyword.toUpperCase()
+      })).concat(cells.filter(c => c.col === null).map(c => ({
+        scope: 'row',
+        rowId: c.row,
+        severity: 'error',
+        message: c.best.message
+      }))));
+    }
+    renderSummary(label, rows.length, cells, rowLevel, note);
+  }
+
+  /* ---------- CSV: schema-typed parsing so leading zeros survive ---------- */
+  function numericOnly(prop) {
+    const kinds = new Set();
+    (function scan(node, base, depth) {
+      if (!node || typeof node !== 'object' || depth > 6) return;
+      node = deref(node, base);
+      if (!node || typeof node !== 'object') return;
+      const ts = Array.isArray(node.type) ? node.type : (node.type ? [node.type] : []);
+      for (const t of ts) kinds.add(t === 'integer' || t === 'number' ? 'num' : t);
+      if ('const' in node) kinds.add(typeof node.const === 'number' ? 'num' : 'other');
+      for (const v of node.enum || []) kinds.add(typeof v === 'number' ? 'num' : 'other');
+      for (const key of ['oneOf', 'anyOf', 'allOf']) {
+        for (const br of node[key] || []) scan(br, base, depth + 1);
+      }
+    })(prop.schema, prop.base, 0);
+    return kinds.size === 1 && kinds.has('num');
+  }
+  function parseCsv(text) {
+    const rows = []; let row = [], field = '', inQ = false;
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQ) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false;
+        } else field += c;
+      } else if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c !== '\r') field += c;
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.length > 1 || (r[0] || '').trim() !== '');
+  }
+  function csvToRows(text) {
+    const grid = parseCsv(text);
+    if (!grid.length) return [];
+    const headers = grid[0];
+    const coerce = headers.map(h => rowProps[h] ? numericOnly(rowProps[h]) : false);
+    return grid.slice(1).map(cells => {
+      const obj = {};
+      headers.forEach((h, i) => {
+        if (i >= cells.length) return;              // ragged row: let `required` fire
+        const raw = cells[i];
+        if (coerce[i] && raw.trim() !== '') {
+          const n = Number(raw);
+          obj[h] = Number.isFinite(n) ? n : raw;
+        } else obj[h] = raw;
+      });
+      return obj;
+    });
+  }
+
+  /* ---------- wiring ---------- */
+  const LABELS = { toy_valid: 'Toy PASS data (examples/)', toy_invalid: 'Toy FAIL data (examples/)' };
+  for (const b of document.querySelectorAll('.toolbar [data-dataset]')) {
+    b.dataset.label = LABELS[b.dataset.dataset];
+    b.addEventListener('click', () => loadAndValidate(datasets[b.dataset.dataset] || [], LABELS[b.dataset.dataset]));
+  }
+  document.getElementById('upload').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      if (/\.csv$/i.test(file.name)) {
+        await loadAndValidate(csvToRows(text), file.name,
+          'CSV values were typed from the schema (numeric-only columns become numbers; ' +
+          'everything else stays text). For the authoritative verdict, validate a JSON ' +
+          'export or run tools/validate.py.');
+      } else {
+        const rows = JSON.parse(text);
+        await loadAndValidate(rows, file.name);
+      }
+    } catch (err) {
+      summaryEmpty(file.name, 'Could not read the file: ' + (err && err.message || err));
+    }
+    e.target.value = '';
+  });
+
+  if (Array.isArray(datasets.toy_valid) && datasets.toy_valid.length) {
+    await loadAndValidate(datasets.toy_valid, LABELS.toy_valid);
+  } else {
+    summaryEmpty('No dataset loaded', 'Author toy fixtures per the package README, or upload a file.');
+  }
+  </script>
+
+  <footer class="colophon chrome">Generated by schemify · {{GENERATED_DATE}} · assets {{ASSETS_VERSION}} · page {{PAGE_FINGERPRINT}}.
+  Written by an AI conversion assistant. The JSON Schema files are the source of truth — this page is a disposable render.
+  Uploaded files are validated entirely in your browser and never leave your machine.
+  · <a href="README.md">Package README</a> · <a href="dictionary.html">Data dictionary</a></footer>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lark/sleep_diary/categories/sleep.json",
+  "title": "SLEEP_DIARY — Sleep",
+  "description": "Nightly sleep quantity and disruptions from the morning diary.",
+  "type": "object",
+  "x-variable-group": "sleep",
+  "properties": {
+    "diary_date": {
+      "$ref": "../../common/defs.json#/$defs/date_iso",
+      "title": "Diary date",
+      "$comment": "Source coding: YYYY-MM-DD. One row per participant per night.",
+      "x-role": "time key"
+    },
+    "bedtime": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+      "title": "Bedtime (HH:MM, 24h)",
+      "$comment": "Source coding: hh:mm 24-hour clock. Anchored pattern per D009 (supersedes D008)."
+    },
+    "sleep_minutes": {
+      "title": "Total sleep last night (minutes)",
+      "$comment": "Source coding: minutes; -666 - N/A (no diary entry); -888 - Don't know. Plausibility bounds 0-960 are not stated by the source (D005).",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 960
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ],
+      "x-unit": "minutes"
+    },
+    "awakenings": {
+      "title": "Number of night awakenings",
+      "$comment": "Source coding: count 0-20; -888 - Don't know.",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "nap_yesterday": {
+      "title": "Napped yesterday",
+      "$comment": "Source coding: 0 - No; 1 - Yes; -888 - Don't know.",
+      "oneOf": [
+        {
+          "const": 0,
+          "title": "No"
+        },
+        {
+          "const": 1,
+          "title": "Yes"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "nap_minutes": {
+      "title": "Nap duration yesterday (minutes)",
+      "$comment": "Source coding: minutes; -666 - N/A (no nap); -888 - Don't know. Plausibility bounds 0-600 are not stated by the source (D006).",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ],
+      "x-unit": "minutes",
+      "x-universe": "Participants who reported a nap yesterday."
+    },
+    "caffeine_after_noon": {
+      "title": "Caffeine after noon",
+      "$comment": "Source coding: 0 - No; 1 - Yes; -888 - Don't know.",
+      "oneOf": [
+        {
+          "const": 0,
+          "title": "No"
+        },
+        {
+          "const": 1,
+          "title": "Yes"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    }
+  },
+  "required": [
+    "diary_date",
+    "bedtime",
+    "sleep_minutes",
+    "awakenings",
+    "nap_yesterday",
+    "nap_minutes",
+    "caffeine_after_noon"
+  ],
+  "$comment": "Soft checks: sleep_minutes should not exceed the bedtime-to-wake interval reported in the full diary; arithmetic across columns is not expressible here (D012)."
+}

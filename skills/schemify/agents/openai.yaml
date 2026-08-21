@@ -1,0 +1,5 @@
+interface:
+  display_name: "Schemify"
+  short_description: "Convert a data dictionary into JSON Schema"
+policy:
+  allow_implicit_invocation: false

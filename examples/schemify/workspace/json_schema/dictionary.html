@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>LARK — SLEEP_DIARY table — data dictionary</title>
+<!-- failsafe: keeps a stray single-file copy readable; the real stylesheet below overrides it -->
+<style>
+  body{margin:0;font:1rem/1.55 system-ui,sans-serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:72rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .banner{border:1px solid #C99A2E;background:#FBF4E1;padding:.6rem 1rem;border-radius:8px}
+</style>
+<link rel="stylesheet" href="assets/schema-pages.css">
+<script defer src="assets/json-schema-data-dictionary.global.js"></script>
+</head>
+<body data-fingerprint="485824f4dc79">
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb">json_schema · data dictionary</nav>
+    <span class="chip">dictionary</span>
+  </header>
+
+  <h1>LARK — SLEEP_DIARY table</h1>
+  <p class="subtitle"></p>
+
+<!-- render.py fills one .dict-section per table; each holds a #dict-<table> mount
+     and a chrome link to that table's validation playground. -->
+  <section class="dict-section" data-table="sleep_diary">
+    <div class="section-head solo"><a class="btn chrome" href="playground.html">Open the validation playground</a></div>
+    <div class="dict-mount" id="dict-sleep_diary"></div>
+  </section>
+
+  <script type="application/json" class="schema-documents">[{"uri":"https://schema.local/common/defs.json","name":"common/defs.json","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.example.org/lark/common/defs.json","title":"LARK — shared definitions","description":"Only invariant tokens are centralised here; context-specific sentinels are inlined per field because their meanings differ by variable.","$defs":{"not_applicable":{"const":-666,"title":"Not applicable / structural skip","description":"The diary routing determined that the variable was outside the respondent universe."},"dont_know":{"const":-888,"title":"Don't know","description":"The respondent did not know the value or it could not be determined."},"participant_id":{"type":"string","pattern":"^P[0-9]{4}$","title":"Participant identifier"},"date_iso":{"type":"string","pattern":"^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$","title":"Calendar date","description":"Calendar date in YYYY-MM-DD form. Calendar-day validity beyond the regular expression is an application-level check."}}}},{"uri":"https://schema.local/sleep_diary/categories/participant.json","name":"sleep_diary/categories/participant.json","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.example.org/lark/sleep_diary/categories/participant.json","title":"SLEEP_DIARY — Participant","description":"Who the diary row belongs to: identifier, site, and baseline traits.","type":"object","x-variable-group":"participant","properties":{"participant_id":{"$ref":"../../common/defs.json#/$defs/participant_id","title":"Participant identifier","$comment":"Source coding: P#### (P followed by 4 digits).","x-role":"entity key"},"site_id":{"title":"Recruitment site","$comment":"Not in the source dictionary; added on the steward's instruction (D004). String-coded to preserve the leading zero.","oneOf":[{"const":"01","title":"Northside clinic"},{"const":"02","title":"Riverside clinic"},{"const":"03","title":"University campus"},{"const":"04","title":"East community center"},{"const":"05","title":"West community center"}],"x-role":"sample key"},"age":{"title":"Age at enrollment (years)","$comment":"Source coding: 18-90 years; -888 - Don't know.","anyOf":[{"type":"integer","minimum":18,"maximum":90},{"$ref":"../../common/defs.json#/$defs/dont_know"}],"x-unit":"years"},"chronotype":{"title":"Self-described chronotype","$comment":"Source coding: 1 - Morning lark; 2 - Night owl; 3 - Neither; -888 - Don't know.","oneOf":[{"const":1,"title":"Morning lark"},{"const":2,"title":"Night owl"},{"const":3,"title":"Neither"},{"$ref":"../../common/defs.json#/$defs/dont_know"}]}},"required":["participant_id","site_id","age","chronotype"]}},{"uri":"https://schema.local/sleep_diary/categories/sleep.json","name":"sleep_diary/categories/sleep.json","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.example.org/lark/sleep_diary/categories/sleep.json","title":"SLEEP_DIARY — Sleep","description":"Nightly sleep quantity and disruptions from the morning diary.","type":"object","x-variable-group":"sleep","properties":{"diary_date":{"$ref":"../../common/defs.json#/$defs/date_iso","title":"Diary date","$comment":"Source coding: YYYY-MM-DD. One row per participant per night.","x-role":"time key"},"bedtime":{"type":"string","pattern":"^([01][0-9]|2[0-3]):[0-5][0-9]$","title":"Bedtime (HH:MM, 24h)","$comment":"Source coding: hh:mm 24-hour clock. Anchored pattern per D009 (supersedes D008)."},"sleep_minutes":{"title":"Total sleep last night (minutes)","$comment":"Source coding: minutes; -666 - N/A (no diary entry); -888 - Don't know. Plausibility bounds 0-960 are not stated by the source (D005).","anyOf":[{"type":"integer","minimum":0,"maximum":960},{"$ref":"../../common/defs.json#/$defs/not_applicable"},{"$ref":"../../common/defs.json#/$defs/dont_know"}],"x-unit":"minutes"},"awakenings":{"title":"Number of night awakenings","$comment":"Source coding: count 0-20; -888 - Don't know.","anyOf":[{"type":"integer","minimum":0,"maximum":20},{"$ref":"../../common/defs.json#/$defs/dont_know"}]},"nap_yesterday":{"title":"Napped yesterday","$comment":"Source coding: 0 - No; 1 - Yes; -888 - Don't know.","oneOf":[{"const":0,"title":"No"},{"const":1,"title":"Yes"},{"$ref":"../../common/defs.json#/$defs/dont_know"}]},"nap_minutes":{"title":"Nap duration yesterday (minutes)","$comment":"Source coding: minutes; -666 - N/A (no nap); -888 - Don't know. Plausibility bounds 0-600 are not stated by the source (D006).","anyOf":[{"type":"integer","minimum":0,"maximum":600},{"$ref":"../../common/defs.json#/$defs/not_applicable"},{"$ref":"../../common/defs.json#/$defs/dont_know"}],"x-unit":"minutes","x-universe":"Participants who reported a nap yesterday."},"caffeine_after_noon":{"title":"Caffeine after noon","$comment":"Source coding: 0 - No; 1 - Yes; -888 - Don't know.","oneOf":[{"const":0,"title":"No"},{"const":1,"title":"Yes"},{"$ref":"../../common/defs.json#/$defs/dont_know"}]}},"required":["diary_date","bedtime","sleep_minutes","awakenings","nap_yesterday","nap_minutes","caffeine_after_noon"],"$comment":"Soft checks: sleep_minutes should not exceed the bedtime-to-wake interval reported in the full diary; arithmetic across columns is not expressible here (D012)."}},{"uri":"https://schema.local/sleep_diary/sleep_diary.schema.json","name":"sleep_diary/sleep_diary.schema.json","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.example.org/lark/sleep_diary/sleep_diary.schema.json","title":"LARK — SLEEP_DIARY table","description":"Array of diary records. One element is one participant-night. Structurally skipped values remain as reserved sentinel codes so the dataset stays rectangular; the routing rules are enforced below.","$comment":"Standard JSON Schema cannot enforce uniqueness of participant_id + diary_date across rows (D011). See the README's 'Documented but not enforced' section.","type":"array","minItems":1,"uniqueItems":true,"items":{"type":"object","title":"SLEEP_DIARY record","allOf":[{"$ref":"categories/participant.json"},{"$ref":"categories/sleep.json"},{"$comment":"Skip pattern: no nap yesterday means nap duration is structurally not applicable.","if":{"required":["nap_yesterday"],"properties":{"nap_yesterday":{"const":0}}},"then":{"properties":{"nap_minutes":{"const":-666}}}},{"$comment":"Applicability: a reported nap must have a duration or an item-missing code — never the structural-NA code.","if":{"required":["nap_yesterday"],"properties":{"nap_yesterday":{"const":1}}},"then":{"properties":{"nap_minutes":{"not":{"const":-666}}}}}],"unevaluatedProperties":false}}}]</script>
+  <script type="application/json" class="page-config">{"package":"json_schema","generated":"2026-08-21","mounts":[{"table":"sleep_diary","title":"LARK — SLEEP_DIARY table","rootUri":"https://schema.local/sleep_diary/sleep_diary.schema.json"}]}</script>
+
+  <script>
+  /* classic script — no modules, no fetch: this page must open over file:// */
+  document.addEventListener('DOMContentLoaded', function () {
+    var docs   = JSON.parse(document.querySelector('.schema-documents').textContent);
+    var config = JSON.parse(document.querySelector('.page-config').textContent);
+    var lib = window.JsonSchemaDataDictionary;
+    if (!lib) {
+      var b = document.createElement('div');
+      b.className = 'banner';
+      b.textContent = 'assets/json-schema-data-dictionary.global.js is missing — ' +
+        'run `render.py refresh-assets` on this package to restore it.';
+      document.querySelector('.page').prepend(b);
+      return;
+    }
+    config.mounts.forEach(function (m) {
+      var table = lib.schemaDocumentsToTable(docs, {
+        rootUri: m.rootUri,
+        splitAllOfObjectCategories: true
+      });
+      /* shadow:false is load-bearing: the print rules in schema-pages.css must
+         reach the light-DOM .dd-* nodes the library renders. */
+      lib.renderDataDictionary(document.getElementById('dict-' + m.table), table, {
+        shadow: false,
+        theme: 'auto',
+        title: m.title,
+        expandCategories: true
+      });
+      if (table.warnings && table.warnings.length) {
+        console.warn('dictionary warnings for ' + m.table, table.warnings);
+      }
+    });
+  });
+  </script>
+
+  <footer class="colophon">Generated by schemify · 2026-08-21 · assets 91f82b1e9771 · page 485824f4dc79.
+  Written by an AI conversion assistant from the source dictionary, approved external sources, and steward interviews.
+  The JSON Schema files are the source of truth — this page is a disposable render; regenerate it rather than editing it.
+  · <a href="README.md">Package README</a></footer>
+
+</main>
+</body>
+</html>
