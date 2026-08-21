@@ -9,9 +9,9 @@
     {
       "name": "jeyabbalas-skills",
       "source": "./",
-      "description": "Guided three-pass deep reading of academic papers, producing an interactive, printable reading library — plus a handoff skill that makes a conversation portable to another agent.",
+      "description": "Guided three-pass deep reading of academic papers, producing an interactive, printable reading library — plus a handoff skill that makes a conversation portable to another agent, and schemify, which turns bespoke data dictionaries into validated, browsable JSON Schema packages.",
       "category": "learning",
-      "keywords": ["papers", "reading", "research", "handoff"]
+      "keywords": ["papers", "reading", "research", "handoff", "json-schema", "data-dictionary"]
     }
   ]
 }
