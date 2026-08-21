@@ -19,7 +19,7 @@ Table of contents
 
 Adapt, don't recite — but keep it this short and credit the sources:
 
-> We'll read in three passes, each deeper than the last — the method is S. Keshav's "How to Read a Paper", in the spirit of Adler's *How to Read a Book*.
+> We'll read in three passes, each deeper than the last — the method is inspired by S. Keshav's "How to Read a Paper" and M. Adler's *How to Read a Book*.
 > **Pass 1 — bird's-eye** (~minutes): a concise profile of the paper — what it is, what it claims, whether it deserves more of your time.
 > **Pass 2 — analytical** (~an hour+, over sessions): we read it together, section by section — glossary, figures, equations, margin notes; you talk back to the paper.
 > **Pass 3 — line-by-line**: re-derive the math, challenge every assumption, and reproduce or replicate the results in code.
