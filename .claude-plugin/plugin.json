@@ -1,7 +1,7 @@
 {
   "name": "jeyabbalas-skills",
-  "version": "0.2.0",
-  "description": "Jeya Balaji Balasubramanian's agent skills. three-pass — a guided three-pass deep read of academic papers that builds an interactive, printable reading library. handoff — compact a conversation into a portable handoff document for another agent. schemify — turn bespoke data dictionaries into validated, browsable JSON Schema packages.",
+  "version": "0.3.0",
+  "description": "Jeya Balaji Balasubramanian's agent skills. three-pass — a guided three-pass deep read of academic papers that builds an interactive, printable reading library. handoff — compact a conversation into a portable handoff document for another agent. schemify — turn bespoke data dictionaries into validated, browsable JSON Schema packages. chapterhouse — a guided chapter-by-chapter study of whole academic books, with spaced revision, self-assessment, and a printable study site.",
   "author": {
     "name": "Jeya Balaji Balasubramanian",
     "url": "https://github.com/jeyabbalas"
@@ -9,6 +9,6 @@
   "homepage": "https://github.com/jeyabbalas/skills",
   "repository": "https://github.com/jeyabbalas/skills",
   "license": "MIT",
-  "keywords": ["reading", "papers", "research", "three-pass", "learning", "handoff", "context", "json-schema", "data-dictionary", "metadata", "validation", "epidemiology"],
-  "skills": ["./skills/three-pass", "./skills/handoff", "./skills/schemify"]
+  "keywords": ["reading", "papers", "research", "three-pass", "learning", "handoff", "context", "json-schema", "data-dictionary", "metadata", "validation", "epidemiology", "books", "studying", "spaced-repetition", "flashcards", "note-taking"],
+  "skills": ["./skills/three-pass", "./skills/handoff", "./skills/schemify", "./skills/chapterhouse"]
 }

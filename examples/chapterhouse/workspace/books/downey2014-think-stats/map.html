@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Think Stats — chapter prerequisite map</title>
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../assets/book-study.css">
+<script defer src="../../assets/book-study.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../index.html">Shelf</a> <span>›</span> <a href="index.html">Think Stats</a> <span>›</span> <span>Prerequisite map</span></nav>
+    <span class="chip">pass-2</span>
+  </header>
+
+  <h1>Think Stats — chapter prerequisite map</h1>
+  <p class="subtitle">What depends on what, from CONTENTS.md. Solid arrows: stated dependencies; dashed: inferred (◆-grade). Linear order is implied and not drawn.</p>
+  <p class="chrome">Click a chapter to see its details below the map. Reading order flows left to right along the top row; the inference chapters fan out below by what they lean on. Arrows point at prerequisites.</p>
+
+  <div class="map wide">
+    <script type="application/json" class="map-data">
+{
+  "nodes": [
+    {"id": "ch01", "label": "1 · Exploratory data", "sub": "recited · box 3", "title": "Chapter 1 — Exploratory data analysis", "col": 0, "row": 0, "href": "notes/ch01-exploratory.html"},
+    {"id": "ch02", "label": "2 · Distributions", "sub": "recited · box 2", "title": "Chapter 2 — Distributions", "col": 1, "row": 0, "href": "notes/ch02-distributions.html"},
+    {"id": "ch03", "label": "3 · PMFs", "sub": "unread", "title": "Chapter 3 — Probability mass functions", "col": 2, "row": 0, "href": ""},
+    {"id": "ch04", "label": "4 · CDFs", "sub": "unread", "title": "Chapter 4 — Cumulative distribution functions", "col": 3, "row": 0, "href": ""},
+    {"id": "ch05", "label": "5 · Modeling", "sub": "unread", "title": "Chapter 5 — Modeling distributions", "col": 4, "row": 0, "href": ""},
+    {"id": "ch06", "label": "6 · PDFs", "sub": "unread", "title": "Chapter 6 — Probability density functions", "col": 5, "row": 0, "href": ""},
+    {"id": "ch07", "label": "7 · Relationships", "sub": "unread", "title": "Chapter 7 — Relationships between variables", "col": 4, "row": 1, "href": ""},
+    {"id": "ch08", "label": "8 · Estimation", "sub": "unread", "title": "Chapter 8 — Estimation", "col": 5, "row": 2, "href": ""},
+    {"id": "ch09", "label": "9 · Hypothesis testing", "sub": "unread", "title": "Chapter 9 — Hypothesis testing", "col": 6, "row": 1, "href": ""},
+    {"id": "ch10", "label": "10 · Least squares", "sub": "unread", "title": "Chapter 10 — Linear least squares", "col": 5, "row": 3, "href": ""},
+    {"id": "ch11", "label": "11 · Regression", "sub": "unread", "title": "Chapter 11 — Regression", "col": 6, "row": 3, "href": ""},
+    {"id": "ch12", "label": "12 · Time series", "sub": "skimmed", "title": "Chapter 12 — Time series analysis", "col": 7, "row": 3, "href": ""},
+    {"id": "ch13", "label": "13 · Survival", "sub": "unread", "title": "Chapter 13 — Survival analysis", "col": 6, "row": 2, "href": ""},
+    {"id": "ch14", "label": "14 · Analytic methods", "sub": "unread", "title": "Chapter 14 — Analytic methods", "col": 7, "row": 1, "href": ""}
+  ],
+  "edges": [
+    {"from": "ch02", "to": "ch01", "label": "NSFG variables", "kind": "prereq"},
+    {"from": "ch06", "to": "ch04", "label": "framework", "kind": "prereq"},
+    {"from": "ch06", "to": "ch05", "label": "fitted models", "kind": "soft"},
+    {"from": "ch07", "to": "ch02", "label": "distributions", "kind": "prereq"},
+    {"from": "ch07", "to": "ch04", "label": "percentiles", "kind": "prereq"},
+    {"from": "ch09", "to": "ch02", "label": "first babies again", "kind": "prereq"},
+    {"from": "ch09", "to": "ch08", "label": "sampling", "kind": "prereq"},
+    {"from": "ch10", "to": "ch07", "label": "correlation", "kind": "prereq"},
+    {"from": "ch11", "to": "ch10", "label": "extends", "kind": "prereq"},
+    {"from": "ch12", "to": "ch11", "label": "regression", "kind": "prereq"},
+    {"from": "ch13", "to": "ch04", "label": "CDFs", "kind": "prereq"},
+    {"from": "ch13", "to": "ch08", "label": "estimation", "kind": "soft"},
+    {"from": "ch14", "to": "ch08", "label": "analytic SEs", "kind": "prereq"},
+    {"from": "ch14", "to": "ch09", "label": "analytic tests", "kind": "prereq"}
+  ]
+}
+    </script>
+  </div>
+
+  <section class="map-profile print-urls" id="panel-ch01" hidden>
+    <h2>1 · Exploratory data analysis</h2>
+    <p>recited · box 3 · due 2026-08-26 · Trustworthy data: survey design, codebook, import, cleaning, validation. 7 cues, 8 cards.</p>
+    <p><a href="notes/ch01-exploratory.html">Chapter note</a> · <a href="decks/ch01.html">Deck</a></p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch02" hidden>
+    <h2>2 · Distributions</h2>
+    <p>recited · box 2 · due 2026-08-22 · Histograms, outliers as judgment, summaries, effect size. 6 cues, 9 cards (one at completion stage).</p>
+    <p><a href="notes/ch02-distributions.html">Chapter note</a> · <a href="decks/ch02.html">Deck</a></p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch03" hidden>
+    <h2>3 · Probability mass functions</h2>
+    <p>unread · PMFs; the class size paradox · diff 2 · 4 exercises. Next on the plan.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch04" hidden>
+    <h2>4 · Cumulative distribution functions</h2>
+    <p>unread · CDFs and percentiles · diff 2 · 4 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch05" hidden>
+    <h2>5 · Modeling distributions</h2>
+    <p>unread · Exponential, normal, lognormal, Pareto fits · diff 2 · 5 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch06" hidden>
+    <h2>6 · Probability density functions</h2>
+    <p>unread · PDFs, KDE, moments, skewness · diff 3 · 4 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch07" hidden>
+    <h2>7 · Relationships between variables</h2>
+    <p>unread · Scatter plots, covariance, Pearson and Spearman correlation · diff 2 · 3 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch08" hidden>
+    <h2>8 · Estimation</h2>
+    <p>unread · Sampling distributions, bias, standard error · diff 2 · 4 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch09" hidden>
+    <h2>9 · Hypothesis testing</h2>
+    <p>unread · Permutation/simulation testing; “First babies again” · diff 3 · 4 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch10" hidden>
+    <h2>10 · Linear least squares</h2>
+    <p>unread · Least squares fit, residuals, goodness of fit · diff 2 · 4 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch11" hidden>
+    <h2>11 · Regression</h2>
+    <p>unread · Multiple and logistic regression with StatsModels · diff 3 · 4 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch12" hidden>
+    <h2>12 · Time series analysis</h2>
+    <p>skimmed by license (no time-series endpoints in my cohorts; revocable) · diff 2 · 4 exercises.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch13" hidden>
+    <h2>13 · Survival analysis</h2>
+    <p>unread · Survival curves, hazards, Kaplan-Meier · diff 2 · 4 exercises. Can be pulled forward once ch 4 and 8 are recited.</p>
+  </section>
+  <section class="map-profile print-urls" id="panel-ch14" hidden>
+    <h2>14 · Analytic methods</h2>
+    <p>unread · The analytic versions of the book's simulations; CLT · diff 3 · 4 exercises.</p>
+  </section>
+
+  <footer class="colophon">Generated by chapterhouse · pass-2 artifact · 2026-08-19. Written by an AI study partner. Unmarked content restates the book; anything marked “Beyond the book” is added interpretation. Verify against the original book before citing. · <a href="map.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

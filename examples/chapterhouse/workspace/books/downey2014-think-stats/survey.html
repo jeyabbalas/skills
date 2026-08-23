@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Think Stats — inspectional survey</title>
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../assets/book-study.css">
+<script defer src="../../assets/book-study.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../index.html">Shelf</a> <span>›</span> <a href="index.html">Think Stats</a> <span>›</span> <span>Survey</span></nav>
+    <span class="chip">Pass 1</span>
+  </header>
+
+  <h1>Think Stats, 2nd edition — inspectional survey</h1>
+  <p class="subtitle">Allen B. Downey · O'Reilly · 2014 · surveyed 2026-08-11</p>
+
+  <p><strong>Book type</strong>: practical — the preface organizes the whole book around a process the reader performs: “the process I use when I start working with a dataset” (p.v), with per-chapter exercises meant to be coded.</p>
+  <p><strong>In one sentence</strong>: Statistics taught as a computational practice — simulation and Python code in place of formula-first derivation — with one real question (do first babies arrive late?) carried through a national survey dataset from import to analytic methods.</p>
+
+  <h2>The shape of the book</h2>
+  <ul>
+    <li>The chapter order <em>is</em> the author's analysis pipeline (p.v): import/clean → single-variable distributions (ch 1–6) → pairwise relationships (ch 7) → estimation and testing (ch 8–9) → regression and multivariate (ch 10–11) → specialized methods (ch 12–13) → the analytic shortcuts last, as an epilogue to simulation (ch 14).</li>
+    <li>Two survey datasets run throughout: the NSFG (pregnancy) and BRFSS (health behaviors), both CDC (p.vi–vii).</li>
+    <li>The computational stance is explicit: p-values by simulation, the CLT by experiment; “some ideas that are hard to grasp mathematically are easy to understand by simulation” (p.vi).</li>
+    <li>Everything rides on the companion repo (thinkstats2.py, thinkplot.py, per-chapter notebooks with solutions; §0.2).</li>
+  </ul>
+
+  <h2>Chapter map</h2>
+  <ul>
+    <li>ch 1 — <a href="notes/ch01-exploratory.html">Trustworthy data: survey design, codebook, import, cleaning, validation</a> · diff 1 · 3 exx</li>
+    <li>ch 2 — <a href="notes/ch02-distributions.html">Histograms, outliers as judgment, summaries, effect size</a> · diff 1 · 4 exx</li>
+    <li>ch 3 — PMFs; the class size paradox · diff 2 · 4 exx</li>
+    <li>ch 4 — CDFs and percentiles · diff 2 · 4 exx</li>
+    <li>ch 5 — Fitting model distributions (exponential, normal, lognormal, Pareto) · diff 2 · 5 exx</li>
+    <li>ch 6 — PDFs, KDE, moments, skewness · diff 3 · 4 exx</li>
+    <li>ch 7 — Scatter plots, covariance, correlation (Pearson, Spearman) · diff 2 · 3 exx</li>
+    <li>ch 8 — Estimation: sampling distributions, bias, standard error · diff 2 · 4 exx</li>
+    <li>ch 9 — Hypothesis testing by permutation/simulation · diff 3 · 4 exx</li>
+    <li>ch 10 — Linear least squares · diff 2 · 4 exx</li>
+    <li>ch 11 — Multiple and logistic regression (StatsModels) · diff 3 · 4 exx</li>
+    <li>ch 12 — Time series · diff 2 · 4 exx · <em>skimmed by license: no time-series endpoints in my cohorts</em></li>
+    <li>ch 13 — Survival analysis, Kaplan-Meier · diff 2 · 4 exx</li>
+    <li>ch 14 — Analytic methods: the CLT cash-out · diff 3 · 4 exx</li>
+  </ul>
+
+  <h2>What depends on what</h2>
+  <ul>
+    <li>6 ← 4, 5 — the distribution framework unifies CDFs with the fitted models (§6.3)</li>
+    <li>7 ← 2, 4 — relationships are read through distributions and percentiles</li>
+    <li>9 ← 2, 8 — testing revisits the ch 2 first-babies effect with ch 8's sampling machinery (“First babies again”, §9.8)</li>
+    <li>13 ← 4, 8 — survival curves are built from CDFs and estimated with ch 8's tools</li>
+    <li>14 ← 8, 9 — the analytic versions of the simulations</li>
+    <li>otherwise linear; the full column lives in CONTENTS.md — see the <a href="map.html">prerequisite map</a></li>
+  </ul>
+
+  <aside class="beyond" data-kind="context">
+    <p class="beyond-kicker">◆ Beyond the book · Context</p>
+    <p>The 6←5 and 13←8 edges are inferred from the section titles and preface pipeline, not from an explicit “this chapter assumes”; treat them as soft until those chapters are read.</p>
+  </aside>
+
+  <h2>Your questions for this book</h2>
+  <ol>
+    <li>When my effect is tiny but my n is huge, what should I report — a p-value, an effect size, or both?</li>
+    <li>What actually goes wrong when I drop “outliers” before analysis?</li>
+    <li>Do first babies actually arrive late — and what does honest evidence for a null-ish answer look like?</li>
+    <li>How do I choose summaries for skewed, birth-weight-like variables?</li>
+    <li>What is a p-value under the hood — can I compute one by simulation and trust it?</li>
+    <li>How do I tell sampling error from a real cohort effect?</li>
+    <li>When is a lognormal model justified for biomarker-like data, rather than merely convenient?</li>
+    <li>What does pandas replace in my R workflow, and where will it bite me?</li>
+  </ol>
+
+  <h2>The reading plan</h2>
+  <p>Book order, ch 12 skimmed by license (revocable). 13 chapters at 2 sessions/week ≈ 7 weeks of pass 2, assuming one chapter per sitting; ch 6, 9, 11, 14 are flagged diff 3 and may split. The plan changes if the first diff-3 chapter overruns badly, or if cohort work makes ch 13 urgent — it can be pulled forward once ch 4 and 8 are recited.</p>
+
+  <footer class="colophon">Generated by chapterhouse · Pass 1 artifact · 2026-08-11. Written by an AI study partner. Unmarked content restates the book; anything marked “Beyond the book” is added interpretation. Verify against the original book before citing. · <a href="survey.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

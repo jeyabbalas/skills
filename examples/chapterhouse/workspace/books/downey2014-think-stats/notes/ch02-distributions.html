@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Ch 2 — Distributions</title>
+<!-- failsafe: keeps a stray single-file copy readable; the real stylesheet below overrides it -->
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../../assets/book-study.css">
+<script defer src="../../../assets/book-study.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Shelf</a> <span>›</span> <a href="../index.html">Think Stats</a> <span>›</span> <span>Chapter 2</span></nav>
+    <span class="chip">pass-2</span>
+  </header>
+
+  <h1>Ch 2 — Distributions</h1>
+  <p class="subtitle">Think Stats 2e · pages 37–50 (PDF; printed 17–30) · deck: <a href="../decks/ch02.html">chapter 2 deck</a> · recited 2026-08-16</p>
+
+  <div class="sec-tools chrome"><button class="btn" data-details="open">Expand all</button>
+  <button class="btn" data-details="close">Collapse all</button></div>
+
+  <details class="sec" open id="cues">
+    <summary>Cues</summary>
+    <ul>
+      <li>C1 Histograms — what is the book’s representation, and what would I have reached for in R (table())? → §2.1–2.2 · recite 2026-08-16 ✓</li>
+      <li>C2 (backlog Q2) What actually goes wrong when I drop “outliers” before analysis? → §2.5 · recite 2026-08-16 ✓</li>
+      <li>C3 (backlog Q4) When does a mean summarize honestly, and what do I do when it doesn’t? → §2.7 · recite 2026-08-16 ✓</li>
+      <li>C4 What does chapter 2 already say about the first-babies question? → §2.6, §2.9 · recite 2026-08-16 ✓</li>
+      <li>C5 (backlog Q1) Effect size — what is it, and why report it instead of (or with) a p-value? → §2.9 · recite 2026-08-16 ✓ (Cohen’s d pooled step wobbled — ch02-c007 at completion stage) · revise 2026-08-19 ✗ → retried ✓</li>
+      <li>C6 The four NSFG histograms — what shapes, and what do the shapes mean? → §2.4 · recite 2026-08-16 ✓</li>
+    </ul>
+  </details>
+
+  <details class="sec" open id="terms">
+    <summary>Terms</summary>
+    <div class="scroll wide">
+      <table>
+        <tr><th>term</th><th>the book’s definition (verbatim, p.)</th><th>field usage / contrast</th></tr>
+        <tr><td>distribution</td><td>“the values that appear in the dataset and how many times each value appears” (p.17)</td><td>◆ the empirical distribution; the book drops the qualifier</td></tr>
+        <tr><td>histogram</td><td>“a mapping from values to frequencies, or a graph that shows this mapping” (p.29)</td><td>—</td></tr>
+        <tr><td>mode</td><td>“the most frequent value in a sample, or one of the most frequent values” (p.30)</td><td>—</td></tr>
+        <tr><td>effect size</td><td>“a summary statistic intended to describe… the size of an effect” (p.27)</td><td>—</td></tr>
+        <tr><td>clinically significant</td><td>“a result… that is relevant in practice” (p.28)</td><td>◆ epi keeps this sharply apart from statistical significance; the book plants that flag a chapter early</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <details class="sec" open id="propositions">
+    <summary>Propositions</summary>
+    <ul>
+      <li>A histogram is a complete description of a sample’s distribution — the sample could be reconstructed from it, minus order (p.25).</li>
+      <li>The four NSFG histograms each carry a story: birthwgt_lb bell-ish with a left tail; birthwgt_oz should be uniform but 0 spikes and 1/15 dip — respondents round near whole pounds; agepreg right-tailed with mode 21; prglngth piled on 39 with a long left tail (p.19–22).</li>
+      <li>Outlier handling “depends on domain knowledge… and on what analysis you are planning to perform”: below 10 weeks certainly errors, 10–30 ambiguous, above 30 probably real; this analysis keeps &gt;27 weeks because the question concerns full-term births (p.22–23).</li>
+      <li>Histograms compare two groups badly when group sizes differ — the fix (PMFs) is the next chapter’s opening problem (p.24).</li>
+      <li>Mean is one summary among several (“average” is the family); it describes a sample only when values cluster — the 100-pound mean pumpkin describes nothing (p.25–26).</li>
+      <li>Variance S² = mean squared deviation, in square units — useful in calculation, poor as a summary; n vs n−1 deferred to ch. 8 (p.26).</li>
+      <li>The first-babies answer so far: difference in means 0.078 weeks (13 hours), Cohen’s d = 0.029 sd — tiny against the height-gap benchmark of 1.7 sd (p.27–28).</li>
+      <li>Reporting is audience- and ethics-laden: persuade with a clear story, but acknowledge uncertainty and limitations (p.28).</li>
+    </ul>
+  </details>
+
+  <details class="sec" open id="argument">
+    <summary>Argument</summary>
+    <p>My reconstruction: the chapter walks one honest arc from “look at everything” to “summarize responsibly.” Start with the complete object (the histogram), read shapes for mechanism — the ounce-part spike at 0 is my field’s digit preference, a measurement artifact you’d miss with summary-first habits. Only then compress: means when values cluster, means-plus-spread when they don’t, and never a bare mean for pumpkin-like data. The first-babies case shows the punchline: with n in the thousands you can <em>detect</em> a 13-hour difference that <em>means</em> nothing — so the honest summary is the effect size in units of spread (d = 0.029), not the headline difference. That is backlog Q1 half-answered already: report d with the raw difference; the p-value question is still ahead (ch. 9).</p>
+  </details>
+
+  <details class="sec" open id="worked-examples">
+    <summary>Worked examples</summary>
+    <h3>CohenEffectSize (p.27–28)</h3>
+    <pre><code>def CohenEffectSize(group1, group2):
+    diff = group1.mean() - group2.mean()
+    var1 = group1.var()
+    var2 = group2.var()
+    n1, n2 = len(group1), len(group2)
+    pooled_var = (n1 * var1 + n2 * var2) / (n1 + n2)
+    d = diff / math.sqrt(pooled_var)
+    return d</code></pre>
+    <p>Annotations: the numerator is the plain difference in means; the denominator is the <em>pooled</em> standard deviation — each group’s variance weighted by its n, so the bigger group’s spread counts more (this is the step I keep fumbling; it’s a weighted mean of variances, nothing deeper). Result is in standard-deviation units, which is what makes 0.029 readable as “tiny” without knowing the units.</p>
+
+    <h3>Figure 2.2 — the rounding artifact (p.20)</h3>
+    <figure class="figure wide">
+      <img src="../figures/ch02-fig-02.png" alt="Histogram of the ounce part of birth weight: bars near-uniform from 0 to 15 ounces, with a tall spike at 0 and shorter bars at 1 and 15.">
+      <figcaption>Figure 2.2: Histogram of the ounce part of birth weight.</figcaption>
+      <p class="src">Figure 2.2 · p.20 of book.pdf</p>
+    </figure>
+    <p>Expected uniform over 0–15; the spike at 0 and dips at 1 and 15 are respondents rounding to whole pounds (p.22).</p>
+  </details>
+
+  <details class="sec" open id="my-questions">
+    <summary>My questions</summary>
+    <ul>
+      <li>Q1 (open) The book defers n vs n−1 to ch. 8 (p.26) — park it there; watch whether the estimation chapter connects it to bias the way I’d explain it to a student.</li>
+      <li>Q2 (open) Cohen’s d arrives as a point estimate with no uncertainty attached. How would I put an interval on d for the cohort write-ups where I’d actually use it? Candidate pass-3 material.</li>
+    </ul>
+  </details>
+
+  <details class="sec" open id="teach-back">
+    <summary>Teach-back</summary>
+    <h3>2026-08-16 · closed-book</h3>
+    <p>Look at the whole distribution before you compress it. Histograms show you shapes, and shapes have causes: birth weight’s ounce part should be flat but spikes at zero because people round — that’s digit preference, the same artifact I see in self-reported cohort data. Outliers aren’t a cleaning step, they’re a judgment call that depends on what you’re asking; here, keep &gt;27 weeks because the question is about full-term babies. Summaries: the mean is only honest when values cluster around it — no typical pumpkin, no meaningful mean. And the first-babies “effect” is real but microscopic: 13 hours, d about 0.03 standard deviations. The chapter’s real lesson for me: with big n, detectability and importance come apart, so report the effect size.</p>
+    <h4>Critique</h4>
+    <p>Strong — mechanism given for the rounding spike and the &gt;27-week cut. One flag, scope: <strong>“digit preference” is your field’s name — the book does not use it</strong> (it says respondents “round off”, p.22); kept, marked as yours (◆ in the Terms row). The pooled-variance step was absent from the teach-back and wobbled again at the 08-19 revise — ch02-c007 stays at completion stage; no new card needed, the existing one is aimed at exactly that step.</p>
+  </details>
+
+  <details class="sec" open id="summary">
+    <summary>Summary</summary>
+    <p>Chapter 2 teaches distribution-first thinking: build the histogram, read its shape for mechanism (rounding artifacts, tails, modes), treat outliers as domain-knowledge decisions tied to the question, and only then summarize — mean and spread when they’re honest, effect size when comparing groups. Its first-babies verdict is the book’s thesis in miniature: a detectable difference of 13 hours, d = 0.029, is a finding about <em>detection</em>, not about babies. Reporting choices are framed as ethical acts: persuade clearly, acknowledge uncertainty.</p>
+  </details>
+
+  <details class="sec" open id="links">
+    <summary>Links</summary>
+    <div class="print-urls">
+      <aside class="beyond" data-kind="source">
+        <p class="beyond-kicker">◆ Beyond the book · Source</p>
+        <p><a href="https://seeing-theory.brown.edu/">Seeing Theory — Basic Probability &amp; distributions</a> — interactive histograms and distribution visualizations; ten minutes here makes §2.4’s shape-reading tactile.</p>
+      </aside>
+      <p>concept: <a href="../../../concepts/effect-size.html">effect size</a></p>
+    </div>
+  </details>
+
+  <footer class="colophon">Generated by chapterhouse · pass-2 artifact · 2026-08-19. Written by an AI study partner. Unmarked content restates the book; anything marked “Beyond the book” is added interpretation. Verify against the original book before citing. · <a href="ch02-distributions.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

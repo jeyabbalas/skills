@@ -6,6 +6,12 @@
 # each example's README says how to restore both.
 examples/**/paper.pdf
 examples/**/reproduction/code/data/
+
+# examples/: book files stay untracked (license hygiene — the example README says
+# how to restore them) and extract/ caches regenerate from the ingest scripts.
+examples/**/book.pdf
+examples/**/book.epub
+examples/**/extract/
 node_modules/
 __pycache__/
 *.pyc

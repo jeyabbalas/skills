@@ -1,0 +1,5 @@
+interface:
+  display_name: "Chapterhouse"
+  short_description: "Study an academic book deeply, chapter by chapter"
+policy:
+  allow_implicit_invocation: false

@@ -9,6 +9,7 @@ Agent skills I use for my own work, shared so you (or your agent) can install th
 | [`three-pass`](./skills/three-pass/SKILL.md) | Read an academic paper together in three passes of increasing depth — a bird's-eye profile, an interactive close reading, and a line-by-line derivation or reproduction — building a reading workspace that remembers you and your papers across sessions. | User-invoked |
 | [`handoff`](./skills/handoff/SKILL.md) | Compact the current conversation into a portable handoff document, so a fresh agent — in another harness, another directory, or another person's hands — can pick the work up without you re-explaining it. | User-invoked |
 | [`schemify`](./skills/schemify/SKILL.md) | Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: interviews for what the files don't say, toy-data unit tests for every rule (skip patterns and sentinel codes included), browsable web pages for feedback, and progress that persists across sessions. | User-invoked |
+| [`chapterhouse`](./skills/chapterhouse/SKILL.md) | Study a whole academic book together, chapter by chapter, in three passes of increasing depth — an inspectional survey that maps and plans the read, an analytical read where every chapter ends in a closed-book recitation, and a synthesis pass of critique, re-creation, and a cumulative exam — building a study workspace of Cornell notes, flashcard decks, and a spaced-revision schedule that remembers you, your books, and what's due across sessions. | User-invoked |
 
 ## Install
 
@@ -26,7 +27,7 @@ Update later with `/plugin marketplace update jeyabbalas`.
 ### Any agent (Claude Code, Codex, Cursor, …) — via skills.sh
 
 ```bash
-npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify
+npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify chapterhouse
 ```
 
 Names are space-separated after one `--skill`; drop the ones you don't want. This copies the skills into your project as files you own. Pull updates with `npx skills@latest update`.
@@ -35,7 +36,7 @@ Names are space-separated after one `--skill`; drop the ones you don't want. Thi
 
 Paste this to any coding agent and it will install the skills itself:
 
-> Install the agent skills `three-pass`, `handoff`, and `schemify` from the GitHub repo `jeyabbalas/skills`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify` and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy the folders `skills/three-pass/` (including its `scripts/`, `templates/`, and `assets/`), `skills/handoff/`, and `skills/schemify/` (including its `scripts/`, `templates/`, and `assets/`) into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying all three skills are listed as available and telling me the exact phrase to invoke each one.
+> Install the agent skills `three-pass`, `handoff`, `schemify`, and `chapterhouse` from the GitHub repo `jeyabbalas/skills`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify chapterhouse` and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy the folders `skills/three-pass/` (including its `scripts/`, `templates/`, and `assets/`), `skills/handoff/`, `skills/schemify/` (including its `scripts/`, `templates/`, and `assets/`), and `skills/chapterhouse/` (including its `scripts/`, `templates/`, and `assets/`) into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying all four skills are listed as available and telling me the exact phrase to invoke each one.
 
 ## Using `three-pass`
 
@@ -78,6 +79,21 @@ Invoke it in the repository where the JSON Schema package should live, pointing 
 The first run inventories the dictionary, interviews you about the study — what is one row? which codes mean missing or not-applicable? — proposes topic categories for you to approve, then converts category by category, validating each against toy PASS/FAIL data (survey skip patterns and sentinel codes included) and re-rendering two web pages for your review: `dictionary.html`, a searchable, printable data dictionary that opens by double-click, and `playground.html`, a live validator you can drop your own JSON or CSV into, entirely in your browser. Large dictionaries deliberately run over several sittings: progress, every judgment call, and every source live as markdown beside the schemas, so any later `/schemify` picks up exactly where the last session stopped, and the closing review walks each decision with you before the working files are cleaned away. The finished package stands alone — schemas, toy data, a bundled validator, and the pages — usable by collaborators and CI without this skill installed.
 
 A complete example package — a small synthetic sleep-diary study, source dictionary included — lives in [`examples/schemify/`](./examples/schemify/), with a README of copy-able prompts.
+
+## Using `chapterhouse`
+
+Invoke it in the directory you want as your study workspace, pointing at your book:
+
+```
+/chapterhouse path/to/book.pdf
+/chapterhouse path/to/book.epub
+/chapterhouse                    (resume — the due check runs first, then the next: pointer)
+/chapterhouse revise             (a pure revision session: whatever the schedule says is due)
+```
+
+The first run introduces the method — Adler's inspectional/analytical/syntopical reading, SQ3R, retrieval practice, spaced repetition — and interviews you about your background and study cadence. Pass 1 maps the book (chapters, difficulty, prerequisites), classifies what kind of book it is, collects the questions you want it to answer, and plans the read. Pass 2 takes one chapter per session into a Cornell note and will not mark a chapter done without a closed-book recitation — misses become flashcards. Pass 3 is critique, re-creation from memory, and a cumulative exam. Every session opens by checking what the review ledger says is due, and everything renders into a local, printable study site: chapter pages, quiz decks (printable as questions-only or with the answer key), a progress dashboard with calibration scores, and a chapter prerequisite map.
+
+A complete example workspace — Allen Downey's *Think Stats* surveyed, two chapters studied with real decks and review history, a started critique — lives in [`examples/chapterhouse/`](./examples/chapterhouse/), with a README of copy-able prompts.
 
 ## Credits
 

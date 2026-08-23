@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Ch 1 — Exploratory data analysis</title>
+<!-- failsafe: keeps a stray single-file copy readable; the real stylesheet below overrides it -->
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../../assets/book-study.css">
+<script defer src="../../../assets/book-study.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Shelf</a> <span>›</span> <a href="../index.html">Think Stats</a> <span>›</span> <span>Chapter 1</span></nav>
+    <span class="chip">pass-2</span>
+  </header>
+
+  <h1>Ch 1 — Exploratory data analysis</h1>
+  <p class="subtitle">Think Stats 2e · pages 21–36 (PDF; printed 1–16) · deck: <a href="../decks/ch01.html">chapter 1 deck</a> · recited 2026-08-13</p>
+
+  <div class="sec-tools chrome"><button class="btn" data-details="open">Expand all</button>
+  <button class="btn" data-details="close">Collapse all</button></div>
+
+  <details class="sec" open id="cues">
+    <summary>Cues</summary>
+    <ul>
+      <li>C1 The book opens on anecdotes — what exactly makes anecdotal evidence fail? → §1 (four named failure modes) · recite 2026-08-13 ✓</li>
+      <li>C2 What kind of study is the NSFG, and whom does it represent? → §1.2 · recite 2026-08-13 ✓</li>
+      <li>C3 (backlog Q8) What does pandas replace in my R workflow — data.frame, vectors — and where will it bite? → §1.4 (DataFrame/Series/Index mapped; more coming) · recite 2026-08-13 ✓</li>
+      <li>C4 What does “cleaning” concretely involve for this data? → §1.6 · recite 2026-08-13 ✗ on the dot-notation half → ch01-c006, retried ✓</li>
+      <li>C5 How do you validate a freshly imported dataset? → §1.7 · recite 2026-08-13 ✓</li>
+      <li>C6 What is a recode, and when should I trust one over raw data? → §1.5 · recite 2026-08-13 ✓</li>
+      <li>C7 The last heading is “Interpretation” — what does it add beyond the numbers? → §1.8 · recite 2026-08-13 ✓</li>
+    </ul>
+  </details>
+
+  <details class="sec" open id="terms">
+    <summary>Terms</summary>
+    <div class="scroll wide">
+      <table>
+        <tr><th>term</th><th>the book’s definition (verbatim, p.)</th><th>field usage / contrast</th></tr>
+        <tr><td>anecdotal evidence</td><td>“based on data that is unpublished and usually personal” (p.1)</td><td>—</td></tr>
+        <tr><td>cross-sectional study</td><td>“captures a snapshot of a group at a point in time” (p.3)</td><td>—</td></tr>
+        <tr><td>oversampling</td><td>recruiting some groups “at rates higher than their representation in the U.S. population” (p.4)</td><td>◆ in epi I’d say stratified sampling with unequal fractions; same object, design-weights (finalwgt) to undo it</td></tr>
+        <tr><td>recode</td><td>“not part of the raw data… calculated using the raw data” (p.8)</td><td>◆ epi datasets call these derived variables</td></tr>
+        <tr><td>data cleaning</td><td>“check for errors, deal with special values, convert data into different formats, and perform calculations” (p.8)</td><td>—</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <details class="sec" open id="propositions">
+    <summary>Propositions</summary>
+    <ul>
+      <li>Anecdotal evidence fails on four counts: small n, selection bias, confirmation bias, inaccuracy (p.2).</li>
+      <li>The statistical alternative is a pipeline: data collection → descriptive statistics → exploratory analysis → estimation → hypothesis testing (p.2–3).</li>
+      <li>The NSFG (Cycle 6, 2002–03) is cross-sectional, targets U.S. residents aged 15–44, and is deliberately <em>not</em> representative — three groups oversampled for subgroup power, at the cost of direct generalization (p.3–4).</li>
+      <li>Import runs through the Stata dictionary (2002FemPreg.dct) into a pandas DataFrame: 13,593 pregnancies × 244 variables (p.4–6).</li>
+      <li>Cleaning is consequential, not cosmetic: sentinel codes 97/98/99 → np.nan, agepreg centiyears → years, totalwgt_lb built from pounds + ounces/16 (p.9).</li>
+      <li>Validation = value_counts() against the codebook’s published tables; it caught a 51-pound baby (p.11–12).</li>
+      <li>Work on two levels at once — statistics and context; records are people (p.12–13).</li>
+    </ul>
+  </details>
+
+  <details class="sec" open id="argument">
+    <summary>Argument</summary>
+    <p>My reconstruction: the chapter is one long argument that <em>trustworthy conclusions are manufactured, step by step, before any statistics happen</em>. Anecdotes fail for reasons that are really sampling-theory reasons (n, selection, confirmation, measurement). The remedy is a designed survey plus a disciplined import: know the design (cross-sectional, oversampled — so weights exist for a reason), read the codebook, prefer recodes because they embed the designers’ consistency logic, convert sentinel codes to nan so missingness can’t masquerade as data, then validate against published margins before believing anything downstream. The 51-pound baby is the whole thesis in one row: an error you’d never see without deliberately looking. This is exactly my R workflow’s read_dta → clean → sanity-check loop, with the codebook playing the role of my data dictionary.</p>
+  </details>
+
+  <details class="sec" open id="worked-examples">
+    <summary>Worked examples</summary>
+    <h3>CleanFemPreg (p.9)</h3>
+    <pre><code>def CleanFemPreg(df):
+    df.agepreg /= 100.0
+    na_vals = [97, 98, 99]
+    df['birthwgt_lb'] = df.birthwgt_lb.replace(na_vals, np.nan)
+    df['birthwgt_oz'] = df.birthwgt_oz.replace(na_vals, np.nan)
+    df['totalwgt_lb'] = df.birthwgt_lb + df.birthwgt_oz / 16.0</code></pre>
+    <p>Line by line: centiyears→years in place (dot access is fine for <em>reading/modifying</em> an existing column); sentinel codes become nan so IEEE nan-propagation keeps them out of every later computation; the new column is created with bracket syntax — creation is the one place dot syntax silently does the wrong thing (attribute, not column; p.10). The later addition <code>df.loc[df.birthwgt_lb &gt; 20, 'birthwgt_lb'] = np.nan</code> (p.12) is the validation loop feeding back into cleaning.</p>
+  </details>
+
+  <details class="sec" open id="my-questions">
+    <summary>My questions</summary>
+    <ul>
+      <li>Q1 (open) finalwgt is introduced and shelved (“we will come back to this point later”, p.4) — where exactly does the book cash in the survey weights, and does it ever compare weighted vs unweighted answers?</li>
+      <li>Q2 (closed — answered in §1.8) Whether the book would treat ethics as in scope: it does, explicitly (respect for respondents, p.13).</li>
+    </ul>
+  </details>
+
+  <details class="sec" open id="teach-back">
+    <summary>Teach-back</summary>
+    <h3>2026-08-13 · closed-book</h3>
+    <p>The chapter says: don’t trust stories, trust designed data — but designed data only pays off if you respect its design. The NSFG oversamples some groups on purpose, so raw proportions don’t describe the country until you use the weights. Getting the data in is half the work: variables come with a codebook, some are precomputed from raw answers and you should usually take those, and missing answers hide behind codes like 97–99 that will wreck your means if you don’t turn them into real missing values. Then you check yourself against the published tables before doing anything — that’s how a 51-pound baby gets caught. And the last point I liked: every row is a person; one respondent’s record was six miscarriages then a birth. Statistics with empathy.</p>
+    <h4>Critique</h4>
+    <p>Solid — all seven cues touched, mechanism given for the sentinel-code trap. One scope note: “you should usually take those” (recodes) — the book’s version carries a condition, “unless there is a compelling reason to process the raw data yourself” (p.8); kept as stated since the qualifier came back on probing. No new cards minted; ch01-c003/c005 already cover the wobbliest ground.</p>
+  </details>
+
+  <details class="sec" open id="summary">
+    <summary>Summary</summary>
+    <p>Chapter 1 replaces anecdote with a manufactured chain of trust: a designed survey read through its codebook, imported into pandas, cleaned so sentinel codes become honest missingness, and validated against published tables before analysis begins. Its two lasting reflexes are “prefer recodes, they embed the designers’ checks” and “compare value_counts to the codebook before believing anything.” The chapter’s ethic — records are people — is stated as part of the method, not an aside.</p>
+  </details>
+
+  <details class="sec" open id="links">
+    <summary>Links</summary>
+    <div class="print-urls">
+      <aside class="beyond" data-kind="source">
+        <p class="beyond-kicker">◆ Beyond the book · Source</p>
+        <p><a href="https://pandas.pydata.org/docs/getting_started/comparison/comparison_with_r.html">pandas: Comparison with R / R libraries</a> — the one-page mapping (data.frame ↔ DataFrame, aggregate ↔ groupby) that makes §1.4 read natively for an R hand.</p>
+      </aside>
+    </div>
+  </details>
+
+  <footer class="colophon">Generated by chapterhouse · pass-2 artifact · 2026-08-13. Written by an AI study partner. Unmarked content restates the book; anything marked “Beyond the book” is added interpretation. Verify against the original book before citing. · <a href="ch01-exploratory.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

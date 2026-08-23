@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Think Stats — Chapter 1 deck</title>
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../../assets/book-study.css">
+<script defer src="../../../assets/book-study.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Shelf</a> <span>›</span> <a href="../index.html">Think Stats</a> <span>›</span> <span>Chapter 1 deck</span></nav>
+    <span class="chip">pass-2</span>
+  </header>
+
+  <h1>Think Stats — Chapter 1 deck</h1>
+  <p class="subtitle">Chapter 1 · Exploratory data analysis · 8 cards · first recited 2026-08-13</p>
+
+  <div class="sec-tools chrome">
+    <button class="btn" type="button" data-answers="open">Reveal all answers</button>
+    <button class="btn" type="button" data-answers="close">Hide all answers</button>
+    <button class="btn" type="button" data-print-key aria-pressed="false">Print: questions only</button>
+  </div>
+
+  <input class="filter chrome" type="search" placeholder="Filter cards…" data-filter="#cards" aria-label="Filter cards">
+  <p class="filter-count" aria-live="polite"></p>
+
+  <div class="entries print-urls" id="cards">
+
+    <article class="entry qa" data-tags="term, remember" id="card-ch01-c001">
+      <p class="entry-meta"><span>ch01-c001</span><span class="tag">term</span></p>
+      <div class="q"><p>What is anecdotal evidence, and what are the four reasons the book gives for why it usually fails?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Evidence based on data that is unpublished and usually personal. It fails because of: small number of observations, selection bias, confirmation bias, and inaccuracy (misremembered, misrepresented, repeated inaccurately).</p></div>
+        <p class="rubric"><strong>Good requires:</strong> the unpublished/personal definition plus at least three of the four failure modes, named. Easy: all four unprompted. Hard: definition right, failure modes vague.</p>
+        <p class="entry-meta"><span>ch.1 · p.1 · “Reports like these are called”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="term, remember" id="card-ch01-c002">
+      <p class="entry-meta"><span>ch01-c002</span><span class="tag">term</span></p>
+      <div class="q"><p>Contrast a cross-sectional study with a longitudinal study, and say which the NSFG is.</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Cross-sectional captures a snapshot of a group at a point in time; longitudinal observes the same group repeatedly over time. The NSFG is cross-sectional (repeated in cycles — we use Cycle 6, 2002–2003).</p></div>
+        <p class="rubric"><strong>Good requires:</strong> both definitions, the contrast, and NSFG placed correctly. Easy: adds the cycle detail unprompted.</p>
+        <p class="entry-meta"><span>ch.1 · §1.2 · p.3 · “captures a snapshot of a group”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="concept, understand" id="card-ch01-c003">
+      <p class="entry-meta"><span>ch01-c003</span><span class="tag">concept</span></p>
+      <div class="q"><p>The NSFG is not representative — it is deliberately oversampled. What does that mean, why did the designers do it, and what does it cost?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Three groups (Hispanics, African-Americans, teenagers) were recruited at rates higher than their population share, so each subgroup is large enough for valid inferences. The cost: statistics from the sample no longer transfer directly to the general population (the finalwgt weights exist to fix this).</p></div>
+        <p class="rubric"><strong>Good requires:</strong> the mechanism, the why (subgroup power), and the cost. Hard: mechanism only.</p>
+        <p class="entry-meta"><span>ch.1 · §1.2 · p.4 · “instead it is deliberately oversampled”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="term, remember" id="card-ch01-c004">
+      <p class="entry-meta"><span>ch01-c004</span><span class="tag">term</span></p>
+      <div class="q"><p>What is a recode in the NSFG, with an example — and what is the book’s advice about using them?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>A variable calculated from the raw data rather than collected directly — e.g. prglngth is wksgest when available, else mosgest × 4.33. Advice: prefer recodes when available, since they often encode consistency checks, unless you have a compelling reason to process raw data yourself.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> definition + the prglngth example (or another real one) + the advice. Hard: definition only.</p>
+        <p class="entry-meta"><span>ch.1 · §1.5 · p.8 · “many of the variables are recodes”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="apply" id="card-ch01-c005">
+      <p class="entry-meta"><span>ch01-c005</span><span class="tag">apply</span></p>
+      <div class="q"><p>In CleanFemPreg, birthwgt_lb values 97, 98, 99 are replaced with np.nan. What do those codes mean, and what concretely goes wrong if you skip this step?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>They are special codes: 97 NOT ASCERTAINED, 98 REFUSED, 99 DON’T KNOW. Left in place they behave as real weights and poison computations — the book’s example is a bogus 99-pound baby in any mean or histogram. As nan they propagate safely (nan arithmetic yields nan; pandas functions handle nan).</p></div>
+        <p class="rubric"><strong>Good requires:</strong> what the codes are + a concrete bogus-result consequence + why nan is safe. Easy: quotes the propagation rule.</p>
+        <p class="entry-meta"><span>ch.1 · §1.6 · p.9 · “special values encoded as numbers are”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="analyze" id="card-ch01-c006">
+      <p class="entry-meta"><span>ch01-c006</span><span class="tag">analyze</span></p>
+      <div class="q"><p>Adding a new column: <code>df['totalwgt_lb'] = …</code> versus <code>df.totalwgt_lb = …</code>. What does each actually do, and why is the second one wrong?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Dictionary syntax creates a real column in the DataFrame. Dot notation instead attaches a plain Python attribute to the DataFrame object — it is not treated as a column, so later column operations silently miss it.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> the attribute-not-column mechanism, not just “use brackets”. Hard: knows the rule but not the mechanism.</p>
+        <p class="entry-meta"><span>ch.1 · §1.6 · p.10 · “you must use dictionary syntax”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="apply" id="card-ch01-c007">
+      <p class="entry-meta"><span>ch01-c007</span><span class="tag">apply</span></p>
+      <div class="q"><p>Describe the book’s validation move for a freshly imported NSFG variable, and how it caught the 51-pound baby.</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Compare value_counts() against the codebook’s published table per variable. For outcome the counts matched exactly; for birthwgt_lb the binned counts matched but the full listing exposed an impossible value (51 lb), fixed with <code>df.loc[df.birthwgt_lb &gt; 20, 'birthwgt_lb'] = np.nan</code>.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> the compare-to-codebook move + the loc-based fix. Easy: writes the loc line unprompted.</p>
+        <p class="entry-meta"><span>ch.1 · §1.7 · p.11 · “compute basic statistics and compare them”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="concept, understand" id="card-ch01-c008">
+      <p class="entry-meta"><span>ch01-c008</span><span class="tag">concept</span></p>
+      <div class="q"><p>The book says to work on two levels at once. What are they, and what does the caseid 10229 example add?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>The level of statistics and the level of context. Respondent 10229’s outcomes read [4 4 4 4 4 4 1] — statistically unremarkable, but in context the story of six miscarriages before a live birth; the data deserve empathy and the respondents respect.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> both levels + what the example shows about reading records as people.</p>
+        <p class="entry-meta"><span>ch.1 · §1.8 · p.12 · “think on two levels at the”</span></p>
+      </details>
+    </article>
+
+  </div>
+
+  <footer class="colophon">Generated by chapterhouse · pass-2 artifact · 2026-08-13. Written by an AI study partner. Unmarked content restates the book; anything marked “Beyond the book” is added interpretation. Verify against the original book before citing. · <a href="ch01.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

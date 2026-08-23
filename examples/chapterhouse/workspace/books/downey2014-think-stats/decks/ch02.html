@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Think Stats — Chapter 2 deck</title>
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../../assets/book-study.css">
+<script defer src="../../../assets/book-study.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Shelf</a> <span>›</span> <a href="../index.html">Think Stats</a> <span>›</span> <span>Chapter 2 deck</span></nav>
+    <span class="chip">pass-2</span>
+  </header>
+
+  <h1>Think Stats — Chapter 2 deck</h1>
+  <p class="subtitle">Chapter 2 · Distributions · 9 cards · first recited 2026-08-16</p>
+
+  <div class="sec-tools chrome">
+    <button class="btn" type="button" data-answers="open">Reveal all answers</button>
+    <button class="btn" type="button" data-answers="close">Hide all answers</button>
+    <button class="btn" type="button" data-print-key aria-pressed="false">Print: questions only</button>
+  </div>
+
+  <input class="filter chrome" type="search" placeholder="Filter cards…" data-filter="#cards" aria-label="Filter cards">
+  <p class="filter-count" aria-live="polite"></p>
+
+  <div class="entries print-urls" id="cards">
+
+    <article class="entry qa" data-tags="term, remember" id="card-ch02-c001">
+      <p class="entry-meta"><span>ch02-c001</span><span class="tag">term</span></p>
+      <div class="q"><p>Define distribution and histogram as the book does, and give the one-line Python idiom for computing frequencies with a dictionary.</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>The distribution of a variable is the values that appear and how many times each appears; a histogram is a mapping from values to frequencies (and the graph of it). Idiom: <code>hist[x] = hist.get(x, 0) + 1</code> in a loop (or <code>collections.Counter</code>).</p></div>
+        <p class="rubric"><strong>Good requires:</strong> both definitions + one working idiom. Easy: names Counter too.</p>
+        <p class="entry-meta"><span>ch.2 · §2.1 · p.17 · “the values that appear in the”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="concept, understand" id="card-ch02-c002">
+      <p class="entry-meta"><span>ch02-c002</span><span class="tag">concept</span></p>
+      <div class="q"><p>Two Hist behaviors worth knowing cold: what happens to nan values, and what does Freq return for a value never seen?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>When a pandas Series is passed, nan values are dropped before counting; Freq of an absent value returns 0 (no KeyError).</p></div>
+        <p class="rubric"><strong>Good requires:</strong> both behaviors. Hard: one of the two.</p>
+        <p class="entry-meta"><span>ch.2 · §2.4 · p.20 · “any nan values are dropped”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="analyze" id="card-ch02-c003">
+      <p class="entry-meta"><span>ch02-c003</span><span class="tag">analyze</span></p>
+      <div class="q"><p>The histogram of birthwgt_oz should in theory be uniform. What does it actually show, and what is the book’s explanation?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>0 ounces is more common than other values, and 1 and 15 are less common — respondents round off birth weights near whole pounds. A measurement/reporting artifact, not biology.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> the deviation (0 up, 1 and 15 down) + the rounding explanation. Easy: names it as a digit-preference-style reporting artifact.</p>
+        <p class="entry-meta"><span>ch.2 · §2.4 · p.22 · “0 is more common than the”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="apply" id="card-ch02-c004">
+      <p class="entry-meta"><span>ch02-c004</span><span class="tag">apply</span></p>
+      <div class="q"><p>For prglngth in live births, the ten smallest values are [0, 4, 9, 13, 17, 18, 19, 20, 21, 22]. Walk the book’s outlier reasoning: which are certainly errors, which are ambiguous, and what cut did it choose for the first-babies analysis — on what grounds?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Below 10 weeks: certainly errors (most likely miscoded outcome). 10–30 weeks: hard to be sure — some errors, some premature births. Above 30: probably legitimate. The analysis keeps pregnancies longer than 27 weeks, because the motivating question concerns full-term births — the handling depends on domain knowledge and the analysis at hand, not a fixed rule.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> the three zones + the 27-week cut + the domain-knowledge rationale. Hard: zones without the rationale.</p>
+        <p class="entry-meta"><span>ch.2 · §2.5 · p.22 · “check for outliers, which are extreme”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="term, remember" id="card-ch02-c005">
+      <p class="entry-meta"><span>ch02-c005</span><span class="tag">term</span></p>
+      <div class="q"><p>The book distinguishes “mean” from “average”. State the distinction.</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>The mean is the specific summary statistic Σxᵢ/n; an “average” is any of several summary statistics you might choose to describe central tendency.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> mean as the formula-defined statistic, average as the family.</p>
+        <p class="entry-meta"><span>ch.2 · §2.7 · p.25 · “the words mean and average are”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="concept, understand" id="card-ch02-c006">
+      <p class="entry-meta"><span>ch02-c006</span><span class="tag">concept</span></p>
+      <div class="q"><p>Apples versus pumpkins: what is the example doing, and when does a mean stop being a good description?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Six half-pound apples are summarized well by their mean; three 1-lb, two 3-lb, and one 591-lb pumpkin have mean 100 lb — misleading because there is no typical pumpkin. A mean describes a sample well only when values cluster around it; with high spread or extreme values there may be no meaningful single-number summary.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> the point of the contrast, stated generally (not just retelling the pumpkins).</p>
+        <p class="entry-meta"><span>ch.2 · §2.7 · p.26 · “there is no meaningful average because”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="apply, completion" id="card-ch02-c007">
+      <p class="entry-meta"><span>ch02-c007</span><span class="tag">apply</span><span class="tag">completion</span></p>
+      <div class="q"><p>Compute Cohen’s d for first-baby vs other pregnancy lengths. At completion stage: present d = (x̄₁ − x̄₂)/s with the pooled-variance step blanked; the student supplies it and interprets the book’s value.</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Pooled variance = (n₁s₁² + n₂s₂²)/(n₁ + n₂); s is its square root. The book’s result: the means differ by 0.029 standard deviations — tiny (the male–female height gap is ≈1.7 sd, for scale).</p></div>
+        <p class="rubric"><strong>Good requires:</strong> correct pooled variance, d in units of sd, and the “0.029 sd is small” interpretation with the comparison. Again: cannot set up the pooled step.</p>
+        <p class="entry-meta"><span>ch.2 · §2.9 · p.27 · “compare the difference between groups to”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="apply" id="card-ch02-c008">
+      <p class="entry-meta"><span>ch02-c008</span><span class="tag">apply</span></p>
+      <div class="q"><p>Work practice/ch02/exercise_01.py — Exercise 2.3: Mode and AllModes over a Hist-like dict. Run: <code>python3 practice/ch02/test_exercise_01.py</code>.</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>Behavior is pinned by the asserts in practice/ch02/test_exercise_01.py; no prose answer.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> all tests pass with the student’s own code (rating map in ASSESS.md). Any hint from me is ◆ and caps at Hard.</p>
+        <p class="entry-meta"><span>ch.2 · §2.11 · p.29 · “write a function called Mode that”</span></p>
+      </details>
+    </article>
+
+    <article class="entry qa" data-tags="evaluate" id="card-ch02-c009">
+      <p class="entry-meta"><span>ch02-c009</span><span class="tag">evaluate</span></p>
+      <div class="q"><p>You have the first-babies results: difference 0.078 weeks (13 hours), d = 0.029. Which summaries would get a story on the evening news, which would reassure an anxious patient — and what does the book say keeps either report honest?</p></div>
+      <details class="answer">
+        <summary>Answer</summary>
+        <div class="a"><p>News: the raw difference dramatized (13 hours! or “first babies arrive later”). Patient: the effect size in context (0.029 sd, ~0.2% of a pregnancy) or a probability framing relevant to her. Honesty: persuasion is fine, but reports must acknowledge uncertainty and limitations — the choice of statistic is itself a rhetorical act guided by professional ethics.</p></div>
+        <p class="rubric"><strong>Good requires:</strong> audience-appropriate statistic for both cases + the acknowledge-uncertainty principle.</p>
+        <p class="entry-meta"><span>ch.2 · §2.10 · p.28 · “the answer depends on who is”</span></p>
+      </details>
+    </article>
+
+  </div>
+
+  <footer class="colophon">Generated by chapterhouse · pass-2 artifact · 2026-08-16. Written by an AI study partner. Unmarked content restates the book; anything marked “Beyond the book” is added interpretation. Verify against the original book before citing. · <a href="ch02.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>
