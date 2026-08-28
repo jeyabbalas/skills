@@ -38,9 +38,9 @@ source: {errata page URL · checked YYYY-MM-DD} — or "none found ({date}, sear
 - **`title`** — linked to the chapter note once one exists; bare text before that.
 - **`pages`** — the chapter's PDF page range (always PDF pages, never the printed numbers — the ingest output labels which it gave you). EPUBs put the spine/file run here (`spine 3–5`).
 - **`prereqs`** — comma-separated chapter numbers this chapter leans on, or `—`. Linear order is implied; list only real dependencies. This column is the prerequisite-DAG authority: the map page and `revise.py`'s interleaving both read it. Rationale for a surprising edge belongs on the survey page as ◆, not here.
-- **`diff`** — anticipated difficulty for *this* student, 1–3, judged at survey time.
+- **`diff`** — anticipated difficulty for *this* student, 1–3, judged at survey time. `diff 3` is also the cue to propose section pacing (PASS-2.md).
 - **`exx`** — the book's own exercise count for the chapter.
-- **`status`** — `unread` · `reading` (started, recite not passed) · `recited` (closed-book recite passed — the only route to this value is a ledger event) · `skimmed` · `skipped` (reading-plan licenses executed; no recite owed).
+- **`status`** — `unread` · `reading` (started, recite not passed) · `recited` (closed-book recite passed — the only route to this value is a ledger event) · `skimmed` · `skipped` (reading-plan licenses executed; no recite owed). While a chapter is section-paced or scaffolded, `reading` may carry a short parenthetical gist — `reading (§1.2 of 4)`, `reading (opener + §1.1)` — an index of the note's `## Sections`, never an authority, dropped when the status moves. Only `reading` may be annotated: the other four stay bare, exactly as spelled — `revise.py` matches them as exact strings.
 - **`box`** — 1–6, the chapter's rung on the Leitner ladder, or `—` before the first passing recite. Gap table and movement rules live in REVISE.md.
 - **`due`** — the chapter's next cumulative-recite date, from the ladder.
 - **`conf`** — the student's most recent whole-chapter confidence (25/50/75/90/99) — the pre-recite estimate, superseded by each delayed judgment of learning (REVISE.md).
@@ -56,3 +56,4 @@ Filled from the intake errata lookup (PASS-1.md) and extended whenever a new err
 - **`status` and the plan columns are this file's own.** Statuses move per the playbooks (`recited` only after a passing closed-book recite; `skimmed`/`skipped` only per the reading plan's licenses, decided by the student).
 - **Hand edits are first-class.** Ingestion output is a seed; the student confirms chapter ranges before this file is written, and later corrections are made here directly — every other file follows this one.
 - **Rows edit in place.** History lives in BOOK.md's session log and the ledger, never here.
+- **Sections never get rows here.** Within-chapter pacing lives in the chapter note's `## Sections` (NOTES-FORMAT.md); this file stays one table, one row per chapter — `revise.py` treats every table row in this file whose first cell is a number as a chapter row, so a second table would corrupt the replay.

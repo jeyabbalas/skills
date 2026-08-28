@@ -8,6 +8,8 @@ Table of contents
 - [Math](#math)
 - [Survey page](#survey-page)
 - [Chapter pages](#chapter-pages)
+- [Guide pages](#guide-pages)
+- [Lab pages](#lab-pages)
 - [Deck pages](#deck-pages)
 - [Exam pages](#exam-pages)
 - [Concept pages and index](#concept-pages-and-index)
@@ -30,6 +32,7 @@ Regenerate the render of every markdown file you touched this session — and on
 | Template | Used for |
 |---|---|
 | `./templates/page.html` | survey, chapter notes, concept notes, critique — any article |
+| `./templates/guide.html` | scaffold guides — foundations files and section walkthroughs (page-level ◆ banner, inverted colophon) |
 | `./templates/list.html` | the concepts index — filterable entry lists |
 | `./templates/deck.html` | deck quiz pages and exam pages — question/answer lists with reveal and print modes |
 | `./templates/hub.html` | the book hub `index.html` |
@@ -75,13 +78,21 @@ SKILL.md defines when content must be demarcated and the five kinds. The forms:
 
 ## Chapter pages
 
-`notes/chNN-<slug>.md` → `.html` via `page.html`. The note's `##` sections (NOTES-FORMAT.md) render in order as `<details class="sec" open id="cues">…` — slug ids `cues`, `terms`, `propositions`, `argument`, `worked-examples`, `my-questions`, `teach-back`, `summary`, `links` — with the `sec-tools` expand/collapse block once, before the first. Inside:
+`notes/chNN-<slug>.md` → `.html` via `page.html`. The note's `##` sections (NOTES-FORMAT.md) render in order as `<details class="sec" open id="cues">…` — slug ids: an optional `sections` first (the pacing checklist, rows ticked as recites pass), then `cues`, `terms`, `propositions`, `argument`, `worked-examples`, `my-questions`, `teach-back`, `summary`, `links` — with the `sec-tools` expand/collapse block once, before the first. Inside:
 
 - **Cues** as a plain list; resolved cues carry their pointer, missed ones their `✗ → card id` as text (the deck page is where cards live — link it once in the section's lead line).
 - **Terms** as a semantic `<table>` in `div.scroll.wide`.
 - **Worked examples** verbatim in `pre` (code) or display math; figures referenced from the book render as `figure.figure.wide` with the image at `../figures/chNN-fig-MM.png`, the **verbatim** caption as `figcaption`, and `<p class="src">Figure N.M · p.P of book.pdf</p>`. If the crop doesn't exist yet: keep the `<img>` and add `<p class="placeholder">No image yet — see book.pdf, page P. Save a screenshot to figures/chNN-fig-MM.png and it will appear here.</p>`.
 - **Teach-back** — the student's text as a plain paragraph (it is their voice, not a book quote: no blockquote), the critique under an `h4`.
-- **Links** — each resource as a ◆ `Source` aside; concept links as plain links. Container class `print-urls` on this section.
+- **Links** — each resource as a ◆ `Source` aside; concept and guide links as plain links. Container class `print-urls` on this section.
+
+## Guide pages
+
+`guides/*.md` → `.html` via `guide.html` (source formats in GUIDE-FORMAT.md) — the one template whose colophon inverts page.html's: on a guide, *unmarked content is the study partner's teaching*, and the book's words appear only inside quotation marks with anchors. The sister's lead ◆ blockquote fills the template's page-banner aside. Badge `Pass 2`; breadcrumb `Shelf › <book> › Guide — §N.M` (collection segment skipped, as with Notes). Individual ◆ asides appear only for `Critique`, `Source`, and `Diagram`. Embedded widgets use the template's `aside.beyond[data-kind="diagram"][id="wN"]` markup with all widget style and script inline in that page — shared assets never change for a widget — and each widget's md-sister announcement is a ◆ `Diagram` blockquote that describes the demonstration well enough to survive printing and links the page's `#wN` anchor. Foundations checks render as their two italic lines, so the printed guide stays self-testable.
+
+## Lab pages
+
+`labs/chNN-<slug>.html` — the one page kind not built from a template: a fully self-contained interactive sandbox (inline style and script; theme-safe via `prefers-color-scheme`, dark included; works from `file://`; no external dependencies beyond the pinned KaTeX tags when it carries math). It still carries a title, one ◆ banner line, a link back to the guide or note it serves, and a footer naming its markdown sister. The sister (`labs/chNN-<slug>.md`, a dozen lines is plenty) is a printable description of what the lab demonstrates and which book claims it maps to. Preference-gated and offered (SCAFFOLD.md), ~1 per chapter; open it in a browser once before the session closes. `workspace.py check` validates the sister pairing like any page.
 
 ## Deck pages
 
@@ -147,8 +158,8 @@ Node `id` = `chNN`; `label` = `N · Short title` (≤26 chars); `sub` = the stat
    </div>
    ```
 
-   `stat` and `bar` come from `revise.py stats` at regeneration (accuracy = the bar; omit both spans for chapters with no attempts). A blind-spot-flagged chapter adds class `flagged` to its row and appends ` · blind spot` to the stat. Unread chapters: bare text, `state` = `unread`.
-3. `section.dir` rows for the book-level artifacts that exist — survey, map, critique, each exam, the deck index (one row per deck), `book.pdf`, and the state files (BOOK.md, CONTENTS.md — linked as files).
+   `stat` and `bar` come from `revise.py stats` at regeneration (accuracy = the bar; omit both spans for chapters with no attempts). A blind-spot-flagged chapter adds class `flagged` to its row and appends ` · blind spot` to the stat. Unread chapters: bare text, `state` = `unread`. A section-paced chapter's `state` carries the gist: `reading · §2 of 4`.
+3. `section.dir` rows for the book-level artifacts that exist — survey, map, critique, each exam, the deck index (one row per deck), each guide and lab, `book.pdf`, and the state files (BOOK.md, CONTENTS.md — linked as files).
 
 Regenerate whenever a session adds an artifact, moves a status, or changes the numbers.
 

@@ -15,6 +15,11 @@ Table of contents
 # Ch 3 — Probability mass functions
 book: downey2014-think-stats · pages: 27–36 · deck: ../decks/ch03.md
 
+## Sections
+pacing: by sections (their call, {YYYY-MM-DD}) — omit this whole section on a chapter-paced chapter
+- [x] §3.1 {title} · pp. 27–30 · read {YYYY-MM-DD} [· guide: ../guides/ch03-s01-<slug>.md]
+- [ ] §3.2 {title} · pp. 31–36
+
 ## Cues
 - [x] C1 What does a PMF add that a histogram lacks? → §3.1 · recite 2026-08-27 ✓
 - [ ] C2 Why must PMF values sum to 1? → §3.1 · recite 2026-08-27 ✗ → ch03-c004
@@ -51,16 +56,18 @@ marks alone carry the book's voice here}
 ## Links
 - ◆ **Resource · video** — [{title}]({url}): {one line on why it earns a place}
 - concept: [p-value](../../../concepts/p-value.md)
+- guide: [§3.2 walkthrough](../guides/ch03-s02-<slug>.md) — only on a scaffolded chapter
 ```
 
 ## Chapter note rules
 
-- **Cues are the retrieval surface.** 4–8 prequestions written *before* the read (PASS-2.md), numbered `C1`…; append, never renumber. After the read each gains a one-line pointer to where it resolved; after a recite, `✓` or `✗ → <card id>` with the date. A cue is the human-readable face of what the recite will ask.
+- **Cues are the retrieval surface.** 4–8 questions per chapter, numbered `C1`…; append, never renumber. Written as prequestions before the read when the student wants them (the offer is PASS-2.md's), or during and after the read — from what the chapter actually leaned on — when they don't; either way the section must be populated by recite time, because the recite, the cumulative recite (REVISE.md), and the no-scheduler fallback (LAYOUT.md) all run on it. After the read each cue gains a one-line pointer to where it resolved (on a scaffolded chapter it may add `· guide SN`); after a recite, `✓` or `✗ → <card id>` with the date. A cue is the human-readable face of what the recite will ask.
 - **Terms is Adler's "come to terms":** the author's definition verbatim with its page, and — only where usage genuinely diverges from the field — a ◆ contrast. A term the whole field shares belongs in a concept note; this table is about *this author's* usage.
-- **Propositions restate the book; Argument restates the student.** Propositions are the chapter's claims in the book's voice, every bullet anchored. Argument is the same logic rebuilt in the student's own notation — the section that proves the chapter was understood rather than transcribed.
+- **Propositions restate the book; Argument restates the student.** Propositions are the chapter's claims in the book's voice, every bullet anchored. Argument is the same logic rebuilt in the student's own notation — the section that proves the chapter was understood rather than transcribed. In scaffold mode (SCAFFOLD.md) Argument is exactly the student's say-back after their solo read — never a copy of the guide's steps, which is where your re-teaching already lives (GUIDE-FORMAT.md).
 - **Worked examples are transcribed verbatim** (the worked-example fade in ASSESS.md builds on them); annotations interleave as plain lines, no ◆ needed (see Voice, below).
 - **My questions** are the student's open threads, `Q1`… per chapter, `open` → `closed — {what closed it}`; pass 3's critique harvests the ones that stayed open.
-- **Header facts are static book facts** (pages, deck path). Mutable study state — status, box, due, confidence — lives in CONTENTS.md only; a note header never carries it.
+- **`## Sections` appears only on a section-paced chapter** (PASS-2.md's Section pacing): the section list from the chapter survey, page-ranged, each row ticked with its read date as its recite passes; a row links its guide when one exists (GUIDE-FORMAT.md).
+- **Header facts are static book facts** (pages, deck path). Mutable study state — status, box, due, confidence — lives in CONTENTS.md only; a note header never carries it. The `## Sections` checklist above is the sole, bounded exception: within-chapter *reading* progress lives there and nowhere else — scheduling state still never does.
 - **Voice.** Like margin notes in three-pass, a chapter note is mostly the conversation's own voice: inside Argument, Worked-example annotations, My questions, Teach-back, and Summary, no ◆ is needed — quotation marks with anchors carry the book's voice. Cues, Terms, Propositions, and Links follow the normal ◆ rule because they mix the book's content with yours.
 
 ## Who writes which section

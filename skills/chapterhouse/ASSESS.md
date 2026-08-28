@@ -36,7 +36,7 @@ Six types, doubling as Bloom levels (storage grammar in DECK-FORMAT.md), written
 
 ## The recite protocol
 
-For chapter recites (PASS-2.md), revision blocks (REVISE.md), and exams (PASS-3.md) alike:
+For pass-2 recites — chapter or section (PASS-2.md) — revision blocks (REVISE.md), and exams (PASS-3.md) alike:
 
 1. **Declare closed-book.** *"Book closed, notes closed? Say ready."* Don't start before it. If they want open-book, run it — every line records `note: "open-book"` and ratings cap at Good.
 2. **One item at a time**, prompt only — never the card id, never the chapter ("this one's from chapter 5" un-interleaves the session; the plan withholds chapters on purpose).
@@ -49,6 +49,8 @@ For chapter recites (PASS-2.md), revision blocks (REVISE.md), and exams (PASS-3.
 9. **A miss that exposes a *new* gap mints a card** — the missed card already covers the asked one.
 
 Ratings: `again` — couldn't produce it; `hard` — produced with a hint or major gaps; `good` — correct, effortful; `easy` — immediate and complete. `correct` is the rubric-level boolean and can disagree with the rating's difficulty shading; both are final post-override.
+
+**Rehearsal is not grading.** A guide's self-test and foundations checks (SCAFFOLD.md) run open-voice and ungraded — no confidence ritual, no ledger line. Only the four ledger modes (`recite | revise | exam | practice`) are graded events.
 
 ## Hand-worked problems
 

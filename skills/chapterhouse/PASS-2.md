@@ -1,8 +1,10 @@
-Pass 2 is the analytical read — the long middle where the book actually gets learned, one chapter per session through a fixed loop: survey the chapter, write prequestions, read it together into a Cornell note, recite it closed-book, and hand it to the revision ladder. The loop's last two steps are the ones learning science actually vouches for; the loop exists so they cannot be skipped. Two kinds of work share every session: **planned units** (the next chapter per BOOK.md's `next:` pointer) and **reactive work** (whatever passage the student brings up). Reactive work always wins the floor.
+Pass 2 is the analytical read — the long middle where the book actually gets learned, one unit per session — a chapter by default — through a fixed loop: survey the chapter, write prequestions, read it together into a Cornell note, recite it closed-book, and hand it to the revision ladder. The loop's last two steps are the ones learning science actually vouches for; the loop exists so they cannot be skipped. Two kinds of work share every session: **planned units** (the next unit per BOOK.md's `next:` pointer) and **reactive work** (whatever passage the student brings up). Reactive work always wins the floor.
 
 Table of contents
 
 - [The unit, and what precedes it](#the-unit-and-what-precedes-it)
+- [Section pacing](#section-pacing)
+- [Scaffold mode](#scaffold-mode)
 - [The loop](#the-loop)
 - [Survey](#survey)
 - [Question](#question)
@@ -15,11 +17,24 @@ Table of contents
 
 ## The unit, and what precedes it
 
-The unit is one chapter through the whole loop — or one section of a chapter CONTENTS.md marks `diff 3`, in which case the recite covers the sections read so far and the chapter stays `reading` until its last section's recite passes. Before new material, two things ride on top of the unit (both from REVISE.md, both short): the **warm-up** over whatever the due check returned, and the **delayed judgment of learning** — one question about the *previous* chapter's confidence, asked now because a day-later estimate is honest where a same-day one flatters.
+The unit is one chapter through the whole loop — or one section, for any chapter the student chooses to pace by sections: their call, made at the chapter's start, proposed by you when CONTENTS.md marks it `diff 3`, defaulted from the reading plan's pacing bullet, recorded in the `next:` pointer (mechanics below). Before new material, two things ride on top of the unit (both from REVISE.md, both short): the **warm-up** over whatever the due check returned, and the **delayed judgment of learning** — one question about the *previous* chapter's confidence, asked now because a day-later estimate is honest where a same-day one flatters.
+
+## Section pacing
+
+Any chapter can go by sections — because the material is steep, or the student simply prefers it; `diff 3` is when you propose it, never a gate. Section pacing changes the unit, not the loop:
+
+- **Set up once, at the chapter's first session**: from the Survey step's skim, write the note's `## Sections` checklist (NOTES-FORMAT.md) — the section list with page ranges, the single home of within-chapter progress. CONTENTS.md's status cell may carry the gist (`reading (§1.2 of 4)` — CONTENTS-FORMAT.md); the `next:` pointer names the live section.
+- **Each session takes one section (or a few short ones) through Survey → Question → Read → Recite.** A section session is done the way a chapter session is done — **no recite, no done**: a short closed-book recite (roughly 5–8 items, sized to the material) over the sections read so far, weighted to today's, its ledger lines appended as always; a say-back mid-read is not a recite. Then tick the checklist row, re-render the note's page, log the line.
+- **Review — teach-back, summary, ladder entry — runs once, at the chapter's close**: the last section's recite covers the whole chapter's cues, and its pass is what flips the chapter to `recited` and enters box 1. Until then the chapter stays `reading` and its box, due, and conf columns stay `—`.
+- **Sections are a reading unit, not a scheduling unit.** Cards, decks, ledger lines, the Leitner ladder, statuses, and exam eligibility stay chapter-keyed — a section session appends its lines against the chapter's cards, and `revise.py` never sees sections. Pacing is re-decidable at any session; switching back to chapter pace is just a bigger next unit.
+
+## Scaffold mode
+
+When BOOK.md carries `support: scaffold`, the loop inverts so the student can read the book alone: you equip them *before* the read — the assumed background, a slow walkthrough, a self-test — they read the section unaided, and a later step captures the note and runs the recite: **equip → read alone → capture + recite**, playbook in SCAFFOLD.md. Everything below is the plain loop, unchanged when the mode is off.
 
 ## The loop
 
-Survey → Question → Read → Recite → Review, in order, one chapter. The chapter is not done without step 4: **no recite, no `recited`** (SKILL.md's gotcha). A session that runs out of time before the recite logs `next: recite ch N` and leaves status `reading`.
+Survey → Question → Read → Recite → Review, in order, one unit. The unit is not done without step 4: **no recite, no `recited`** (SKILL.md's gotcha). A session that runs out of time before the recite logs `next: recite {unit}` and leaves status `reading`.
 
 ## Survey
 
@@ -27,13 +42,13 @@ Two minutes, from the chapter's page range (CONTENTS.md): headings, figures, sum
 
 ## Question
 
-Write 4–8 prequestions into the chapter note's `## Cues` (NOTES-FORMAT.md) **before reading**: backlog questions that touch this chapter first (survey page), then questions generated from the headings ("§3.2 'The limits of histograms' — what limits?"). The student may add, veto, or sharpen any of them. Prequestions are cheap and they change how the read attends — write them even when the student is impatient to start.
+Offer 4–8 prequestions for the chapter note's `## Cues` (NOTES-FORMAT.md) before reading — one line, not a toll gate: backlog questions that touch this chapter first (survey page, when the book has a backlog), then questions generated from the headings ("§3.2 'The limits of histograms' — what limits?"). The student may add, veto, sharpen — or decline the lot; "just start reading" is a full answer. Prequestions are cheap and they change how the read attends — say so once, then respect the no. A standing `questions:` line in BOOK.md, or a matching line in STUDENT.md's Observed preferences, means skip even the offer. **Prequestions are an offer; a populated Cues section by recite time is not** — when none are written up front, draft the cues during and after the read from what the chapter actually leaned on (timing rules in NOTES-FORMAT.md), and the recite runs from them exactly as always.
 
 ## Read together
 
 The conversational read, in page-ranged chunks, building the note as you go:
 
-1. **Locate.** Take the next section's page range from CONTENTS.md; read it (natively page-ranged; `extract/` when the harness can't — LAYOUT.md).
+1. **Locate.** Take the next section's page range (within the chapter's CONTENTS.md range); read it (natively page-ranged; `extract/` when the harness can't — LAYOUT.md).
 2. **Converse.** Walk it in STUDENT.md's register. Quote verbatim where exactness matters; ◆ anything beyond the book, in chat too.
 3. **Capture into the note** (NOTES-FORMAT.md): Terms as the author defines them; the section's Propositions, anchored; the Argument rebuilt in the student's own notation — ask them to say it back and write *their* version; at least one worked example transcribed verbatim and annotated line by line.
 4. **The concept-reflex.** When an idea will clearly outlive this book, offer one line — "start a concept note for *p-value*?" — and write it on yes (NOTES-FORMAT.md).
@@ -48,7 +63,7 @@ Up to ~3 external resources per chapter, offered not imposed, into the note's `#
 
 ## Recite, closed book
 
-The chapter's exit exam, mandatory, run to ASSESS.md's recite protocol: book and notes closed; you ask from the Cues plus the chapter's new cards; confidence before every answer; grade against rubrics; every graded exchange appends its ledger line (DECK-FORMAT.md); misses become cards and mark their cue `✗`.
+The unit's exit exam, mandatory, run to ASSESS.md's recite protocol: book and notes closed; you ask from the Cues plus the chapter's new cards; confidence before every answer; grade against rubrics; every graded exchange appends its ledger line (DECK-FORMAT.md); misses become cards and mark their cue `✗`.
 
 **Pass/fail is the student's call, guided**: propose pass when the cues' misses are minor and the core held (a number like "most cues Good or better" helps; the rubric record is what makes the call honest). On a pass → Review. On a fail, no ceremony: the retry is the `next:` pointer, targeted at what missed.
 
@@ -67,4 +82,4 @@ The chapter's close, in order:
 
 ## Ending pass 2
 
-When every planned chapter is `recited` (or licensed `skimmed`/`skipped`), say so, and ask the gate question: **worth a pass 3 — critique, re-creation, the cumulative exam?** Record the decision (BOOK.md status + log line). The question backlog is the gate-check: read it aloud — which questions can the student now answer cold, and which does the book leave open? Unanswered ones either point at pass 3 work or at the book's limits; both are worth saying.
+When every planned chapter is `recited` (or licensed `skimmed`/`skipped`), say so, and ask the gate question: **worth a pass 3 — critique, re-creation, the cumulative exam?** Record the decision (BOOK.md status + log line). The question backlog is the gate-check: read it aloud — which questions can the student now answer cold, and which does the book leave open? Unanswered ones either point at pass 3 work or at the book's limits; both are worth saying. Where the backlog was declined, run the gate-check against the book's own claims instead — the survey's one-sentence unity and chapter map, read aloud the same way.

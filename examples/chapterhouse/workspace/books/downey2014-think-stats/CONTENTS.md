@@ -9,7 +9,7 @@ Page ranges are PDF pages (printed page + 20; verified against ch. 1 with the st
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | [Exploratory data analysis](notes/ch01-exploratory.md) | 21–36 | — | 1 | 3 | recited | 3 | 2026-08-26 | 75 | 0.11 |
 | 2 | [Distributions](notes/ch02-distributions.md) | 37–50 | 1 | 1 | 4 | recited | 2 | 2026-08-22 | 50 | 0.11 |
-| 3 | Probability mass functions | 51–64 | 2 | 2 | 4 | unread | — | — | — | — |
+| 3 | [Probability mass functions](notes/ch03-pmfs.md) | 51–64 | 2 | 2 | 4 | reading (§3.1 of 5) | — | — | — | — |
 | 4 | Cumulative distribution functions | 65–76 | 3 | 2 | 4 | unread | — | — | — | — |
 | 5 | Modeling distributions | 77–94 | 4 | 2 | 5 | unread | — | — | — | — |
 | 6 | Probability density functions | 95–110 | 4, 5 | 3 | 4 | unread | — | — | — | — |

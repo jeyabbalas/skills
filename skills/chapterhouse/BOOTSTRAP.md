@@ -20,8 +20,8 @@ Table of contents
 Adapt, don't recite — but keep it this short and credit the sources:
 
 > We'll study the whole book in three passes — the method draws on M. Adler's *How to Read a Book*, F. Robinson's SQ3R, and what learning science actually validates: testing yourself and spacing the reviews.
-> **Pass 1 — inspectional survey** (a session or two): map the book — chapters, difficulty, what depends on what — classify what kind of book it is, write down the questions you want it to answer, and plan the read. Then decide: is this the right book?
-> **Pass 2 — analytical read** (the long middle, one chapter per session): we read each chapter together into structured notes, and the chapter ends with a closed-book quiz — misses become flashcards.
+> **Pass 1 — inspectional survey** (a session or two): map the book — chapters, difficulty, what depends on what — classify what kind of book it is, note any questions you want it to answer — none is a fine answer — and plan the read. Then decide: is this the right book?
+> **Pass 2 — analytical read** (the long middle, one chapter — or one section when the going is steep — per session): we read each chapter together into structured notes, and the chapter ends with a closed-book quiz — misses become flashcards.
 > **Pass 3 — synthesis**: critique the book, re-create its core results from memory, sit a cumulative exam.
 > And woven through everything: each session opens with whatever your flashcards and chapters say is due for review. You decide at every gate whether to go deeper. It all lives in this directory as markdown and web pages, so any future session picks up exactly where we left off.
 

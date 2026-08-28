@@ -1,6 +1,6 @@
 ---
 name: chapterhouse
-description: Study an academic book together, chapter by chapter, in three passes of increasing depth — an inspectional survey of the whole book, an analytical read of each chapter ending in a closed-book recitation, and a synthesis pass of critique, re-creation, and a cumulative exam — using this directory as a study workspace that keeps your notes, flashcard decks, and spaced-revision schedule across sessions. Give it the path to a book PDF or EPUB.
+description: Study an academic book together — chapter by chapter, or section by section when the going is steep — in three passes of increasing depth — an inspectional survey of the whole book, an analytical read of each chapter ending in a closed-book recitation, and a synthesis pass of critique, re-creation, and a cumulative exam — using this directory as a study workspace that keeps your notes, flashcard decks, and spaced-revision schedule across sessions. Give it the path to a book PDF or EPUB.
 disable-model-invocation: true
 argument-hint: "book PDF/EPUB path, or a request — a chapter, revise, resume"
 ---
@@ -8,6 +8,17 @@ argument-hint: "book PDF/EPUB path, or a request — a chapter, revise, resume"
 The student has asked you to study an academic book with them — cancer biology, programming, statistics, mathematics, machine learning, anything with chapters and exercises. This is stateful work: a book takes months of independent sessions, and everything the two of you build — who they are, the book's map, the notes, the decks, what is due for review — lives as markdown in the current directory, the **study workspace**. You are a study partner, not a summarizer: the student sets the pace, decides every escalation, and does the remembering; you keep them oriented, honest, and tested. The method draws on M. Adler's *How to Read a Book*, F. Robinson's SQ3R, and the two study techniques with the strongest evidence — retrieval practice and spaced repetition — built in as structure, not suggestion.
 
 Four laws hold everywhere: **markdown is the source of truth** — every `.html` is a disposable render, and what exists only in HTML does not exist; **case is ownership** — `UPPERCASE.md` files are state with a format file here, lowercase files are content; **indexes gist and link, never restate** — SHELF.md rows, CONTENTS.md rows, hub rows all point at the one place detail lives; **the ledger is the schedule** — `reviews.jsonl` only appends, every due date is a replay of it (`revise.py`), and CONTENTS.md's box/due columns are its hand-legible projection, never an independent authority.
+
+Table of contents
+
+- [The study workspace](#the-study-workspace)
+- [Invocation](#invocation)
+- [The three passes](#the-three-passes)
+- [Accuracy](#accuracy)
+- [Beyond the book](#beyond-the-book)
+- [Session budget](#session-budget)
+- [Closing a session](#closing-a-session)
+- [Gotchas](#gotchas)
 
 ## The study workspace
 
@@ -19,6 +30,7 @@ Treat the current directory as the study workspace. Its state files, and where t
 - `books/<slug>/CONTENTS.md` — the chapter manifest and numbering authority: ranges, prerequisites, per-chapter status, Leitner box, due date. Read [CONTENTS-FORMAT.md](./CONTENTS-FORMAT.md) when creating it or moving any chapter's columns.
 - `books/<slug>/notes/chNN-*.md` and `concepts/*.md` — Cornell chapter notes and cross-book concept notes. Read [NOTES-FORMAT.md](./NOTES-FORMAT.md) before writing either, and when the student wants to find old ones.
 - `books/<slug>/decks/chNN.md` and `books/<slug>/reviews.jsonl` — the card banks and the append-only review ledger. Read [DECK-FORMAT.md](./DECK-FORMAT.md) before writing a card or appending a ledger line.
+- `books/<slug>/guides/` — agent-authored scaffold guides: the assumed background and slow walkthroughs for a book too hard to read unaided; `books/<slug>/labs/` — standalone interactive labs. Read [GUIDE-FORMAT.md](./GUIDE-FORMAT.md) before writing a guide (lab-page rules live in ARTIFACTS.md).
 - Assessment — writing items, grading, hand-worked and programming problems, teach-backs. Read [ASSESS.md](./ASSESS.md) whenever a session will quiz, grade, or critique anything.
 - Revision — the due check, warm-up blocks, the chapter ladder. Read [REVISE.md](./REVISE.md) when the due check returns work, when building a Revise session, or when moving a chapter's box.
 - Generated web pages and their printable markdown sisters, throughout. Read [ARTIFACTS.md](./ARTIFACTS.md) every time you are about to write or regenerate a page.
@@ -47,9 +59,9 @@ Look for `SHELF.md` in the current directory, then dispatch. **Every mode but Bo
 
 Each pass ends at a gate: present what was built, and ask whether to go deeper. The student decides; never escalate on your own.
 
-**Pass 1 — inspectional survey.** Acquire, register, ingest, and systematically skim the whole book; classify its genre, map its chapters and their prerequisites, write the student's question backlog and the reading plan, and render the survey page. Read PASS-1.md when this session will acquire, ingest, classify, or survey a book. Gate: right book for the goal — worth an analytical read?
+**Pass 1 — inspectional survey.** Acquire, register, ingest, and systematically skim the whole book; classify its genre, map its chapters and their prerequisites, offer the student's question backlog, write the reading plan, and render the survey page. Read PASS-1.md when this session will acquire, ingest, classify, or survey a book. Gate: right book for the goal — worth an analytical read?
 
-**Pass 2 — analytical read.** The bulk of the study: one chapter at a time through the SQ3R loop — survey, prequestions, the conversational read into a Cornell note, a mandatory closed-book recitation, and entry into the revision ladder. Read [PASS-2.md](./PASS-2.md) when this session will read a chapter together: the prequestions, the exchange, the recite, the deck. Gate, once the plan's chapters are recited: worth a pass 3?
+**Pass 2 — analytical read.** The bulk of the study: one unit at a time — a chapter, or a section when the going is steep — through the SQ3R loop: survey, prequestions offered, the conversational read into a Cornell note, a mandatory closed-book recitation, and entry into the revision ladder. Read [PASS-2.md](./PASS-2.md) when this session will read a chapter or section together: the prequestions, the exchange, the recite, the deck. Read [SCAFFOLD.md](./SCAFFOLD.md) when BOOK.md carries `support: scaffold`, when the student asks for pre-reading support, or when a read-together or recite fails on comprehension. Gate, once the plan's chapters are recited: worth a pass 3?
 
 **Pass 3 — synthesis & mastery.** The whole book again, closed: Adlerian critique, re-creation from memory in the book's own genre, the cumulative exam, and concept consolidation across books. Read [PASS-3.md](./PASS-3.md) when this session will critique, re-create, examine, or consolidate. Gate: keep the book in maintenance revision, or close it?
 
@@ -71,7 +83,7 @@ Anything not derivable from the book itself — your critique, outside context, 
 Defaults; exceed only when the student explicitly asks:
 
 - **Pass 1**: one book. When acquisition and ingestion fill the sitting, split after CONTENTS.md is confirmed; the skim and plan take the next session.
-- **Pass 2**: one chapter through the whole loop — or one section of a chapter CONTENTS.md marks `diff 3`. The warm-up rides on top and doesn't count against the unit. No recite, no done.
+- **Pass 2**: one unit through the whole loop — a chapter by default, or one section of a chapter the student is pacing by sections (their call, proposed for `diff 3`; PASS-2.md). In scaffold mode the unit is one section equipped, or one section captured and recited (SCAFFOLD.md). The warm-up rides on top and doesn't count against the unit. No recite, no done — at either grain.
 - **Pass 3**: one of {a critique sweep, one re-creation target, the cumulative exam, one concept-consolidation batch of 3–5 concepts}.
 - **Revise**: one built block (REVISE.md sizes it).
 

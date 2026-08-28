@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Ch 3 — Foundations</title>
+<!-- failsafe: keeps a stray single-file copy readable; the real stylesheet below overrides it -->
+<style>
+  body{margin:0;font:1.125rem/1.65 Georgia,serif;color:#1F2328;background:#FAF9F6}
+  .page{max-width:46rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .beyond{border-left:3px solid #C99A2E;background:#FBF4E1;padding:.85rem 1.1rem}
+  img{max-width:100%}
+</style>
+<link rel="stylesheet" href="../../../assets/book-study.css">
+<script defer src="../../../assets/book-study.js"></script>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead chrome">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Shelf</a> <span>›</span> <a href="../index.html">Think Stats</a> <span>›</span> <span>Guide — Ch 3 foundations</span></nav>
+    <span class="chip">Pass 2</span>
+  </header>
+
+  <h1>Ch 3 — Foundations</h1>
+  <p class="subtitle">The Python chapter 3 silently assumes, mapped once onto R. For: ch 3 · note: <a href="../notes/ch03-pmfs.html">Ch 3 — Probability mass functions</a>.</p>
+
+  <aside class="beyond" data-kind="context">
+    <p class="beyond-kicker">◆ Beyond the book</p>
+    <p>Everything in this file is mine, not Downey’s: the Python the chapter assumes without teaching, mapped once onto the R you already own. Skip any item you already have — the check tells you. The book’s own words appear only in quotation marks with printed pages.</p>
+  </aside>
+
+  <h3>F1 — The Python dict is your named vector, used as a mapping</h3>
+  <p>§3.1 builds a PMF with three lines the book never explains: <code>d = {}</code> makes an empty <strong>dict</strong>, and <code>d[x] = freq / n</code> files a value under a key (p. 31). A dict is Python’s mapping type — R’s named vector or named list, but with real keys instead of character names:</p>
+  <div class="scroll"><table class="mini">
+    <thead><tr><th>move</th><th>R</th><th>Python</th></tr></thead>
+    <tbody>
+      <tr><td>make one</td><td><code>d &lt;- c("1"=0.2, "2"=0.4)</code></td><td><code>d = {1: 0.2, 2: 0.4}</code></td></tr>
+      <tr><td>look up</td><td><code>d[["2"]]</code></td><td><code>d[2]</code></td></tr>
+      <tr><td>add / overwrite</td><td><code>d[["5"]] &lt;- 0.2</code></td><td><code>d[5] = 0.2</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Two differences that bite R hands: keys keep their type (<code>d[2]</code> and <code>d["2"]</code> are different entries), and there is no partial matching — a missing key is a <code>KeyError</code>, not <code>NULL</code>.</p>
+  <p><em>Check: after <code>d = {}</code> then <code>d[1] = 0.4</code> then <code>d[1] = 0.2</code>, what is <code>d[1]</code>? — 0.2: assignment to an existing key overwrites; that is why the book’s loop needs no pre-allocation.</em></p>
+
+  <h3>F2 — Tuple unpacking drives Python’s loops</h3>
+  <p>The book’s loop header is <code>for x, freq in hist.Items():</code> (p. 31). <code>Items()</code> yields <strong>pairs</strong>, and <code>x, freq = pair</code> splits one pair into two names — that is <strong>tuple unpacking</strong>, and it is everywhere in idiomatic Python. R has no direct analogue; the nearest habit is looping over <code>names(v)</code> and indexing back in, which is exactly the clumsiness unpacking removes.</p>
+  <p><em>Check: looping <code>for x, freq in [(1, 2), (2, 2), (5, 1)]:</code> — what are <code>x</code> and <code>freq</code> on the second pass? — x = 2, freq = 2.</em></p>
+
+  <h3>F3 — Reading Python classes: <code>obj.Method()</code>, <code>obj[key]</code>, inheritance</h3>
+  <p>Three idioms you must read (not write) all through this book:</p>
+  <ul>
+    <li><code>pmf.Prob(2)</code> — a <strong>method</strong>: a function that travels with the object. R’s S3 spelling would be <code>Prob(pmf, 2)</code>; Python puts the object first, before the dot.</li>
+    <li><code>pmf[2]</code> — the bracket operator is also a method, one the class chose to support; here it is defined to do the same lookup as <code>Prob</code>.</li>
+    <li>“they inherit many of their methods from a common parent class” (p. 31) — <strong>inheritance</strong>: <code>Hist</code> and <code>Pmf</code> share one toolbox (<code>Values</code>, <code>Items</code>, …), so what you learned on <code>Hist</code> in chapter 2 transfers unchanged.</li>
+  </ul>
+  <p><em>Check: do <code>pmf.Prob(2)</code> and <code>pmf[2]</code> differ? — no: the bracket form is defined as the same lookup; the book says “The bracket operator is equivalent” (p. 32).</em></p>
+
+  <h3>If a foundation is missing</h3>
+  <aside class="beyond" data-kind="source">
+    <p class="beyond-kicker">◆ Beyond the book · Source</p>
+    <p><a href="https://docs.python.org/3/tutorial/datastructures.html#dictionaries">The Python Tutorial §5.5–5.6, “Dictionaries” and “Looping Techniques”</a> — for F1 and F2: ten minutes, official, with the <code>items()</code> loop shown exactly as the book uses it.</p>
+  </aside>
+  <aside class="beyond" data-kind="source">
+    <p class="beyond-kicker">◆ Beyond the book · Source</p>
+    <p><a href="https://pandas.pydata.org/docs/getting_started/comparison/comparison_with_r.html">pandas: “Comparison with R / R libraries”</a> — the standing R→Python phrasebook; keep it open from §3.5 (DataFrame indexing) onward.</p>
+  </aside>
+
+  <footer class="colophon">Generated by chapterhouse · Pass 2 guide · 2026-08-21. Written by an AI study partner as pre-reading support. Unmarked content on this page is the study partner’s teaching, not the book’s — the book’s own words appear only in quotation marks with page anchors. Verify against the original book before citing. · <a href="ch03-foundations.md">Markdown version</a></footer>
+
+</main>
+</body>
+</html>

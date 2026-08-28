@@ -36,6 +36,10 @@ A workspace with one book mid-study (the same shape holds at three books — `co
         ├── critique.html / critique.md ← pass 3 critique
         ├── notes/                  ← ch02-distributions.md/.html — Cornell chapter notes
         ├── decks/                  ← ch02.md/.html — card banks and their quiz pages
+        ├── guides/                 ← ch03-foundations.md/.html + ch03-s01-<slug>.md/.html —
+        │                             scaffold-mode guides (GUIDE-FORMAT.md)
+        ├── labs/                   ← ch03-<slug>.md/.html — standalone interactive labs
+        │                             (ARTIFACTS.md)
         ├── exams/                  ← exam-01.md/.html — cumulative exams
         ├── practice/               ← ch02/exercise_01.py + its test; p3-<slug>/
         │                             re-creations (code and worked files, no pages)
@@ -56,6 +60,9 @@ A workspace with one book mid-study (the same shape holds at three books — `co
 - **Book slug**: `surname` + `year` + `-short-title`, lowercase kebab, short title 1–4 words, whole slug ≤ 40 characters: `downey2014-think-stats`, `weinberg2013-biology-of-cancer`. On collision, extend the short title with more title words — never numeric suffixes. The slug doubles as the citation key. Multi-volume works: one slug per volume by default; a work studied as one arc keeps one slug, continuous chapter numbers, and a note in CONTENTS.md naming which file holds which chapters.
 - **Chapters**: `chNN` — the book's own chapter numbers, zero-padded to two digits (`ch101` past 99). CONTENTS.md is the numbering authority; front and back matter the book doesn't number stay out of the chapter table (the survey covers them).
 - **Chapter notes**: `notes/chNN-<short-slug>.md` — `ch02-distributions.md`.
+- **Sections**: `§N.M` in prose, pointers, and anchors; `sMM` in filenames when a per-section file exists — the book's own within-chapter section number, zero-padded (`§3.2` → `s02`); unnumbered sections take their order in the chapter.
+- **Guides**: `guides/chNN-foundations.md` (one per scaffolded chapter) and `guides/chNN-sMM-<short-slug>.md` (one per scaffolded section; a book without usable sections: `guides/chNN-<short-slug>.md`). Formats in GUIDE-FORMAT.md.
+- **Labs**: `labs/chNN-<short-slug>.md` with its self-contained `.html` beside it (ARTIFACTS.md). `practice/` stays code and worked files only — no pages.
 - **Decks and cards**: `decks/chNN.md`; cards inside are `chNN-cNNN`, zero-padded to three. Scan the deck for the highest number and increment; never reuse an id — the ledger references it forever.
 - **Exams**: `exams/exam-NN.md`, numbered in the order they are sat.
 - **Figures**: `figures/chNN-fig-MM.png` — `MM` is the book's within-chapter figure number (`Figure 2.3` → `ch02-fig-03.png`); books that number straight through keep the running number (`Figure 47` in chapter 5 → `ch05-fig-47.png`).
@@ -72,7 +79,7 @@ Pages link the shared assets relatively; the depth is fixed by location:
 | workspace root (`index.html`) | `` (empty) |
 | `concepts/` | `../` |
 | book root (`books/<slug>/*.html`) | `../../` |
-| book subdirectory (`notes/`, `decks/`, `exams/`) | `../../../` |
+| book subdirectory (`notes/`, `decks/`, `exams/`, `guides/`, `labs/`) | `../../../` |
 
 ## Script contracts
 

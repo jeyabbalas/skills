@@ -28,7 +28,7 @@ Each is one session (SKILL.md's budget); repeat units as the student likes (a se
 - **illogical** — the conclusion doesn't follow (name the step that breaks);
 - **incomplete** — the account stops short of what the book's own goal requires (this is the mildest count, and the only one that can stand alone without disagreement).
 
-Harvest the raw material before judging fresh: the notes' open `My questions`, `critique`-flavored ◆ asides in chapter notes, backlog questions the book never answered. A finding that dissolves on re-reading is recorded as dissolved, not deleted — how the judgment evolved is signal.
+Harvest the raw material before judging fresh: the notes' open `My questions`, `critique`-flavored ◆ asides in chapter notes, backlog questions the book never answered (when one exists). A finding that dissolves on re-reading is recorded as dissolved, not deleted — how the judgment evolved is signal.
 
 ## Critique template
 
@@ -68,4 +68,4 @@ The syntopical unit: 3–5 concepts per sitting, into `concepts/` per NOTES-FORM
 
 ## Ending pass 3
 
-When the student calls the four units served (all four is typical, not required), present the whole: the critique, the re-creation outcomes, the exam debrief, the backlog read out one final time — answered, open, out of scope. Then the last gate: **maintenance, or closed?** `maintenance` keeps the cards cycling — sessions in this workspace keep offering the book's due reviews indefinitely. `closed` retires it from revision; its log line ends `next: — (closed)`. Either way, status + SHELF row + log line, and the hub regenerated one last time.
+When the student calls the four units served (all four is typical, not required), present the whole: the critique, the re-creation outcomes, the exam debrief, the backlog read out one final time — answered, open, out of scope (a declined backlog reads out the book's own claims instead: the survey's one-sentence unity, or a capstone list when the book offers one, held against what the student can now state). Then the last gate: **maintenance, or closed?** `maintenance` keeps the cards cycling — sessions in this workspace keep offering the book's due reviews indefinitely. `closed` retires it from revision; its log line ends `next: — (closed)`. Either way, status + SHELF row + log line, and the hub regenerated one last time.

@@ -16,6 +16,8 @@ format: pdf
 added: 2026-08-10
 source: https://greenteapress.com/thinkstats2/thinkstats2.pdf (free edition from the author's site, Green Tea Press license page names CC BY-NC — checked 2026-08-10)
 bibsource: greenteapress.com book page + the book's title page
+support: scaffold (since 2026-08-21 — ch 3's Python idiom runs ahead of a rusty-Python reader) · ch 3 only
+
 
 ## Goal
 > "I want to stop leaning on canned R recipes. Rebuild my exploratory-statistics instincts in Python — simulation first — so when I analyze my own cohort data I'm exercising judgment, not ritual."
@@ -33,3 +35,4 @@ bibsource: greenteapress.com book page + the book's title page
 - 2026-08-15 · revise · warm-up 5 items; ch 1 cumulative recite passed → box 2; teach-back critique minted nothing new · next: ch 2
 - 2026-08-16 · pass 2 · delayed JOL ch 1 (75); ch 2 read + recited; deck ch02 (9 cards, one completion-stage); practice/ch02 exercise passing; fig 2.2 cropped; effect-size concept note started; box 1 · next: ch 3
 - 2026-08-19 · revise · delayed JOL ch 2 (50); ch 1 cumulative → box 3, ch 2 cumulative passed with one miss (ch02-c007 → retried) → box 2; 7 items · next: ch 3
+- 2026-08-21 · pass 2 · due check clean; ch 3 goes section-paced + scaffolded at the student's request (support: ch 3 only, STUDENT.md noted) — equip §3.1: note started (## Sections ×5, cues C1–C6), guides/ch03-foundations F1–F3 written, checks run live (F2 unpacking wobbled once, item deepened), guides/ch03-s01-pmfs S1–S4 + self-test written; ch 3 → reading · next: read §3.1 alone (PDF 51–52) with guide ch03-s01, then capture + recite C1, C2, C5

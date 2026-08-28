@@ -70,7 +70,7 @@ Fill `prereqs` from the book's own signals first — "this chapter assumes chapt
 
 ## The question backlog
 
-Before any real reading, elicit **5–15 questions the student wants this book to answer** — concrete, in their words, against their goal ("Why do my cohort's p-values cluster near 0.05?", not "understand statistics"). Push once past generic answers. The backlog lives on the survey page; pass 2 seeds each chapter's prequestions from the backlog items that touch it, and pass 3's synthesis answers the backlog explicitly. A question the book turns out not to answer is a finding, not a failure.
+Before any real reading, **offer** the backlog, once: 5–15 questions the student wants this book to answer — concrete, in their words, against their goal ("Why do my cohort's p-values cluster near 0.05?", not "understand statistics"). Push once past generic answers — then take the answer, whichever it is. **"Reading cover to cover", "I don't know the book yet", and "no questions" are first-class answers, not failed elicitations**: record the decline verbatim and dated in the survey's questions section, add the `questions:` line to BOOK.md (BOOK-FORMAT.md), and never offer again — a question the student brings later, any session, simply joins the survey section and retires the line. With a backlog: it lives on the survey page; pass 2 seeds each chapter's prequestions from the backlog items that touch it, and pass 3's synthesis answers it explicitly. Without one: prequestions, when the student wants them at all, derive from each chapter's own survey (PASS-2.md), and pass 3 answers to the book's own claims instead (PASS-3.md). A question the book turns out not to answer is a finding, not a failure.
 
 ## The reading plan
 
@@ -78,7 +78,8 @@ Adler licenses not reading everything; make the license explicit and the student
 
 - **Order** — the default is the book's own; reorder only along the DAG.
 - **Skip / skim licenses** — chapters outside the goal get `skipped`; background the student owns gets `skimmed`. Both leave the recite denominator; either can be revoked later.
-- **Target sessions** — chapters ÷ STUDENT.md's cadence, said honestly: "13 chapters at 2 sessions a week is about 7 weeks of pass 2."
+- **Pacing** — chapter-at-a-time is the default; any chapter may be planned by sections instead (propose it for the ones marked `diff 3`; mechanics in PASS-2.md). A default, not a contract — the student re-decides at any chapter's start, and the log's `next:` pointer always names the live unit.
+- **Target sessions** — planned units — chapters, or their sections where the plan paces by sections — ÷ STUDENT.md's cadence, said honestly: "13 chapters at 2 sessions a week is about 7 weeks of pass 2."
 
 The plan's prose lives on the survey page; its outcomes are CONTENTS.md statuses.
 
@@ -103,10 +104,11 @@ The plan's prose lives on the survey page; its outcomes are CONTENTS.md statuses
 {the non-linear prerequisite edges, one line each, with the book's evidence — or "strictly linear"}
 
 ## Your questions for this book
-1. {backlog, numbered, verbatim}
+1. {backlog, numbered, verbatim — or the decline, quoted and dated: "{their words}"
+   ({date} — offered and declined; one line on what replaces it in passes 2 and 3)}
 
 ## The reading plan
-{order · licenses · target sessions — and what would change the plan}
+{order · licenses · pacing · target sessions — and what would change the plan}
 ```
 
 ## Presenting pass 1

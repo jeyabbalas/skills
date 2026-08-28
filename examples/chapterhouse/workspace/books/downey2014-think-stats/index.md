@@ -10,7 +10,7 @@ Allen B. Downey · 2nd ed. · 2014 · status: pass-2
 |---|---|---|---|
 | [1 · Exploratory data analysis](notes/ch01-exploratory.md) | recited | box 3 · due 2026-08-26 | 0.94 · 0.11 |
 | [2 · Distributions](notes/ch02-distributions.md) | recited | box 2 · due 2026-08-22 | 0.92 · 0.11 |
-| 3 · Probability mass functions | unread | — | — |
+| [3 · Probability mass functions](notes/ch03-pmfs.md) | reading (§3.1 of 5) · scaffolded | — | — |
 | 4 · Cumulative distribution functions | unread | — | — |
 | 5 · Modeling distributions | unread | — | — |
 | 6 · Probability density functions | unread | — | — |
@@ -29,6 +29,8 @@ Allen B. Downey · 2nd ed. · 2014 · status: pass-2
 - [Prerequisite map](map.md) — Pass 1 · maintained
 - [Chapter 1 deck](decks/ch01.md) — 8 cards
 - [Chapter 2 deck](decks/ch02.md) — 9 cards
+- [Ch 3 foundations guide](guides/ch03-foundations.md) — scaffold · F1–F3 with checks
+- [§3.1 guide](guides/ch03-s01-pmfs.md) — scaffold · S1–S4 + self-test
 - practice/ch02/ — Exercise 2.3, tests passing
 - book.pdf — source
 - BOOK.md · CONTENTS.md · reviews.jsonl — state

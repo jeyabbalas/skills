@@ -18,3 +18,4 @@ cadence: 2 × 60 min per week, usually Tue/Fri
 
 ## Observed preferences
 - 2026-08-16 — prefers exercises typed in an editor over pseudo-coding in chat
+- 2026-08-21 — when a chapter's Python runs ahead of them, wants section pacing plus a pre-reading guide (scaffold mode) rather than a longer read-together

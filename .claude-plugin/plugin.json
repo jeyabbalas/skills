@@ -1,7 +1,7 @@
 {
   "name": "jeyabbalas-skills",
   "version": "0.3.0",
-  "description": "Jeya Balaji Balasubramanian's agent skills. three-pass — a guided three-pass deep read of academic papers that builds an interactive, printable reading library. handoff — compact a conversation into a portable handoff document for another agent. schemify — turn bespoke data dictionaries into validated, browsable JSON Schema packages. chapterhouse — a guided chapter-by-chapter study of whole academic books, with spaced revision, self-assessment, and a printable study site.",
+  "description": "Jeya Balaji Balasubramanian's agent skills. three-pass — a guided three-pass deep read of academic papers that builds an interactive, printable reading library. handoff — compact a conversation into a portable handoff document for another agent. schemify — turn bespoke data dictionaries into validated, browsable JSON Schema packages. chapterhouse — a guided study of whole academic books, chapter by chapter or section by section, with scaffolded support for difficult books, spaced revision, self-assessment, and a printable study site.",
   "author": {
     "name": "Jeya Balaji Balasubramanian",
     "url": "https://github.com/jeyabbalas"
