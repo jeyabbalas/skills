@@ -1,6 +1,6 @@
 ---
 name: schemify
-description: Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: it interviews you for what the files don't say, tests every rule against toy data, renders browsable web pages for feedback, and remembers progress across sessions. Give it the path to your data dictionary.
+description: "Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: it interviews you for what the files don't say, tests every rule against toy data, renders browsable web pages for feedback, and remembers progress across sessions. Give it the path to your data dictionary."
 disable-model-invocation: true
 argument-hint: "data dictionary path(s), or a request — a category, a change, review"
 ---
