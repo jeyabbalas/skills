@@ -59,7 +59,7 @@ The package README is the deliverable's front door — written for a consumer wh
    python3 tools/validate.py data . --file your_export.csv
    ```
 
-   plus one line each: double-click `dictionary.html`; `python3 -m http.server 8000` then open `playground.html`. Note that the `$id` namespace is a placeholder to replace before publishing the schemas anywhere public.
+   plus one line each: double-click `dictionary.html` (keyword search built in; the Semantic search switch fetches a small model once, then also finds related variables by meaning); `python3 -m http.server 8000` then open `playground.html`. Note that the `$id` namespace is a placeholder to replace before publishing the schemas anywhere public.
 10. **Open items to confirm with the data provider** — the surviving opens, one line each.
 
 ## Cleanup

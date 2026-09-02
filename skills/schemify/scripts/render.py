@@ -11,8 +11,9 @@ subcommands print JSON to stdout and exit non-zero on failure.
 Subcommands:
 
   init PKG
-      Create assets/ (vendored rendering library + stylesheet) and tools/
-      (validator copy + requirements.txt); stamp assets/VERSION. Idempotent.
+      Create assets/ (vendored rendering library, its embedding worker, the
+      stylesheet) and tools/ (validator copy + requirements.txt); stamp
+      assets/VERSION. Idempotent.
   refresh-assets PKG
       Overwrite the shipped copies from the skill and re-stamp VERSION -
       upgrades the package's whole executable surface at once.
@@ -33,6 +34,7 @@ import json
 import re
 import shutil
 import sys
+import urllib.parse
 from pathlib import Path, PurePosixPath
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -42,9 +44,13 @@ SCHEMA_HINT_KEYS = {"$schema", "$id", "$defs", "properties", "type", "allOf", "o
 
 SHIPPED = [
     ("assets/json-schema-data-dictionary.global.js", "assets/json-schema-data-dictionary.global.js"),
+    ("assets/embed-worker.js", "assets/embed-worker.js"),
     ("assets/schema-pages.css", "assets/schema-pages.css"),
     ("scripts/validate.py", "tools/validate.py"),
 ]
+# The brand mark is inlined into every page at render time (never copied), so a
+# page's fingerprint covers it alongside the template.
+BRAND_MARK = "assets/schemify-mark.svg"
 REQUIREMENTS = "jsonschema>=4.18\nreferencing>=0.35\n"
 
 
@@ -189,13 +195,51 @@ def run_refresh(pkg, args):
                  "`render.py check` reports stale pages."})
 
 
+# ----------------------------------------------------------------- page chrome
+
+
+def template_bytes(name):
+    """A page's template plus the brand mark inlined into it - what its fingerprint covers."""
+    return skill_file("templates/" + name).read_bytes() + skill_file(BRAND_MARK).read_bytes()
+
+
+def brand():
+    """The inline brand mark and the favicon derived from it - one source file."""
+    svg = skill_file(BRAND_MARK).read_text().strip()
+    return svg, "data:image/svg+xml," + urllib.parse.quote(svg)
+
+
+def playground_name(table, multi):
+    return "playground-{}.html".format(table) if multi else "playground.html"
+
+
+def page_nav(tables, multi, current):
+    """The masthead's page switcher: the dictionary, then one playground per table.
+    `current` is "dictionary" or a table name."""
+    items = [("dictionary", "Dictionary", "dictionary.html")]
+    for table in tables:
+        label = "Playground · " + table if multi else "Playground"
+        items.append((table, label, playground_name(table, multi)))
+    return "".join(
+        '<a class="tab" href="{}"{}>{}</a>'.format(
+            href, ' aria-current="page"' if key == current else "", esc(label))
+        for key, label, href in items)
+
+
 # ------------------------------------------------------------------ dictionary
 
 
-def first_sentence(text):
-    text = (text or "").strip()
-    m = re.match(r"(.+?[.!?])(\s|$)", text)
-    return (m.group(1) if m else text)[:200]
+def manifest_study(pkg):
+    path = pkg / "manifest.json"
+    if not path.is_file():
+        return None
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            card = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+    study = card.get("study") if isinstance(card, dict) else None
+    return study.strip() if isinstance(study, str) and study.strip() else None
 
 
 def run_dictionary(pkg, args):
@@ -211,31 +255,39 @@ def run_dictionary(pkg, args):
     for table in sorted(mothers):
         mother = docs[mothers[table]]
         title = mother.get("title", table)
-        playground = "playground-{}.html".format(table) if multi else "playground.html"
-        heading = "<h2>{}</h2>".format(esc(title)) if multi else ""
-        sections.append(
-            '  <section class="dict-section" data-table="{t}">\n'
-            '    <div class="section-head{solo}">{heading}'
-            '<a class="btn chrome" href="{pg}">Open the validation playground</a></div>\n'
-            '    <div class="dict-mount" id="dict-{t}"></div>\n'
-            '  </section>'.format(t=esc(table), heading=heading,
-                                  solo="" if multi else " solo", pg=playground))
+        if multi:
+            # Several tables: each section carries its heading and its own playground link.
+            sections.append(
+                '  <section class="dict-section" data-table="{t}">\n'
+                '    <div class="section-head"><h2>{title}</h2>'
+                '<a class="chrome" href="{pg}">Validation playground</a></div>\n'
+                '    <div class="dict-mount" id="dict-{t}"></div>\n'
+                '  </section>'.format(t=esc(table), title=esc(title),
+                                      pg=playground_name(table, True)))
+        else:
+            # One table: the page title and the masthead's Playground tab already cover it.
+            sections.append(
+                '  <section class="dict-section" data-table="{t}">\n'
+                '    <div class="dict-mount" id="dict-{t}"></div>\n'
+                '  </section>'.format(t=esc(table)))
         mounts.append({"table": table, "title": title,
                        "rootUri": SYNTHETIC_BASE + mothers[table]})
     single_mother = docs[next(iter(mothers.values()))]
+    # One table: the mother's title. Several: the study named by manifest.json
+    # (its optional package card), else the package directory's name.
     page_title = args.title or (single_mother.get("title") if not multi else None) \
-        or "{} - data dictionary".format(pkg.name)
+        or manifest_study(pkg) or pkg.name
     # Single table: the library's own header prints the full description right
     # below, so the page subtitle would only repeat its first sentence.
     subtitle = "" if not multi else \
         "{} tables - {}".format(len(mothers), ", ".join(sorted(mothers)))
 
-    template_path = skill_file("templates/dictionary.html")
-    template = template_path.read_text()
+    template = skill_file("templates/dictionary.html").read_text()
+    mark, favicon = brand()
     documents = schema_documents(docs)
     config = {"package": pkg.name, "generated": datetime.date.today().isoformat(),
               "mounts": mounts}
-    fp = fingerprint(template_path.read_bytes(), version,
+    fp = fingerprint(template_bytes("dictionary.html"), version,
                      [json.dumps(docs[rel], sort_keys=True).encode()
                       for rel in sorted(docs)])
     html = template
@@ -246,6 +298,9 @@ def run_dictionary(pkg, args):
         ("{{GENERATED_DATE}}", config["generated"]),
         ("{{ASSETS_VERSION}}", version),
         ("{{PAGE_FINGERPRINT}}", fp),
+        ("{{BRAND_MARK}}", mark),
+        ("{{FAVICON}}", favicon),
+        ("{{PAGE_NAV}}", page_nav(sorted(mothers), multi, "dictionary")),
         ("{{MOUNT_SECTIONS}}", "\n".join(sections)),
         ("{{SCHEMA_DOCUMENTS_JSON}}", inline_json(documents)),
         ("{{PAGE_CONFIG_JSON}}", inline_json(config)),
@@ -254,7 +309,8 @@ def run_dictionary(pkg, args):
     (pkg / "dictionary.html").write_text(html)
     out({"ok": True, "page": "dictionary.html", "tables": sorted(mothers),
          "documents": len(documents), "fingerprint": fp,
-         "note": "Double-click to open - works over file://."})
+         "note": "Double-click to open - works over file://. Keyword search is built in; "
+                 "the page's Semantic search switch is opt-in and needs the network once."})
 
 
 # ------------------------------------------------------------------ playground
@@ -274,8 +330,8 @@ def run_playground(pkg, args):
     multi = len(mothers) > 1
     tables = [args.table] if args.table else sorted(mothers)
     version = package_version(pkg)
-    template_path = skill_file("templates/playground.html")
-    template = template_path.read_text()
+    template = skill_file("templates/playground.html").read_text()
+    mark, favicon = brand()
     documents = schema_documents(docs)
     pages = []
     for table in tables:
@@ -300,7 +356,7 @@ def run_playground(pkg, args):
                   "rootUri": SYNTHETIC_BASE + mother_rel,
                   "rootId": mother.get("$id"),
                   "generated": datetime.date.today().isoformat()}
-        fp = fingerprint(template_path.read_bytes(), version,
+        fp = fingerprint(template_bytes("playground.html"), version,
                          [json.dumps(docs[rel], sort_keys=True).encode()
                           for rel in sorted(docs)] + dataset_bytes)
         html = template
@@ -311,12 +367,15 @@ def run_playground(pkg, args):
             ("{{GENERATED_DATE}}", config["generated"]),
             ("{{ASSETS_VERSION}}", version),
             ("{{PAGE_FINGERPRINT}}", fp),
+            ("{{BRAND_MARK}}", mark),
+            ("{{FAVICON}}", favicon),
+            ("{{PAGE_NAV}}", page_nav(sorted(mothers), multi, table)),
             ("{{SCHEMA_DOCUMENTS_JSON}}", inline_json(documents)),
             ("{{DATASETS_JSON}}", inline_json(datasets)),
             ("{{PAGE_CONFIG_JSON}}", inline_json(config)),
         ]:
             html = html.replace(token, value)
-        name = "playground-{}.html".format(table) if multi else "playground.html"
+        name = playground_name(table, multi)
         (pkg / name).write_text(html)
         pages.append({"page": name, "table": table, "fingerprint": fp,
                       "fixtures": sorted(datasets)})
@@ -367,8 +426,8 @@ def run_check(pkg, args):
                                      "pages can't be checked for staleness."})
             continue
         if page.name == "dictionary.html":
-            template = skill_file("templates/dictionary.html").read_bytes()
-            expected = fingerprint(template, installed or "", schema_bytes)
+            expected = fingerprint(template_bytes("dictionary.html"), installed or "",
+                                   schema_bytes)
         elif page.name.startswith("playground"):
             table = page.name[len("playground-"):-len(".html")] \
                 if page.name.startswith("playground-") else \
@@ -378,8 +437,7 @@ def run_check(pkg, args):
                 fpath = fixture_dir(pkg, table, multi) / (key + ".json")
                 if fpath.is_file():
                     dataset_bytes.append(fpath.read_bytes())
-            template = skill_file("templates/playground.html").read_bytes()
-            expected = fingerprint(template, installed or "",
+            expected = fingerprint(template_bytes("playground.html"), installed or "",
                                    schema_bytes + dataset_bytes)
         else:
             continue

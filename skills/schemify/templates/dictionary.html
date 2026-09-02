@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>{{TITLE}} — data dictionary</title>
+<title>{{TITLE}} · data dictionary</title>
+<link rel="icon" href="{{FAVICON}}">
 <!-- failsafe: keeps a stray single-file copy readable; the real stylesheet below overrides it -->
 <style>
   body{margin:0;font:1rem/1.55 system-ui,sans-serif;color:#1F2328;background:#FAF9F6}
-  .page{max-width:72rem;margin:0 auto;padding:1.2rem 1.25rem 3rem}
+  .page{max-width:76rem;margin:0 auto;padding:1rem 1.5rem 2.5rem}
   .banner{border:1px solid #C99A2E;background:#FBF4E1;padding:.6rem 1rem;border-radius:8px}
 </style>
 <link rel="stylesheet" href="assets/schema-pages.css">
@@ -17,16 +18,31 @@
 <body data-fingerprint="{{PAGE_FINGERPRINT}}">
 <main class="page">
 
-  <header class="masthead chrome">
-    <nav class="crumbs" aria-label="Breadcrumb">{{PACKAGE_NAME}} · data dictionary</nav>
-    <span class="chip">dictionary</span>
+  <header class="masthead">
+    <a class="brand" href="https://github.com/jeyabbalas/skills/tree/main/skills/schemify" title="Made with /schemify">{{BRAND_MARK}}<span class="brand-name">schemify</span></a>
+    <nav class="pages chrome" aria-label="Pages">{{PAGE_NAV}}</nav>
   </header>
 
-  <h1>{{TITLE}}</h1>
-  <p class="subtitle">{{SUBTITLE}}</p>
+  <div class="title-block">
+    <div class="titles">
+      <p class="eyebrow">Data dictionary</p>
+      <h1>{{TITLE}}</h1>
+      <p class="subtitle">{{SUBTITLE}}</p>
+    </div>
+    <div class="page-tools chrome">
+      <label class="switch" for="semantic-toggle"
+             title="Runs a small text-embedding model in your browser (Xenova/bge-small-en-v1.5, fetched once from huggingface.co).">
+        <input type="checkbox" id="semantic-toggle" role="switch" aria-describedby="semantic-note">
+        <span>Semantic search</span>
+      </label>
+      <span class="tools-note" id="semantic-note">Also finds related variables — “smoking” turns up the tobacco rows.
+        Downloads a 34 MB model once; nothing you type leaves your browser.</span>
+      <span class="tools-status" id="semantic-status" role="status"></span>
+    </div>
+  </div>
 
-<!-- render.py fills one .dict-section per table; each holds a #dict-<table> mount
-     and a chrome link to that table's validation playground. -->
+<!-- render.py fills one .dict-section per table, each holding a #dict-<table> mount
+     (and, with several tables, a heading plus a link to that table's playground). -->
 {{MOUNT_SECTIONS}}
 
   <script type="application/json" class="schema-documents">{{SCHEMA_DOCUMENTS_JSON}}</script>
@@ -38,37 +54,138 @@
     var docs   = JSON.parse(document.querySelector('.schema-documents').textContent);
     var config = JSON.parse(document.querySelector('.page-config').textContent);
     var lib = window.JsonSchemaDataDictionary;
+    var page = document.querySelector('.page');
     if (!lib) {
       var b = document.createElement('div');
       b.className = 'banner';
       b.textContent = 'assets/json-schema-data-dictionary.global.js is missing — ' +
         'run `render.py refresh-assets` on this package to restore it.';
-      document.querySelector('.page').prepend(b);
+      page.insertBefore(b, document.querySelector('.title-block'));
       return;
     }
-    config.mounts.forEach(function (m) {
+
+    /* ---------- the dictionaries: one mount per table ---------- */
+    var mounts = config.mounts.map(function (m) {
       var table = lib.schemaDocumentsToTable(docs, {
         rootUri: m.rootUri,
         splitAllOfObjectCategories: true
       });
-      /* shadow:false is load-bearing: the print rules in schema-pages.css must
-         reach the light-DOM .dd-* nodes the library renders. */
-      lib.renderDataDictionary(document.getElementById('dict-' + m.table), table, {
-        shadow: false,
-        theme: 'auto',
-        title: m.title,
-        expandCategories: true
-      });
       if (table.warnings && table.warnings.length) {
         console.warn('dictionary warnings for ' + m.table, table.warnings);
       }
+      return { table: m.table, title: m.title, data: table,
+               container: document.getElementById('dict-' + m.table), element: null, cache: null };
     });
+
+    /* ---------- semantic search: opt-in, keyword search never depends on it ----------
+       The embedding model runs in assets/embed-worker.js when the page is served over
+       http (workers cannot start from file://), otherwise on the main thread. The
+       embedder is created once and reused across re-renders; row vectors are cached in
+       IndexedDB, one store per table, so a revisit is instant and only edited rows are
+       re-embedded. Model weights are fetched from the Hugging Face Hub the first time;
+       nothing else leaves the browser. */
+    var SEMANTIC = {
+      transformers: 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0',
+      model: 'Xenova/bge-small-en-v1.5',   /* 33M params, 384-d, MIT; ~34 MB quantized */
+      dtype: 'q8',
+      worker: 'assets/embed-worker.js'
+    };
+    var STORE_KEY = 'schemify:' + config.package + ':semantic';
+    var toggle = document.getElementById('semantic-toggle');
+    var statusEl = document.getElementById('semantic-status');
+    var embedder = null, worker = null, embedderPromise = null;
+
+    function renderAll() {
+      mounts.forEach(function (m) {
+        var options = { shadow: false, theme: 'auto', title: m.title, expandCategories: true };
+        /* shadow:false is load-bearing: the print rules in schema-pages.css must
+           reach the light-DOM .dd-* nodes the library renders. */
+        if (embedder) {
+          m.cache = m.cache || lib.createIndexedDbVectorCache({
+            dbName: 'schemify:' + config.package + ':' + m.table });
+          options.semanticSearch = { embedder: embedder, cache: m.cache };
+        }
+        if (m.element) m.element.options = options;       /* keeps the index across re-renders */
+        else m.element = lib.renderDataDictionary(m.container, m.data, options);
+      });
+    }
+
+    function setStatus(text, isError) {
+      statusEl.textContent = text || '';
+      statusEl.className = 'tools-status' + (isError ? ' error' : '');
+    }
+    function loadTransformers() {
+      return import(SEMANTIC.transformers).then(function (t) {
+        t.env.allowLocalModels = false;     /* never probe ./models/… on this origin */
+        return t;
+      });
+    }
+    function workerEmbedder() {
+      return new Promise(function (resolve, reject) {
+        var w;
+        var query = new URLSearchParams({ transformers: SEMANTIC.transformers,
+                                          model: SEMANTIC.model, dtype: SEMANTIC.dtype });
+        try { w = new Worker(SEMANTIC.worker + '?' + query.toString()); }
+        catch (err) { reject(err); return; }
+        var timer = setTimeout(function () { reject(new Error('worker did not respond')); }, 8000);
+        w.addEventListener('error', function (e) {
+          clearTimeout(timer); reject(new Error(e.message || 'worker failed to start'));
+        });
+        lib.createWorkerEmbedder(w).then(
+          function (emb) { clearTimeout(timer); worker = w; resolve(emb); },
+          function (err) { clearTimeout(timer); reject(err); });
+      }).catch(function (err) {
+        if (worker) { worker.terminate(); worker = null; }
+        throw err;
+      });
+    }
+    function getEmbedder() {
+      if (embedderPromise) return embedderPromise;
+      var canWorker = typeof Worker !== 'undefined' && location.protocol !== 'file:';
+      embedderPromise = (canWorker ? workerEmbedder() : Promise.reject(new Error('workers unavailable')))
+        .catch(function () {
+          /* fallback: the model on the main thread (also the file:// path) */
+          return lib.createTransformersEmbedder(loadTransformers,
+            { model: SEMANTIC.model, dtype: SEMANTIC.dtype, device: 'wasm' });
+        });
+      return embedderPromise;
+    }
+    function setSemantic(on) {
+      try { localStorage.setItem(STORE_KEY, on ? '1' : '0'); } catch (e) {}
+      if (!on) {
+        embedder = null; embedderPromise = null;
+        if (worker) { worker.terminate(); worker = null; }
+        setStatus('');
+        renderAll();
+        return;
+      }
+      setStatus('Starting…');
+      getEmbedder().then(function (emb) {
+        if (!toggle.checked) return;        /* switched off again while starting */
+        embedder = emb;
+        setStatus('');                      /* the table's own status chip takes over */
+        renderAll();
+      }, function (err) {
+        embedderPromise = null;
+        toggle.checked = false;
+        setStatus('Semantic search could not start (' + (err && err.message || err) +
+                  '). Keyword search still works.', true);
+      });
+    }
+
+    toggle.addEventListener('change', function () { setSemantic(toggle.checked); });
+    renderAll();
+    var saved = null;
+    try { saved = localStorage.getItem(STORE_KEY); } catch (e) {}
+    if (saved === '1') { toggle.checked = true; setSemantic(true); }
   });
   </script>
 
-  <footer class="colophon">Generated by schemify · {{GENERATED_DATE}} · assets {{ASSETS_VERSION}} · page {{PAGE_FINGERPRINT}}.
+  <footer class="colophon">Made with <a class="brand-name" href="https://github.com/jeyabbalas/skills/tree/main/skills/schemify">/schemify</a>
+  · {{GENERATED_DATE}} · package {{PACKAGE_NAME}} · assets {{ASSETS_VERSION}} · page {{PAGE_FINGERPRINT}}.
   Written by an AI conversion assistant from the source dictionary, approved external sources, and steward interviews.
   The JSON Schema files are the source of truth — this page is a disposable render; regenerate it rather than editing it.
+  Search runs in your browser; the optional semantic search downloads a model once and sends nothing else anywhere.
   · <a href="README.md">Package README</a></footer>
 
 </main>

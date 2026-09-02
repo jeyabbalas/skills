@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>LARK — SLEEP_DIARY table — validation playground</title>
+<title>LARK — SLEEP_DIARY table · validation playground</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20class%3D%22brand-mark%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%20aria-hidden%3D%22true%22%20focusable%3D%22false%22%3E%3Crect%20class%3D%22tile%22%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%226%22%20fill%3D%22%232563EB%22/%3E%3Cpath%20class%3D%22slash%22%20d%3D%22M14.8%205.4%209.2%2018.6%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%222.7%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
 <!-- failsafe: keeps the shell readable if stylesheets fail to load -->
 <style>
   body{margin:0;font:1rem/1.5 system-ui,sans-serif;color:#1F2328;background:#FAF9F6}
@@ -12,15 +13,27 @@
 </style>
 <link rel="stylesheet" href="https://esm.sh/@jeyabbalas/data-table@0.7.0/styles">
 <link rel="stylesheet" href="assets/schema-pages.css">
+<!-- the vendored dictionary library supplies the column tooltips' metadata -->
+<script src="assets/json-schema-data-dictionary.global.js"></script>
 </head>
-<body class="playground" data-fingerprint="43d88b7b6626">
+<body class="playground" data-fingerprint="de2ac8eb67c8">
 <main class="page app">
 
-  <header class="masthead chrome">
-    <nav class="crumbs" aria-label="Breadcrumb"><a href="dictionary.html">json_schema</a> · playground</nav>
-    <span class="chip">sleep_diary</span>
+  <header class="masthead">
+    <a class="brand" href="https://github.com/jeyabbalas/skills/tree/main/skills/schemify" title="Made with /schemify"><svg class="brand-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><rect class="tile" width="24" height="24" rx="6" fill="#2563EB"/><path class="slash" d="M14.8 5.4 9.2 18.6" fill="none" stroke="#FFFFFF" stroke-width="2.7" stroke-linecap="round"/></svg><span class="brand-name">schemify</span></a>
+    <nav class="pages chrome" aria-label="Pages"><a class="tab" href="dictionary.html">Dictionary</a><a class="tab" href="playground.html" aria-current="page">Playground</a></nav>
   </header>
 
+  <div class="title-block">
+    <div class="titles">
+      <p class="eyebrow">Validation playground · sleep_diary</p>
+      <h1>LARK — SLEEP_DIARY table</h1>
+    </div>
+    <p class="page-note chrome">Load the toy fixtures, or check a file of your own — every seeded violation is
+      explained on its cell. Files are validated entirely in your browser and never leave your machine.</p>
+  </div>
+
+  <div class="stage" id="stage">
   <div class="toolbar chrome">
     <button class="btn" type="button" data-dataset="toy_valid">Toy PASS data</button>
     <button class="btn" type="button" data-dataset="toy_invalid">Toy FAIL data</button>
@@ -35,16 +48,17 @@
   <!-- bounded height is load-bearing: .table-shell is a flex child with min-height:0;
        an unbounded container silently defeats the table's virtualization -->
   <div class="table-shell"><div id="table"></div></div>
+  </div>
 
   <script type="application/json" class="schema-documents">[{"uri":"https://schema.local/common/defs.json","name":"common/defs.json","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.example.org/lark/common/defs.json","title":"LARK — shared definitions","description":"Only invariant tokens are centralised here; context-specific sentinels are inlined per field because their meanings differ by variable.","$defs":{"not_applicable":{"const":-666,"title":"Not applicable / structural skip","description":"The diary routing determined that the variable was outside the respondent universe."},"dont_know":{"const":-888,"title":"Don't know","description":"The respondent did not know the value or it could not be determined."},"participant_id":{"type":"string","pattern":"^P[0-9]{4}$","title":"Participant identifier"},"date_iso":{"type":"string","pattern":"^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$","title":"Calendar date","description":"Calendar date in YYYY-MM-DD form. Calendar-day validity beyond the regular expression is an application-level check."}}}},{"uri":"https://schema.local/sleep_diary/categories/participant.json","name":"sleep_diary/categories/participant.json","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.example.org/lark/sleep_diary/categories/participant.json","title":"SLEEP_DIARY — Participant","description":"Who the diary row belongs to: identifier, site, and baseline traits.","type":"object","x-variable-group":"participant","properties":{"participant_id":{"$ref":"../../common/defs.json#/$defs/participant_id","title":"Participant identifier","$comment":"Source coding: P#### (P followed by 4 digits).","x-role":"entity key"},"site_id":{"title":"Recruitment site","$comment":"Not in the source dictionary; added on the steward's instruction (D004). String-coded to preserve the leading zero.","oneOf":[{"const":"01","title":"Northside clinic"},{"const":"02","title":"Riverside clinic"},{"const":"03","title":"University campus"},{"const":"04","title":"East community center"},{"const":"05","title":"West community center"}],"x-role":"sample key"},"age":{"title":"Age at enrollment (years)","$comment":"Source coding: 18-90 years; -888 - Don't know.","anyOf":[{"type":"integer","minimum":18,"maximum":90},{"$ref":"../../common/defs.json#/$defs/dont_know"}],"x-unit":"years"},"chronotype":{"title":"Self-described chronotype","$comment":"Source coding: 1 - Morning lark; 2 - Night owl; 3 - Neither; -888 - Don't know.","oneOf":[{"const":1,"title":"Morning lark"},{"const":2,"title":"Night owl"},{"const":3,"title":"Neither"},{"$ref":"../../common/defs.json#/$defs/dont_know"}]}},"required":["participant_id","site_id","age","chronotype"]}},{"uri":"https://schema.local/sleep_diary/categories/sleep.json","name":"sleep_diary/categories/sleep.json","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.example.org/lark/sleep_diary/categories/sleep.json","title":"SLEEP_DIARY — Sleep","description":"Nightly sleep quantity and disruptions from the morning diary.","type":"object","x-variable-group":"sleep","properties":{"diary_date":{"$ref":"../../common/defs.json#/$defs/date_iso","title":"Diary date","$comment":"Source coding: YYYY-MM-DD. One row per participant per night.","x-role":"time key"},"bedtime":{"type":"string","pattern":"^([01][0-9]|2[0-3]):[0-5][0-9]$","title":"Bedtime (HH:MM, 24h)","$comment":"Source coding: hh:mm 24-hour clock. Anchored pattern per D009 (supersedes D008)."},"sleep_minutes":{"title":"Total sleep last night (minutes)","$comment":"Source coding: minutes; -666 - N/A (no diary entry); -888 - Don't know. Plausibility bounds 0-960 are not stated by the source (D005).","anyOf":[{"type":"integer","minimum":0,"maximum":960},{"$ref":"../../common/defs.json#/$defs/not_applicable"},{"$ref":"../../common/defs.json#/$defs/dont_know"}],"x-unit":"minutes"},"awakenings":{"title":"Number of night awakenings","$comment":"Source coding: count 0-20; -888 - Don't know.","anyOf":[{"type":"integer","minimum":0,"maximum":20},{"$ref":"../../common/defs.json#/$defs/dont_know"}]},"nap_yesterday":{"title":"Napped yesterday","$comment":"Source coding: 0 - No; 1 - Yes; -888 - Don't know.","oneOf":[{"const":0,"title":"No"},{"const":1,"title":"Yes"},{"$ref":"../../common/defs.json#/$defs/dont_know"}]},"nap_minutes":{"title":"Nap duration yesterday (minutes)","$comment":"Source coding: minutes; -666 - N/A (no nap); -888 - Don't know. Plausibility bounds 0-600 are not stated by the source (D006).","anyOf":[{"type":"integer","minimum":0,"maximum":600},{"$ref":"../../common/defs.json#/$defs/not_applicable"},{"$ref":"../../common/defs.json#/$defs/dont_know"}],"x-unit":"minutes","x-universe":"Participants who reported a nap yesterday."},"caffeine_after_noon":{"title":"Caffeine after noon","$comment":"Source coding: 0 - No; 1 - Yes; -888 - Don't know.","oneOf":[{"const":0,"title":"No"},{"const":1,"title":"Yes"},{"$ref":"../../common/defs.json#/$defs/dont_know"}]}},"required":["diary_date","bedtime","sleep_minutes","awakenings","nap_yesterday","nap_minutes","caffeine_after_noon"],"$comment":"Soft checks: sleep_minutes should not exceed the bedtime-to-wake interval reported in the full diary; arithmetic across columns is not expressible here (D012)."}},{"uri":"https://schema.local/sleep_diary/sleep_diary.schema.json","name":"sleep_diary/sleep_diary.schema.json","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://schemas.example.org/lark/sleep_diary/sleep_diary.schema.json","title":"LARK — SLEEP_DIARY table","description":"Array of diary records. One element is one participant-night. Structurally skipped values remain as reserved sentinel codes so the dataset stays rectangular; the routing rules are enforced below.","$comment":"Standard JSON Schema cannot enforce uniqueness of participant_id + diary_date across rows (D011). See the README's 'Documented but not enforced' section.","type":"array","minItems":1,"uniqueItems":true,"items":{"type":"object","title":"SLEEP_DIARY record","allOf":[{"$ref":"categories/participant.json"},{"$ref":"categories/sleep.json"},{"$comment":"Skip pattern: no nap yesterday means nap duration is structurally not applicable.","if":{"required":["nap_yesterday"],"properties":{"nap_yesterday":{"const":0}}},"then":{"properties":{"nap_minutes":{"const":-666}}}},{"$comment":"Applicability: a reported nap must have a duration or an item-missing code — never the structural-NA code.","if":{"required":["nap_yesterday"],"properties":{"nap_yesterday":{"const":1}}},"then":{"properties":{"nap_minutes":{"not":{"const":-666}}}}}],"unevaluatedProperties":false}}}]</script>
   <script type="application/json" class="datasets">{"toy_valid":[{"participant_id":"P0001","site_id":"01","age":34,"chronotype":1,"diary_date":"2026-03-01","bedtime":"23:15","sleep_minutes":420,"awakenings":1,"nap_yesterday":0,"nap_minutes":-666,"caffeine_after_noon":0},{"participant_id":"P0002","site_id":"02","age":18,"chronotype":2,"diary_date":"2026-03-01","bedtime":"00:30","sleep_minutes":300,"awakenings":0,"nap_yesterday":1,"nap_minutes":45,"caffeine_after_noon":1},{"participant_id":"P0003","site_id":"03","age":90,"chronotype":3,"diary_date":"2026-03-02","bedtime":"21:00","sleep_minutes":960,"awakenings":3,"nap_yesterday":1,"nap_minutes":-888,"caffeine_after_noon":0},{"participant_id":"P0004","site_id":"04","age":-888,"chronotype":1,"diary_date":"2026-03-02","bedtime":"22:45","sleep_minutes":0,"awakenings":20,"nap_yesterday":0,"nap_minutes":-666,"caffeine_after_noon":1},{"participant_id":"P0005","site_id":"05","age":47,"chronotype":-888,"diary_date":"2026-03-03","bedtime":"23:59","sleep_minutes":-666,"awakenings":2,"nap_yesterday":1,"nap_minutes":0,"caffeine_after_noon":0},{"participant_id":"P0006","site_id":"01","age":60,"chronotype":2,"diary_date":"2026-03-03","bedtime":"01:10","sleep_minutes":-888,"awakenings":-888,"nap_yesterday":1,"nap_minutes":600,"caffeine_after_noon":1},{"participant_id":"P0007","site_id":"02","age":25,"chronotype":3,"diary_date":"2026-03-04","bedtime":"20:05","sleep_minutes":512,"awakenings":4,"nap_yesterday":-888,"nap_minutes":30,"caffeine_after_noon":0},{"participant_id":"P0008","site_id":"03","age":71,"chronotype":1,"diary_date":"2026-03-04","bedtime":"23:00","sleep_minutes":385,"awakenings":0,"nap_yesterday":1,"nap_minutes":15,"caffeine_after_noon":-888},{"participant_id":"P0009","site_id":"04","age":39,"chronotype":2,"diary_date":"2026-03-05","bedtime":"22:30","sleep_minutes":610,"awakenings":5,"nap_yesterday":0,"nap_minutes":-666,"caffeine_after_noon":1},{"participant_id":"P0010","site_id":"05","age":52,"chronotype":3,"diary_date":"2026-03-05","bedtime":"23:45","sleep_minutes":505,"awakenings":2,"nap_yesterday":1,"nap_minutes":-888,"caffeine_after_noon":0}],"toy_invalid":[{"participant_id":"P0001","site_id":"01","age":34,"chronotype":1,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":1500,"awakenings":1,"nap_yesterday":1,"nap_minutes":30,"caffeine_after_noon":0},{"participant_id":"P0001","site_id":"01","age":34,"chronotype":9,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":420,"awakenings":1,"nap_yesterday":1,"nap_minutes":30,"caffeine_after_noon":0},{"participant_id":"P0001","site_id":"01","age":34,"chronotype":1,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":420,"awakenings":1,"nap_yesterday":0,"nap_minutes":45,"caffeine_after_noon":0},{"participant_id":"P0001","site_id":"01","age":34,"chronotype":1,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":420,"awakenings":1,"nap_yesterday":1,"nap_minutes":-666,"caffeine_after_noon":0},{"participant_id":"P0001","site_id":"01","age":34,"chronotype":1,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":-999,"awakenings":1,"nap_yesterday":1,"nap_minutes":30,"caffeine_after_noon":0},{"participant_id":"P12","site_id":"01","age":34,"chronotype":1,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":420,"awakenings":1,"nap_yesterday":1,"nap_minutes":30,"caffeine_after_noon":0},{"participant_id":"P0001","site_id":1,"age":34,"chronotype":1,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":420,"awakenings":1,"nap_yesterday":1,"nap_minutes":30,"caffeine_after_noon":0},{"participant_id":"P0001","site_id":"01","chronotype":1,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":420,"awakenings":1,"nap_yesterday":1,"nap_minutes":30,"caffeine_after_noon":0},{"participant_id":"P0001","site_id":"01","age":34,"chronotype":1,"diary_date":"2026-03-06","bedtime":"23:15","sleep_minutes":420,"awakenings":1,"nap_yesterday":1,"nap_minutes":30,"caffeine_after_noon":0,"shoe_size":42}]}</script>
-  <script type="application/json" class="page-config">{"package":"json_schema","table":"sleep_diary","rootUri":"https://schema.local/sleep_diary/sleep_diary.schema.json","rootId":"https://schemas.example.org/lark/sleep_diary/sleep_diary.schema.json","generated":"2026-08-21"}</script>
+  <script type="application/json" class="page-config">{"package":"json_schema","table":"sleep_diary","rootUri":"https://schema.local/sleep_diary/sleep_diary.schema.json","rootId":"https://schemas.example.org/lark/sleep_diary/sleep_diary.schema.json","generated":"2026-09-02"}</script>
 
   <script>
   /* classic guard script — runs even where module scripts cannot */
   (function () {
     if (location.protocol === 'file:') {
-      document.querySelector('.app').innerHTML =
+      document.getElementById('stage').innerHTML =
         '<div class="banner"><strong>This page needs a local server</strong> — it loads a ' +
         'database engine that browsers block on file://.<br>In a terminal, from this folder, run: ' +
         '<code>python3 -m http.server 8000</code><br>then open ' +
@@ -59,7 +73,7 @@
         b.textContent = 'Could not load the table libraries from the CDN (offline or blocked ' +
           'network). The dictionary page (dictionary.html) works fully offline, and ' +
           'tools/validate.py validates without any network.';
-        document.querySelector('.app').prepend(b);
+        document.getElementById('stage').prepend(b);
       }
     }, 8000);
   })();
@@ -67,23 +81,23 @@
 
   <script type="module">
   import { createDataTable, checkBrowserSupport } from "https://esm.sh/@jeyabbalas/data-table@0.7.0";
-  import { schemaDocumentsToTable } from "https://esm.sh/json-schema-data-dictionary@0.1.0";
   import Ajv2020 from "https://esm.sh/ajv@8.17.1/dist/2020";
   import addFormats from "https://esm.sh/ajv-formats@3.0.1";
   window.__pgBooted = true;
   if (location.protocol === 'file:') throw new Error('file:// — the guard banner is already shown');
+  const { schemaDocumentsToTable } = window.JsonSchemaDataDictionary;
 
   const docs     = JSON.parse(document.querySelector('.schema-documents').textContent);
   const datasets = JSON.parse(document.querySelector('.datasets').textContent);
   const config   = JSON.parse(document.querySelector('.page-config').textContent);
   const summaryEl = document.getElementById('summary');
-  const app = document.querySelector('.app');
+  const stage = document.getElementById('stage');
 
   function banner(text) {
     const b = document.createElement('div');
     b.className = 'banner chrome';
     b.textContent = text;
-    app.insertBefore(b, summaryEl);
+    stage.insertBefore(b, summaryEl);
   }
 
   /* ---------- schema registry: resolve $refs by retrieval URI and by $id ---------- */
@@ -414,9 +428,10 @@
   }
   </script>
 
-  <footer class="colophon chrome">Generated by schemify · 2026-08-21 · assets 91f82b1e9771 · page 43d88b7b6626.
-  Written by an AI conversion assistant. The JSON Schema files are the source of truth — this page is a disposable render.
-  Uploaded files are validated entirely in your browser and never leave your machine.
+  <footer class="colophon chrome">Made with <a class="brand-name" href="https://github.com/jeyabbalas/skills/tree/main/skills/schemify">/schemify</a>
+  · 2026-09-02 · package json_schema · assets a7119390d5f8 · page de2ac8eb67c8.
+  Written by an AI conversion assistant. The JSON Schema files are the source of truth — this page is a disposable render; regenerate it rather than editing it.
+  Files you check are validated entirely in your browser and never leave your machine.
   · <a href="README.md">Package README</a> · <a href="dictionary.html">Data dictionary</a></footer>
 
 </main>

@@ -15,7 +15,7 @@ A mid-flight package with one table (the same shape holds at four tables — mor
 ```
 json_schema/                          ← package root (name agreed at intake)
 ├── README.md                         ← the deliverable's front door; finished at review (REVIEW.md)
-├── manifest.json                     ← optional package card: counts, entrypoints, sentinel glossary
+├── manifest.json                     ← optional package card: study name, counts, entrypoints, sentinel glossary
 │                                       (never any JSON Schema keyword, so tools don't mistake it for a schema)
 ├── PROGRESS.md                       ← plan · statuses · session log (PROGRESS-FORMAT.md)
 ├── DECISIONS.md                      ← the judgment ledger (DECISIONS-FORMAT.md)
@@ -39,6 +39,7 @@ json_schema/                          ← package root (name agreed at intake)
 ├── playground.html                   ← toy-data viewer + live validator; needs a local server (PAGES.md)
 └── assets/
     ├── json-schema-data-dictionary.global.js   ← vendored rendering library (render.py init)
+    ├── embed-worker.js                         ← the dictionary's semantic-search worker (render.py init)
     ├── schema-pages.css                        ← the pages' stylesheet
     └── VERSION                                 ← hash stamp; render.py check flags drift
 ```
@@ -84,8 +85,8 @@ State files sit in the package root so the whole story travels together in versi
 | `validate.py fixtures PKG [--table T]` | The unit test: `toy_valid` must yield zero findings; every `toy_invalid` row must fail with an error on exactly the column its ledger names. Per-row verdicts (`caught`, `missed-passed`, `missed-wrong-column`) with hints; ledger and data must match one-to-one. |
 | `validate.py coverage PKG [--inventory PATH]` | Reconcile `VARIABLES.csv` against the schemas: every `converted` row has its property, every property has its row (`converted` or `added`), `deferred`/`dropped`/`pending` rows appear in no schema. |
 | `validate.py summary PKG` | check + fixtures + coverage in one rollup, with a one-line `headline` fit to relay to the steward. Missing fixtures or inventory are reported as skipped, not failed. |
-| `render.py init PKG` | Create `assets/` and `tools/` — the vendored dictionary library, the stylesheet, the validator copy, `requirements.txt` — and stamp `assets/VERSION`. Idempotent; reports when the package's copies are older than the skill's. |
+| `render.py init PKG` | Create `assets/` and `tools/` — the vendored dictionary library, its embedding worker, the stylesheet, the validator copy, `requirements.txt` — and stamp `assets/VERSION`. Idempotent; reports when the package's copies are older than the skill's. |
 | `render.py refresh-assets PKG` | Overwrite the shipped copies from the skill and re-stamp VERSION — upgrades the package's whole executable surface at once. Re-render pages afterwards if it says templates changed. |
-| `render.py dictionary PKG [--title T]` | Build `dictionary.html` from every schema file in the package. The page opens straight from disk. |
+| `render.py dictionary PKG [--title T]` | Build `dictionary.html` from every schema file in the package. The page opens straight from disk; keyword search is built in, semantic search is a switch on the page (PAGES.md). The title is the mother file's with one table, else `manifest.json`'s `study`, else the package name — `--title` overrides. |
 | `render.py playground PKG [--table T]` | Build the playground page(s), schemas and toy fixtures inlined. Without `--table`, builds every table that has a mother file. |
 | `render.py check PKG` | Lint the built surface: asset freshness against the skill, page staleness (each page fingerprints its inputs), inline data parses, no absolute-path or skill-directory references. Run before closing any session that touched schemas or pages. |

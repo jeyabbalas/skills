@@ -6,7 +6,7 @@ The conversion exercises most of the skill's machinery: labeled `oneOf` codes, b
 
 ## Browse it
 
-- `workspace/json_schema/dictionary.html` — double-click it; the searchable, printable data dictionary works straight from disk, offline.
+- `workspace/json_schema/dictionary.html` — double-click it; the searchable, printable data dictionary works straight from disk, offline. Flip **Semantic search** beside the title to also find related variables by meaning (“how long they slept” finds `sleep_minutes` though the words never appear): it fetches a small model once and runs entirely in your browser.
 - `workspace/json_schema/playground.html` — needs a local server: `cd workspace/json_schema && python3 -m http.server 8000`, then open `http://localhost:8000/playground.html`. Click **Toy FAIL data** and hover the tinted cells — each seeded violation is explained on the cell, skip-pattern rules in the study's own words. Drop any `.json`/`.csv` onto **Check your own file**; nothing you upload leaves your browser.
 - `workspace/json_schema/README.md` — the package's own front door: conventions, sentinel table, enforced routing rules, what is documented but not enforced, and the surviving open item.
 - Re-run the checks yourself: `uv run workspace/json_schema/tools/validate.py summary workspace/json_schema` (or `pip install -r workspace/json_schema/tools/requirements.txt` and use `python3`). Expect: 4 schema files valid, toy PASS clean, 9/9 seeded violations caught, coverage 11/12 with one deferred.

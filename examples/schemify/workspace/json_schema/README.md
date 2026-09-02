@@ -72,7 +72,7 @@ python3 tools/validate.py summary .        # schemas, fixtures, coverage — eve
 python3 tools/validate.py data . --file your_export.csv
 ```
 
-Browse: double-click `dictionary.html` (works offline, prints well). For the live validator, run `python3 -m http.server 8000` in this directory and open `http://localhost:8000/playground.html` — files you drop in are validated entirely in your browser.
+Browse: double-click `dictionary.html` (works offline, prints well; keyword search built in, and a Semantic search switch that fetches a small model once to find related variables by meaning). For the live validator, run `python3 -m http.server 8000` in this directory and open `http://localhost:8000/playground.html` — files you drop in are validated entirely in your browser.
 
 The `$id` namespace `https://schemas.example.org/lark/` is a deliberate placeholder — replace it before publishing these schemas anywhere public.
 
