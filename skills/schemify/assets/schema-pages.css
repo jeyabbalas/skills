@@ -330,6 +330,65 @@ code { font-family: var(--mono); font-size: 0.9em; background: var(--code-bg); p
 .table-shell { flex: 1; min-height: 30rem; display: flex; }
 .table-shell > #table { flex: 1; min-height: 0; }
 
+/* --------------------------------------------- the static fallback rendering */
+
+/* What #table holds when the interactive grid cannot start (no worker, or the
+   engine's one download is blocked). It carries the same per-cell findings, so
+   it has to read as the same table - not as an error state. #table is a flex
+   item with min-height:0, so the scroll must live on the wrapper inside it. */
+.pg-fallback-wrap {
+  flex: 1;
+  min-height: 0;
+  /* :has() gives the exact flex bound below; max-height keeps the scroll bounded on
+     browsers without it - which is where the unsupported-browser fallback lands. */
+  max-height: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+#table:has(.pg-fallback-wrap) { display: flex; flex-direction: column; }
+.pg-fallback { border-collapse: collapse; width: 100%; font: 0.875rem/1.45 var(--sans); }
+.pg-fallback th,
+.pg-fallback td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.35rem 0.7rem;
+  text-align: left;
+  white-space: nowrap;
+}
+.pg-fallback thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line-strong);
+  font-weight: 600;
+  cursor: help;
+}
+.pg-fallback thead th.undeclared { color: var(--fail); }
+.pg-fallback td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pg-fallback .pg-rownum {
+  position: sticky;
+  left: 0;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font: 0.75rem/1.45 var(--mono);
+  font-weight: 400;
+  text-align: right;
+}
+.pg-fallback td.absent { background: repeating-linear-gradient(
+  135deg, transparent 0 4px, var(--code-bg) 4px 8px); }
+.pg-fallback td.nullish { color: var(--ink-muted); font-style: italic; }
+.pg-fallback td.bad {
+  background: var(--fail-bg);
+  color: var(--fail);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--fail);
+  cursor: help;
+}
+.pg-fallback tr.bad-row .pg-rownum { color: var(--fail); box-shadow: inset 2px 0 0 var(--fail); }
+.pg-fallback-note { flex: none; color: var(--ink-muted); font-size: 0.8125rem; padding: 0.5rem 0.1rem 0; }
+
 /* ---------------------------------------------------------------- dictionary */
 
 .dict-section { margin: 0 0 2rem; }

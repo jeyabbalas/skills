@@ -48,6 +48,12 @@ SHIPPED = [
     ("assets/schema-pages.css", "assets/schema-pages.css"),
     ("scripts/validate.py", "tools/validate.py"),
 ]
+# Directories copied wholesale. assets/vendor/ holds the playground's table engine and
+# validator: the engine builds its worker URL from its own import.meta.url, so it only
+# starts when it is served from the package's own origin - loaded from a CDN the worker
+# 404s and the page dies. The tree's internal layout (data-table/assets/worker-*.js)
+# is therefore load-bearing; copy it verbatim, never flatten it.
+SHIPPED_TREES = [("assets/vendor", "assets/vendor")]
 # The brand mark is inlined into every page at render time (never copied), so a
 # page's fingerprint covers it alongside the template.
 BRAND_MARK = "assets/schemify-mark.svg"
@@ -83,10 +89,26 @@ def skill_file(rel):
     return path
 
 
+def skill_tree(rel):
+    """Files under a shipped directory, sorted - the order the hash depends on."""
+    root = SKILL_DIR / rel
+    files = sorted(p for p in root.rglob("*") if p.is_file()) if root.is_dir() else []
+    if not files:
+        fail("The skill is missing its own directory: {}".format(rel),
+             "The skill install is incomplete - reinstall it, or run "
+             "`uv run scripts/vendor_schemify_assets.py` in the skills repo.")
+    return files
+
+
 def shipped_hash():
     h = hashlib.sha256()
     for src, _ in SHIPPED:
         h.update(skill_file(src).read_bytes())
+    for src, _ in SHIPPED_TREES:
+        root = SKILL_DIR / src
+        for path in skill_tree(src):
+            h.update(str(path.relative_to(root).as_posix()).encode())
+            h.update(path.read_bytes())
     return h.hexdigest()[:12]
 
 
@@ -165,6 +187,16 @@ def copy_shipped(pkg):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(skill_file(src), target)
         copied.append(dst)
+    for src, dst in SHIPPED_TREES:
+        source = SKILL_DIR / src
+        skill_tree(src)                 # fail loudly before deleting anything
+        target = pkg / dst
+        # Chunk filenames carry content hashes, so an upgrade renames rather than
+        # overwrites - copying over a stale tree would leave dead files that still load.
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(source, target)
+        copied.append(dst + "/")
     req = pkg / "tools" / "requirements.txt"
     req.write_text(REQUIREMENTS)
     version = shipped_hash()
