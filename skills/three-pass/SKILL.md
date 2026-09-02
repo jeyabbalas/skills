@@ -1,6 +1,6 @@
 ---
 name: three-pass
-description: Read an academic paper together in three passes of increasing depth — a bird's-eye profile, an interactive close reading, and a line-by-line derivation or reproduction — using this directory as a reading workspace that remembers you and your papers across sessions. Give it PDF paths or a title, arXiv ID, or DOI.
+description: "Read an academic paper together in three passes of increasing depth — a bird's-eye profile, an interactive close reading, and a line-by-line derivation or reproduction — using this directory as a reading workspace that remembers you and your papers across sessions. Give it PDF paths or a title, arXiv ID, or DOI."
 disable-model-invocation: true
 argument-hint: "PDF path(s), or a title / arXiv ID / DOI"
 ---

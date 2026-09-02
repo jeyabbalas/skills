@@ -1,0 +1,55 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  skills:
+    name: Skill manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      # Frontmatter, cross-manifest, and layout invariants. A SKILL.md whose
+      # YAML does not parse is dropped silently by installers, so this is the
+      # only thing standing between a stray ':' and an unavailable skill.
+      - name: Validate skills
+        run: uv run scripts/validate_skills.py
+
+      # Second opinion from the Claude Code CLI on the plugin/marketplace
+      # manifests, which validate_skills.py only cross-checks against disk.
+      - name: Validate plugin manifest
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate . --strict
+
+  installer:
+    name: skills.sh listing
+    runs-on: ubuntu-latest
+    # Reads the published repo, so it only means anything once main has moved.
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      # Asserts every skill directory on this commit actually shows up in
+      # `skills add --list` against the published repo -- the end-to-end check
+      # that users can install what the tree claims to ship.
+      - name: Every skill is listed by the installer
+        run: |
+          npx -y skills@latest add "${GITHUB_REPOSITORY}" --list 2>&1 | tee listing.txt
+          status=0
+          for d in skills/*/; do
+            name=$(basename "$d")
+            if grep -qx "[[:space:]]*│[[:space:]]*${name}[[:space:]]*" listing.txt; then
+              echo "ok: ${name} is listed"
+            else
+              echo "::error::${name} is not listed by 'skills add --list' -- users cannot install it"
+              status=1
+            fi
+          done
+          exit $status

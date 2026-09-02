@@ -6,6 +6,8 @@ This repository houses agent skills following the [Agent Skills](https://agentsk
 
 - Skills live flat under `skills/<name>/`; the directory name equals the frontmatter `name`.
 - Every promoted skill has a row in `README.md`'s skills table and an entry in `.claude-plugin/plugin.json`'s `skills` array. Run `claude plugin validate . --strict` after touching either manifest.
+- `uv run scripts/validate_skills.py` enforces the invariants on this list — frontmatter, manifests, layout — and CI (`.github/workflows/validate.yml`) runs it on every push and PR. Run it before committing any change under `skills/`, `README.md`, or `.claude-plugin/`.
+- Frontmatter `description` and `argument-hint` values are always double-quoted. An unquoted `": "` makes the YAML unparseable, and installers respond by dropping the skill from their listing with no error — the skill simply appears not to exist.
 - Install commands live only in `README.md`'s install section; change them there first, then propagate anywhere they are quoted.
 - Example output lives under `examples/<skill-name>/` — a `README.md` beside the demo files. Nothing under `examples/` is read by skills at runtime; non-redistributable inputs (paper PDFs) and regenerable fixtures stay untracked, with restore commands in the example's README.
 
