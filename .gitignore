@@ -12,6 +12,10 @@ examples/**/reproduction/code/data/
 examples/**/book.pdf
 examples/**/book.epub
 examples/**/extract/
+# debug/: scratch renders of schemify packages used to reproduce page bugs against
+# a real steward's output. Regenerate with `render.py` rather than committing them.
+debug/
+
 node_modules/
 __pycache__/
 *.pyc

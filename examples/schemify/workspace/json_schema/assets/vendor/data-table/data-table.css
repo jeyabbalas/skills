@@ -1,0 +1,4354 @@
+/**
+ * Interactive Data Table - Default Styles
+ *
+ * This CSS file provides default styling for the data table library.
+ * All colors and sizing use CSS custom properties for easy customization.
+ *
+ * Usage:
+ *   import '@jeyabbalas/data-table/styles';
+ *   // or
+ *   <link rel="stylesheet" href="path/to/data-table.css">
+ *
+ * Customization:
+ *   Override any --dt-* variable in your own CSS to customize the theme.
+ *   Example:
+ *     :root {
+ *       --dt-primary: #10b981;
+ *     }
+ */
+
+/* ===========================================
+   CSS Custom Properties (Theme Variables)
+   ===========================================
+
+   Scoping: light defaults are declared on `:root`. CSS cascade takes care
+   of everything else:
+   - Elements inside `.dt-root` inherit from `:root` through the DOM.
+   - Body-portalled modals (derived column, SQL filter, export dialog,
+     CodeMirror autocomplete tooltip) are also descendants of `<html>`, so
+     they inherit the same values.
+   - Consumer global override: set `--dt-primary` on `:root` (or via
+     `document.documentElement.style.setProperty`) — cascades everywhere.
+   - Consumer per-instance override: set the variable on the specific
+     `.dt-root` element (inline style, or a custom class like
+     `.dt-root.my-theme { --dt-primary: #10b981 }`). Inline style wins over
+     `:root` unconditionally; a custom class wins by source order.
+
+   Do NOT redeclare these variables on `.dt-root`: that would shadow
+   `:root` overrides for everything inside the table.
+
+   Dark mode is dual-scoped: it applies via `prefers-color-scheme: dark`
+   unless an instance explicitly carries `data-dt-color-scheme="light"`,
+   and it applies unconditionally when an element (or ancestor) carries
+   `data-dt-color-scheme="dark"`. The attribute is set by `createDataTable`
+   on the `.dt-root` element and is copied onto body-portalled modal roots
+   by `ModalHost` so portalled content stays in sync.
+
+   Stacking ladder. All z-indices in this file go through `--dt-z-*`
+   variables (table body → pinned cols → header → action panels →
+   filter bar → floating panels → autocomplete → modals; gaps of ≥ 10
+   so consumers can slot their own layers between). Override globally
+   via `document.documentElement.style.setProperty('--dt-z-modal',
+   '5000')`, or per-instance on a `.dt-root` element. Pinned-column
+   stacking is computed in JS as `--dt-z-pinned-col + pinOrderOffset`,
+   so overriding `--dt-z-pinned-col` shifts the whole pinned group.
+   =========================================== */
+
+:root {
+  /* Native form-control chrome (caret, selection highlight, autofill,
+     scrollbars) follows this keyword. Light default here; the dark-mode
+     blocks below flip it alongside the `--dt-*` variables so inputs,
+     textareas and selects render consistently in both schemes — including
+     inside body-portalled modals that carry the copied attribute. */
+  color-scheme: light;
+
+  /* Load marker. `createDataTable()` reads this to detect a missing
+     stylesheet import and warn the consumer. Do not remove. */
+  --dt-stylesheet-loaded: 1;
+
+  /* Primary colors */
+  --dt-primary: #2563eb;
+  --dt-primary-hover: #1d4ed8;
+  --dt-primary-light: #eff6ff;
+  --dt-primary-lighter: #dbeafe;
+
+  /* Neutral colors */
+  --dt-bg: #ffffff;
+  --dt-bg-secondary: #f9fafb;
+  --dt-bg-tertiary: #f3f4f6;
+  --dt-border: #e5e7eb;
+  --dt-border-light: #f3f4f6;
+
+  /* Text colors. `secondary` / `tertiary` are darker than the usual
+     gray-500 / gray-400 pairing because the surfaces they land on are
+     near-white (#f9fafb, #f3f4f6) and the type is 11.2-12px, where WCAG AA
+     demands 4.5:1 with no large-text exemption. gray-500 tops out at 4.39:1
+     on --dt-bg-tertiary. */
+  --dt-text: #111827;
+  --dt-text-secondary: #374151;
+  --dt-text-tertiary: #4b5563;
+
+  /* Sort arrow / action-icon colors. The only indicator that a column is
+     sortable or pinnable, so non-text content under WCAG 1.4.11 needing 3:1
+     against both header states: gray-300 managed 1.34:1 on a hovered one. */
+  --dt-arrow-default: #6b7280;
+  --dt-arrow-hover: #4b5563;
+
+  /* Sizing */
+  --dt-header-height: 120px;
+  --dt-row-height: 32px;
+  --dt-col-width: 200px; /* Default column width */
+  --dt-scrollbar-width: 17px;
+
+  /* Semantic colors, split by role: `success` / `error` are painted as text
+     on near-white surfaces (green-500 read 2.02:1, red-500 3.76:1 on --dt-bg),
+     while `error-dark` / `error-darker` are fills under white --dt-on-error. */
+  --dt-success: #15803d;
+  --dt-error: #dc2626;
+  --dt-error-dark: #dc2626;
+
+  /* Alpha stops of --dt-primary. Overriding --dt-primary cascades via color-mix. */
+  --dt-primary-alpha-10: color-mix(in srgb, var(--dt-primary) 10%, transparent);
+  --dt-primary-alpha-20: color-mix(in srgb, var(--dt-primary) 20%, transparent);
+  --dt-primary-alpha-30: color-mix(in srgb, var(--dt-primary) 30%, transparent);
+  --dt-primary-alpha-50: color-mix(in srgb, var(--dt-primary) 50%, transparent);
+
+  /* Secondary accent (null bars, warning-ish chrome) */
+  --dt-accent: #f59e0b;
+  --dt-accent-hover: #d97706;
+  --dt-accent-soft: color-mix(in srgb, var(--dt-accent) 30%, transparent);
+
+  /* Neutral family (ValueCounts "Other" category — slates) */
+  --dt-neutral: #94a3b8;
+  --dt-neutral-hover: #64748b;
+  --dt-neutral-soft: color-mix(in srgb, var(--dt-neutral) 40%, transparent);
+
+  /* Error chrome tokens */
+  --dt-error-soft: color-mix(in srgb, var(--dt-error) 20%, transparent);
+  --dt-error-darker: #b91c1c;
+  --dt-error-bg: #fef2f2;
+  --dt-error-border-soft: #fecaca;
+  --dt-error-text-strong: #7f1d1d;
+  --dt-on-error: #ffffff;
+
+  /* Modal scrim + shadows */
+  --dt-backdrop: rgba(0, 0, 0, 0.4);
+  --dt-shadow-sm: rgba(0, 0, 0, 0.06);
+  --dt-shadow-md: rgba(0, 0, 0, 0.12);
+
+  /* Syntax-highlighting tokens (SQL editor) — body text on --dt-bg at 13px,
+     so green-600's 3.30:1 needed the same darkening as --dt-success. */
+  --dt-syntax-string: #15803d;
+  --dt-syntax-type: #9333ea;
+
+  /* Misc */
+  --dt-radius: 8px;
+  --dt-radius-sm: 4px;
+  --dt-transition: 0.15s ease;
+  --dt-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --dt-font-size: 0.875rem;
+  --dt-font-size-sm: 0.75rem;
+  --dt-font-size-xs: 0.7rem;
+
+  /* Stacking ladder (override to coordinate with host-app modal layers).
+     Layers are ordered bottom → top. Integer gaps ≥ 10 so consumers can slot
+     their own UI (tooltips, toasts) between table layers without recompiling. */
+  --dt-z-table-body: 1; /* focused cells, resize handle — lift within local stacking */
+  --dt-z-pinned-col: 20; /* sticky pinned column base; JS adds per-pin offsets */
+  --dt-z-header: 21; /* column header row + hidden-columns gutter */
+  --dt-z-action-panel: 30; /* per-column action panel popovers (reserved) */
+  --dt-z-filter-bar: 40; /* filter bar at top of table */
+  --dt-z-floating-panel: 50; /* in-page panels: filter / preset / derived-edit / drop indicator */
+  --dt-z-annotation-popover: 55; /* annotation popover (slots between floating panels and autocomplete) */
+  --dt-z-col-tooltip: 56; /* column-header tooltip popover (one above annotation popover) */
+  --dt-z-autocomplete: 60; /* CodeMirror autocomplete tooltip (portalled to <body>) */
+  --dt-z-modal: 1000; /* full-screen modals + backdrops */
+  --dt-z-modal-stack-step: 2; /* step added per open modal/panel so simultaneously-open dialogs layer predictably */
+
+  /* Default width for floating panels (filter panel, preset panel, derived-
+     column edit panel). Override at the `:root` (or scoped ancestor) to
+     widen panels. TS-side positioning re-measures via offsetWidth so edge
+     clamping respects the override. */
+  --dt-panel-width: 320px;
+
+  /* Annotation severity palette — drives row / cell / header tints and the
+     annotation popover's severity pills. `fg` = foreground/text inside the
+     tinted surface; `bg` = tint background; `bdr` = strong border/accent
+     used for cell left-border and header underline. Three severities cover
+     the validation and QC use cases; ordering is error > warning > info
+     (see `AnnotationStore.getByCell` severity rank). */
+  --dt-annotation-error-fg: #7a0b14;
+  --dt-annotation-error-bg: #fde2e5;
+  --dt-annotation-error-bdr: #d34551;
+  --dt-annotation-warning-fg: #7a4a00;
+  --dt-annotation-warning-bg: #fff0cc;
+  --dt-annotation-warning-bdr: #d89b1b;
+  --dt-annotation-info-fg: #003e66;
+  --dt-annotation-info-bg: #d6ecfa;
+  --dt-annotation-info-bdr: #2687c7;
+
+  /* Hover background for annotated cells — a subtle darkening of the
+     base tint, pulled toward the saturated border color so it reads as
+     on-theme in both light and dark modes (dark-mode `-bg` / `-bdr`
+     overrides cascade through the nested `var(...)` references below
+     without needing duplicate definitions). */
+  --dt-annotation-error-bg-hover: color-mix(
+    in srgb,
+    var(--dt-annotation-error-bg) 82%,
+    var(--dt-annotation-error-bdr) 18%
+  );
+  --dt-annotation-warning-bg-hover: color-mix(
+    in srgb,
+    var(--dt-annotation-warning-bg) 82%,
+    var(--dt-annotation-warning-bdr) 18%
+  );
+  --dt-annotation-info-bg-hover: color-mix(
+    in srgb,
+    var(--dt-annotation-info-bg) 82%,
+    var(--dt-annotation-info-bdr) 18%
+  );
+}
+
+/* Dark mode — two triggers. See header comment for the full model.
+   (1) @media prefers-color-scheme: dark — applies everywhere under :root
+       unless a descendant subtree opts out via `data-dt-color-scheme="light"`.
+   (2) `[data-dt-color-scheme="dark"]` — explicit per-instance opt-in; wins
+       in OS light mode and keeps body-portalled modals in dark when their
+       owning table forces dark. Duplicated variable blocks are intentional
+       (CSS has no mixins). Keep these in sync with the `:root` light block. */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    /* Primary colors — a step lighter than the light ramp, not just a shade.
+       --dt-primary is the cursor ring, the filtered-column underline, the
+       sorted arrow and the active action icon, which need 3:1 against a
+       hovered header and a selected+hovered row; blue-500 read 2.80:1 and
+       2.37:1 there. Filled buttons take `color: var(--dt-bg)` instead of
+       white: no blue light enough to indicate can also carry white text. */
+    --dt-primary: #60a5fa;
+    --dt-primary-hover: #93c5fd;
+    --dt-primary-light: #1e3a5f;
+    --dt-primary-lighter: #1e40af;
+
+    /* Neutral colors - inverted */
+    --dt-bg: #111827;
+    --dt-bg-secondary: #1f2937;
+    --dt-bg-tertiary: #374151;
+    --dt-border: #374151;
+    --dt-border-light: #1f2937;
+
+    /* Text colors - inverted */
+    --dt-text: #f9fafb;
+    --dt-text-secondary: #d1d5db;
+    /* Lifted off gray-400: #9ca3af only reaches 4.06:1 on --dt-bg-tertiary
+       (the hovered column header) and 3.44:1 on --dt-primary-lighter (a
+       selected, hovered row). */
+    --dt-text-tertiary: #b8bfc9;
+
+    /* Sort arrow / action-icon colors — the light block's 3:1 floor
+       mirrored; gray-600 sat at 1.36:1 against a hovered header. */
+    --dt-arrow-default: #9ca3af;
+    --dt-arrow-hover: #d1d5db;
+
+    /* Semantic colors. `success` / `error` stay light — they are text here.
+       The two fill reds keep their light values: white on red-500 is 3.76:1. */
+    --dt-success: #4ade80;
+    --dt-error: #f87171;
+    --dt-error-dark: #dc2626;
+
+    /* Accent family — lighter amber for dark */
+    --dt-accent: #fbbf24;
+    --dt-accent-hover: #f59e0b;
+
+    /* Neutral family — swap the two slate anchors for dark */
+    --dt-neutral: #64748b;
+    --dt-neutral-hover: #94a3b8;
+
+    /* Error chrome surfaces */
+    --dt-error-darker: #b91c1c;
+    --dt-error-bg: #451a1a;
+    --dt-error-border-soft: #7f1d1d;
+    --dt-error-text-strong: #fca5a5;
+
+    /* Modal scrim + shadows */
+    --dt-backdrop: rgba(0, 0, 0, 0.6);
+    --dt-shadow-sm: rgba(0, 0, 0, 0.4);
+    --dt-shadow-md: rgba(0, 0, 0, 0.5);
+
+    /* Syntax-highlighting tokens */
+    --dt-syntax-string: #4ade80;
+    --dt-syntax-type: #c084fc;
+
+    /* Annotation palette — lifted foregrounds + muted backgrounds so tints
+       read against `--dt-bg: #111827` without shouting. Borders stay
+       saturated so the cell left-border and header underline remain visible
+       against tinted cells. */
+    --dt-annotation-error-fg: #fca5a5;
+    --dt-annotation-error-bg: #451a1a;
+    --dt-annotation-error-bdr: #dc2626;
+    --dt-annotation-warning-fg: #fcd34d;
+    --dt-annotation-warning-bg: #3f2d0a;
+    --dt-annotation-warning-bdr: #d89b1b;
+    --dt-annotation-info-fg: #93c5fd;
+    --dt-annotation-info-bg: #0f2a44;
+    --dt-annotation-info-bdr: #2687c7;
+
+    /* Note: --dt-primary-alpha-*, --dt-accent-soft, --dt-neutral-soft, --dt-error-soft
+       are derived via color-mix() from their base tokens; they do not need redeclaration
+       because the base tokens are redeclared above. */
+  }
+
+  /* Restore light tokens for subtrees that explicitly opt out of OS dark. */
+  [data-dt-color-scheme='light'] {
+    color-scheme: light;
+
+    /* Primary colors */
+    --dt-primary: #2563eb;
+    --dt-primary-hover: #1d4ed8;
+    --dt-primary-light: #eff6ff;
+    --dt-primary-lighter: #dbeafe;
+
+    /* Neutral colors */
+    --dt-bg: #ffffff;
+    --dt-bg-secondary: #f9fafb;
+    --dt-bg-tertiary: #f3f4f6;
+    --dt-border: #e5e7eb;
+    --dt-border-light: #f3f4f6;
+
+    /* Text colors. `secondary` / `tertiary` are darker than the usual
+       gray-500 / gray-400 pairing because the surfaces they land on are
+       near-white (#f9fafb, #f3f4f6) and the type is 11.2-12px, where WCAG AA
+       demands 4.5:1 with no large-text exemption. gray-500 tops out at 4.39:1
+       on --dt-bg-tertiary. */
+    --dt-text: #111827;
+    --dt-text-secondary: #374151;
+    --dt-text-tertiary: #4b5563;
+
+    /* Sort arrow / action-icon colors */
+    --dt-arrow-default: #6b7280;
+    --dt-arrow-hover: #4b5563;
+
+    /* Semantic colors */
+    --dt-success: #15803d;
+    --dt-error: #dc2626;
+    --dt-error-dark: #dc2626;
+
+    /* Accent family */
+    --dt-accent: #f59e0b;
+    --dt-accent-hover: #d97706;
+
+    /* Neutral family */
+    --dt-neutral: #94a3b8;
+    --dt-neutral-hover: #64748b;
+
+    /* Error chrome */
+    --dt-error-darker: #b91c1c;
+    --dt-error-bg: #fef2f2;
+    --dt-error-border-soft: #fecaca;
+    --dt-error-text-strong: #7f1d1d;
+
+    /* Modal scrim + shadows */
+    --dt-backdrop: rgba(0, 0, 0, 0.4);
+    --dt-shadow-sm: rgba(0, 0, 0, 0.06);
+    --dt-shadow-md: rgba(0, 0, 0, 0.12);
+
+    /* Syntax-highlighting tokens */
+    --dt-syntax-string: #15803d;
+    --dt-syntax-type: #9333ea;
+
+    /* Annotation palette — light defaults (restored when an instance opts
+       out of OS dark via data-dt-color-scheme="light"). */
+    --dt-annotation-error-fg: #7a0b14;
+    --dt-annotation-error-bg: #fde2e5;
+    --dt-annotation-error-bdr: #d34551;
+    --dt-annotation-warning-fg: #7a4a00;
+    --dt-annotation-warning-bg: #fff0cc;
+    --dt-annotation-warning-bdr: #d89b1b;
+    --dt-annotation-info-fg: #003e66;
+    --dt-annotation-info-bg: #d6ecfa;
+    --dt-annotation-info-bdr: #2687c7;
+  }
+}
+
+/* Explicit dark opt-in — applies regardless of OS preference. */
+[data-dt-color-scheme='dark'] {
+  color-scheme: dark;
+
+  /* Primary colors — see the @media block above for why dark lifts a full
+     step past the light ramp instead of shading it. */
+  --dt-primary: #60a5fa;
+  --dt-primary-hover: #93c5fd;
+  --dt-primary-light: #1e3a5f;
+  --dt-primary-lighter: #1e40af;
+
+  /* Neutral colors - inverted */
+  --dt-bg: #111827;
+  --dt-bg-secondary: #1f2937;
+  --dt-bg-tertiary: #374151;
+  --dt-border: #374151;
+  --dt-border-light: #1f2937;
+
+  /* Text colors - inverted */
+  --dt-text: #f9fafb;
+  --dt-text-secondary: #d1d5db;
+  /* Lifted off gray-400: #9ca3af only reaches 4.06:1 on --dt-bg-tertiary
+     (the hovered column header) and 3.44:1 on --dt-primary-lighter (a
+     selected, hovered row). */
+  --dt-text-tertiary: #b8bfc9;
+
+  /* Sort arrow / action-icon colors */
+  --dt-arrow-default: #9ca3af;
+  --dt-arrow-hover: #d1d5db;
+
+  /* Semantic colors */
+  --dt-success: #4ade80;
+  --dt-error: #f87171;
+  --dt-error-dark: #dc2626;
+
+  /* Accent family — lighter amber for dark */
+  --dt-accent: #fbbf24;
+  --dt-accent-hover: #f59e0b;
+
+  /* Neutral family — swap the two slate anchors for dark */
+  --dt-neutral: #64748b;
+  --dt-neutral-hover: #94a3b8;
+
+  /* Error chrome surfaces */
+  --dt-error-darker: #b91c1c;
+  --dt-error-bg: #451a1a;
+  --dt-error-border-soft: #7f1d1d;
+  --dt-error-text-strong: #fca5a5;
+
+  /* Modal scrim + shadows */
+  --dt-backdrop: rgba(0, 0, 0, 0.6);
+  --dt-shadow-sm: rgba(0, 0, 0, 0.4);
+  --dt-shadow-md: rgba(0, 0, 0, 0.5);
+
+  /* Syntax-highlighting tokens */
+  --dt-syntax-string: #4ade80;
+  --dt-syntax-type: #c084fc;
+
+  /* Annotation palette — dark variants. Mirrors the @media block above so
+     body-portalled popovers that carry `data-dt-color-scheme="dark"` stay
+     in sync when the OS preference is light. */
+  --dt-annotation-error-fg: #fca5a5;
+  --dt-annotation-error-bg: #451a1a;
+  --dt-annotation-error-bdr: #dc2626;
+  --dt-annotation-warning-fg: #fcd34d;
+  --dt-annotation-warning-bg: #3f2d0a;
+  --dt-annotation-warning-bdr: #d89b1b;
+  --dt-annotation-info-fg: #93c5fd;
+  --dt-annotation-info-bg: #0f2a44;
+  --dt-annotation-info-bdr: #2687c7;
+}
+
+/*
+ * Shell — root container, header area, filter bar, gutter labels,
+ * hidden-columns gutter, body-scroll wrapper. Precedes columns / modals /
+ * grid / filters / export / responsive in cascade order.
+ */
+
+/* ===========================================
+   Root Container
+   =========================================== */
+
+.dt-root {
+  position: relative; /* Containing block for pinned demarcation overlay */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius);
+  background: var(--dt-bg);
+  font-family: var(--dt-font-family);
+  container-type: inline-size;
+  container-name: dt-root;
+}
+
+/* ===========================================
+   Grid (ARIA role="grid" — the keyboard cursor's tab stop)
+   =========================================== */
+
+/* Wraps only the header area and the body scroller — the filter bar, live
+   region and gutter stay outside so `role="grid"` owns nothing but rowgroups.
+   The flex chain keeps `.dt-body-scroll { flex: 1; min-height: 0 }` resolving
+   now that the grid sits between it and `.dt-root`. */
+.dt-grid {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* `:focus-visible`, not `:focus` — clicking a cell bounces focus here (see
+   TableContainer.handleGridFocusIn), and a ring around the whole table on
+   every click reads as a glitch. Replaces `.dt-root:focus { outline: none }`,
+   which hid the cursor's tab stop entirely (WCAG 2.4.7, issue #84). */
+.dt-grid:focus-visible,
+.dt-header-scroll:focus-visible,
+.dt-body-scroll:focus-visible {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: -2px;
+}
+
+/* ===========================================
+   Header Area
+   =========================================== */
+
+.dt-header-area {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--dt-border);
+}
+
+.dt-header-scroll {
+  flex: 1;
+  overflow-x: scroll;
+  /* Hide scrollbar - sync with body scroll via JavaScript */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.dt-header-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.dt-scrollbar-gutter {
+  /* Reserves space for body's vertical scrollbar */
+  width: var(--dt-scrollbar-width);
+  flex-shrink: 0;
+  background: var(--dt-bg-secondary);
+}
+
+.dt-header {
+  flex-shrink: 0;
+  background: var(--dt-bg-secondary);
+}
+
+.dt-header-row {
+  display: flex;
+  min-width: fit-content;
+  position: relative; /* Positioning context for drop indicator */
+}
+
+/* ===========================================
+   Filter Bar
+   =========================================== */
+
+.dt-filter-bar {
+  position: relative;
+  z-index: var(--dt-z-filter-bar, 40);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border);
+  background: var(--dt-bg);
+  flex-shrink: 0;
+  overflow: hidden;
+  max-height: 50px;
+  transition:
+    max-height 0.2s ease,
+    padding 0.2s ease,
+    border-bottom-color 0.2s ease;
+}
+
+.dt-filter-bar--hidden {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-color: transparent;
+}
+
+.dt-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dt-border) transparent;
+}
+
+/* Thin scrollbar for chips container (WebKit/Blink) */
+.dt-filter-chips::-webkit-scrollbar {
+  height: 4px;
+}
+
+.dt-filter-chips::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dt-filter-chips::-webkit-scrollbar-thumb {
+  background: var(--dt-border);
+  border-radius: 2px;
+}
+
+.dt-filter-chips::-webkit-scrollbar-thumb:hover {
+  background: var(--dt-text-tertiary);
+}
+
+.dt-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.25rem 0.125rem 0.5rem;
+  background: var(--dt-primary-light);
+  border: 1px solid var(--dt-primary);
+  border-radius: 999px;
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text);
+  max-width: 280px;
+  white-space: nowrap;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.dt-filter-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dt-filter-chip-column {
+  font-weight: 600;
+  color: var(--dt-text);
+}
+
+.dt-filter-chip-detail {
+  color: var(--dt-text-secondary);
+}
+
+.dt-filter-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--dt-text-secondary);
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition);
+  flex-shrink: 0;
+}
+
+/* Ink on a --dt-primary fill is the page background, not literal white: the
+   dark primary is light enough to serve as a focus indicator, which leaves
+   white at 3.68:1 on it. --dt-bg inverts with the scheme and is #ffffff in
+   light, so light mode is unchanged. Every primary fill follows this. */
+.dt-filter-chip-remove:hover {
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+}
+
+.dt-filter-chip-remove:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-filter-chip-remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Clickable filter chip label (toggled when an onEdit handler is wired). */
+.dt-filter-chip-label--clickable {
+  cursor: pointer;
+}
+
+/* SQL filter chip — link-like hover underline only when the chip is clickable
+   (i.e. an onEdit handler is wired, which the FilterBar gates on the
+   `expressionFilter` option). Cursor is handled by --clickable above, so a
+   non-editable raw-SQL chip renders visually identical to any other static
+   chip. */
+.dt-filter-chip-label--sql.dt-filter-chip-label--clickable:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--dt-primary);
+}
+/* SQL chip code icon */
+.dt-filter-chip-sql-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.2rem;
+  opacity: 0.7;
+}
+.dt-filter-chip-sql-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Expression filter button (in filter bar) */
+.dt-filter-expression-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--dt-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dt-text-secondary);
+  font-size: var(--dt-font-size-sm);
+  font-family: var(--dt-font-family);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--dt-transition),
+    color var(--dt-transition),
+    background var(--dt-transition);
+}
+.dt-filter-expression-btn:hover {
+  border-color: var(--dt-primary);
+  color: var(--dt-primary);
+  background: var(--dt-primary-light);
+}
+.dt-filter-expression-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+.dt-filter-expression-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.dt-filter-clear-all {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--dt-text-secondary);
+  font-size: var(--dt-font-size-sm);
+  font-family: var(--dt-font-family);
+  cursor: pointer;
+  border-radius: var(--dt-radius-sm);
+  transition:
+    color var(--dt-transition),
+    background var(--dt-transition);
+  white-space: nowrap;
+}
+
+.dt-filter-clear-all:hover {
+  color: var(--dt-text);
+  background: var(--dt-bg-tertiary);
+}
+
+.dt-filter-clear-all:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+/* ===========================================
+   Gutter Labels (shared by filter bar and hidden gutter)
+   =========================================== */
+
+.dt-gutter-label {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-tertiary);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* ===========================================
+   Hidden Columns Gutter
+   =========================================== */
+
+.dt-hidden-gutter {
+  position: relative;
+  z-index: var(--dt-z-header, 21);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-top: 1px solid var(--dt-border);
+  background: var(--dt-bg);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  overflow: hidden;
+  max-height: 200px;
+  transition:
+    max-height 0.2s ease,
+    padding 0.2s ease,
+    border-top-color 0.2s ease;
+}
+
+/* Past `max-height` the chips still have to be reachable: the roving tabindex
+   scrolls the keyboard cursor into view, but `overflow: hidden` leaves a
+   pointer user no way in. Scoped off the collapsed state so no scrollbar
+   flashes through the transition. axe's `scrollable-region-focusable` is
+   satisfied by the chips themselves — `tabindex` here would put back the tab
+   stop this work removes. */
+.dt-hidden-gutter:not(.dt-hidden-gutter--hidden) {
+  overflow: hidden auto;
+}
+
+.dt-hidden-gutter--hidden {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-color: transparent;
+}
+
+.dt-hidden-chips {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.dt-hidden-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.25rem 0.125rem 0.5rem;
+  background: var(--dt-bg-tertiary);
+  border: 1px solid var(--dt-border);
+  border-radius: 999px;
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text-secondary);
+  max-width: 280px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.dt-hidden-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dt-hidden-chip-restore {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--dt-text-secondary);
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition);
+  flex-shrink: 0;
+}
+
+/* Matches `.dt-filter-chip-remove:hover`, the twin control one gutter up. The
+   old fill was --dt-text-secondary — a text token, so #d1d5db in dark, which
+   left the white glyph at 1.47:1. Text tokens are never backgrounds. */
+.dt-hidden-chip-restore:hover {
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+}
+
+.dt-hidden-chip-restore:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-hidden-chip-restore svg {
+  width: 10px;
+  height: 10px;
+  fill: currentColor;
+}
+
+.dt-hidden-show-all {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--dt-text-secondary);
+  font-size: var(--dt-font-size-sm);
+  font-family: var(--dt-font-family);
+  cursor: pointer;
+  border-radius: var(--dt-radius-sm);
+  transition:
+    color var(--dt-transition),
+    background var(--dt-transition);
+  white-space: nowrap;
+}
+
+.dt-hidden-show-all:hover {
+  color: var(--dt-text);
+  background: var(--dt-bg-tertiary);
+}
+
+.dt-hidden-show-all:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+/* ===========================================
+   Body Area
+   =========================================== */
+
+.dt-body-scroll {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.dt-body {
+  position: relative; /* Positioning context for virtual scroll */
+  min-width: fit-content;
+}
+
+/*
+ * Columns — column headers, resize/drag handles, action panel, derived-column
+ * visual identity, derived-column edit panel, expression editor (CodeMirror),
+ * add-column button. Keyframes colocate with their consumer.
+ */
+
+/* ===========================================
+   Column Headers
+   =========================================== */
+
+.dt-col-header {
+  display: flex;
+  flex-direction: column;
+  position: relative; /* For absolute positioning of resize handle */
+  width: var(--dt-col-width);
+  flex-shrink: 0;
+  padding: 0.5rem 0.75rem; /* Symmetric padding - no extra left padding */
+  border-right: 1px solid var(--dt-border);
+  cursor: default; /* No grab cursor - use drag handle instead */
+  transition:
+    background var(--dt-transition),
+    box-shadow var(--dt-transition);
+  background: var(--dt-bg-secondary);
+}
+
+.dt-col-header:hover {
+  background: var(--dt-bg-tertiary);
+}
+
+@keyframes dt-col-restore-flash {
+  0% {
+    background-color: var(--dt-primary-alpha-10);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.dt-col-header--restored {
+  animation: dt-col-restore-flash 1.5s ease-out;
+}
+
+.dt-col-header:last-child {
+  border-right: none;
+}
+
+.dt-col-header--dragging {
+  opacity: 0.5;
+  background: var(--dt-bg-tertiary);
+}
+
+.dt-col-header--filtered {
+  box-shadow: inset 0 3px 0 0 var(--dt-primary);
+}
+
+/* Keyboard cursor on the header row — mirrors `.dt-cell--focused` in the body
+   so the one cursor reads the same wherever it sits. */
+.dt-col-header--focused {
+  box-shadow: inset 0 0 0 2px var(--dt-primary);
+}
+
+/* Keep both indicators instead of letting the later rule win, the way
+   `.dt-cell--annotated.dt-cell--focused` composes. */
+.dt-col-header--filtered.dt-col-header--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 0 3px 0 0 var(--dt-primary);
+}
+
+/* Column layout mode (Shift+F2) — the arrow keys are about to resize or move
+   THIS column. Deliberately `outline` and not `box-shadow`: every box-shadow
+   on `.dt-col-header` has to be re-composed against the cursor ring at equal
+   specificity (see tests/styles/focusIndicator.test.ts), and the mode always
+   coexists with the ring, since it can only be entered from the cursor.
+   Dashed distinguishes it from the solid ring underneath. */
+.dt-col-header--layout {
+  outline: 2px dashed var(--dt-primary);
+  outline-offset: -2px;
+}
+
+/* Controls mode (F2) parks real focus on a header button, inside the cell
+   that still shows the cursor ring — mark it unmistakably. */
+.dt-col-header button:focus-visible,
+.dt-col-name:focus-visible {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-col-header.dt-col-resetting {
+  transition: width 0.2s ease-out;
+}
+
+/* Name row: flex container for drag handle + column name */
+.dt-col-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dt-col-name {
+  flex: 1; /* Fill available width */
+  min-width: 0; /* Allow text truncation in flex container */
+  font-weight: 600;
+  font-size: var(--dt-font-size);
+  color: var(--dt-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dt-col-name--derived {
+  font-style: italic;
+}
+
+.dt-col-type {
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text-secondary);
+  margin-top: 0.125rem;
+}
+
+/* Clipped, never scrolled. `overflow-y: auto` made this a scrollable region
+   with no focusable content (axe `scrollable-region-focusable`), and the
+   obvious remedy — `tabindex="0"` — is the bug the header rewrite removed:
+   one tab stop per column. The height is a whole number of line boxes
+   (4 × 1.3), so the clip lands on a line boundary. `display` stays untouched:
+   the slot is a public extension point (`BaseStatsPanel` renders into it) and
+   a `-webkit-box` clamp would relayout a custom panel's children. */
+.dt-col-stats {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  margin-top: 0.25rem;
+  height: 5.2em; /* 4 lines × 1.3 line-height — accommodates wrapped stats + hover */
+  line-height: 1.3;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.dt-col-stats .stats-label {
+  font-weight: 600;
+}
+
+/* A colour, not `opacity`. Opacity composites against whatever is behind the
+   text, so contrast changes with every background it is painted on — at 0.8
+   this line failed 4.5:1 in all four theme x header-state combinations. */
+.dt-col-stats .dt-stats-line2 {
+  color: var(--dt-text-tertiary);
+}
+
+.dt-col-viz {
+  height: 60px;
+  margin-top: 0.25rem;
+  background: var(--dt-bg-secondary);
+  border-radius: var(--dt-radius-sm);
+  border: 1px solid var(--dt-border);
+}
+
+/* ===========================================
+   Column Resize Handle
+   =========================================== */
+
+.dt-col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize !important;
+  background: transparent;
+  z-index: var(--dt-z-table-body, 1);
+}
+
+.dt-col-resize-handle:hover {
+  background: var(--dt-primary-alpha-50);
+}
+
+.dt-col-resize-handle--active {
+  background: var(--dt-primary);
+}
+
+/* ===========================================
+   Drag Handle (in action panel)
+   =========================================== */
+
+.dt-col-drag-handle {
+  /* Element within action panel flex container */
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--dt-radius-sm);
+  cursor: grab;
+  opacity: 0.3;
+  transition:
+    opacity var(--dt-transition),
+    background var(--dt-transition);
+}
+
+.dt-col-drag-handle:hover {
+  opacity: 0.7;
+  background: var(--dt-shadow-sm);
+}
+
+.dt-col-drag-handle:active {
+  cursor: grabbing;
+  opacity: 1;
+}
+
+.dt-col-drag-handle:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+  opacity: 0.7;
+}
+
+.dt-col-drag-handle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dt-col-drag-handle circle {
+  fill: var(--dt-text-secondary);
+}
+
+.dt-col-drag-handle--disabled {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Dark mode adjustments for drag handle. Dual-scoped: OS-dark unless the
+   subtree opts out, OR explicit `data-dt-color-scheme="dark"`. */
+@media (prefers-color-scheme: dark) {
+  .dt-root:not([data-dt-color-scheme='light']) .dt-col-drag-handle:hover {
+    /* keep: dark-mode subtle light highlight; no semantic variable */
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+[data-dt-color-scheme='dark'] .dt-col-drag-handle:hover,
+.dt-root[data-dt-color-scheme='dark'] .dt-col-drag-handle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ===========================================
+   Column Action Panel
+   =========================================== */
+
+.dt-col-action-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+}
+
+.dt-col-action-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--dt-radius-sm);
+  cursor: pointer;
+  color: var(--dt-arrow-default);
+  transition:
+    color var(--dt-transition),
+    background var(--dt-transition);
+}
+
+.dt-col-action-btn:hover {
+  color: var(--dt-arrow-hover);
+  background: var(--dt-shadow-sm);
+}
+
+.dt-col-action-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-col-action-btn--active {
+  color: var(--dt-primary);
+}
+
+.dt-col-action-btn--active:hover {
+  color: var(--dt-primary-hover);
+  background: var(--dt-primary-alpha-10);
+}
+
+.dt-col-action-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* Dark mode adjustments for action buttons. */
+@media (prefers-color-scheme: dark) {
+  .dt-root:not([data-dt-color-scheme='light']) .dt-col-action-btn:hover {
+    /* keep: dark-mode subtle light highlight; no semantic variable */
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .dt-root:not([data-dt-color-scheme='light']) .dt-col-action-btn--active:hover {
+    background: var(--dt-primary-alpha-20);
+  }
+}
+[data-dt-color-scheme='dark'] .dt-col-action-btn:hover,
+.dt-root[data-dt-color-scheme='dark'] .dt-col-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+[data-dt-color-scheme='dark'] .dt-col-action-btn--active:hover,
+.dt-root[data-dt-color-scheme='dark'] .dt-col-action-btn--active:hover {
+  background: var(--dt-primary-alpha-20);
+}
+
+.dt-col-action-btn--disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ===========================================
+   Derived Columns (Visual Identity)
+   =========================================== */
+
+/* Header tint */
+.dt-col-header--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 40%, var(--dt-bg-secondary));
+}
+
+.dt-col-header--derived:hover {
+  background: color-mix(in srgb, var(--dt-primary-light) 50%, var(--dt-bg-tertiary));
+}
+
+/* f(x) icon button in column name row */
+.dt-derived-icon-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--dt-primary);
+  transition: color var(--dt-transition);
+}
+
+.dt-derived-icon-btn:hover {
+  background: var(--dt-border);
+}
+
+.dt-derived-icon-btn:focus-visible {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-derived-icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Italic serif "f" glyph for derived columns. The serif italic styling is a
+   deliberate typographic choice for the mathematical f(x) icon, intentionally
+   independent of the host font stack. */
+.dt-derived-fx-glyph {
+  font-family: 'Cambria', Georgia, 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: 600;
+  font-style: italic;
+}
+
+/* Active state: filled circle, white text — applied while edit panel is open */
+.dt-derived-icon-btn--active svg circle {
+  fill: var(--dt-primary);
+}
+
+.dt-derived-icon-btn--active svg text {
+  fill: var(--dt-bg);
+}
+
+.dt-derived-icon-btn--active:hover svg circle {
+  fill: var(--dt-primary-hover);
+}
+
+/* Derived column cell tinting — background covers the full cell including padding.
+   align-self: stretch overrides the row's align-items: center so the tint
+   fills the entire row height. line-height re-centers single-line text. */
+.dt-cell--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 20%, var(--dt-bg));
+  align-self: stretch;
+  line-height: var(--dt-row-height);
+}
+
+/* Hover state */
+.dt-row:hover .dt-cell--derived,
+.dt-row--hover .dt-cell--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 30%, var(--dt-bg-secondary));
+}
+
+/* Selected state */
+.dt-row--selected .dt-cell--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 60%, var(--dt-primary-light));
+}
+
+.dt-row--selected:hover .dt-cell--derived,
+.dt-row--selected.dt-row--hover .dt-cell--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 60%, var(--dt-primary-lighter));
+}
+
+/* Combined pinned + derived */
+.dt-cell--pinned.dt-cell--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 20%, var(--dt-bg));
+}
+
+.dt-row:hover .dt-cell--pinned.dt-cell--derived,
+.dt-row--hover .dt-cell--pinned.dt-cell--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 30%, var(--dt-bg-secondary));
+}
+
+.dt-row--selected .dt-cell--pinned.dt-cell--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 60%, var(--dt-primary-light));
+}
+
+.dt-row--selected:hover .dt-cell--pinned.dt-cell--derived,
+.dt-row--selected.dt-row--hover .dt-cell--pinned.dt-cell--derived {
+  background: color-mix(in srgb, var(--dt-primary-light) 60%, var(--dt-primary-lighter));
+}
+
+/* ===========================================
+   Derived Column Edit Panel
+   =========================================== */
+
+/* Panel container (same visual pattern as .dt-filter-panel) */
+.dt-derived-edit-panel {
+  position: absolute;
+  z-index: var(--dt-z-floating-panel, 50);
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  background: var(--dt-bg);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius);
+  box-shadow: 0 4px 16px var(--dt-shadow-md);
+  font-family: var(--dt-font-family);
+  /* Explicit `color` so descendants (notably CodeMirror's `.cm-content`,
+     which otherwise picks up OS canvas-text via `color-scheme`) inherit
+     a flipping token instead of freezing on the OS default. Modals set
+     the equivalent on their dialog element. */
+  color: var(--dt-text);
+}
+
+/* Header */
+.dt-derived-edit-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border);
+}
+
+.dt-derived-edit-title {
+  font-weight: 600;
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dt-derived-edit-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--dt-radius-sm);
+  color: var(--dt-text-secondary);
+  cursor: pointer;
+}
+
+.dt-derived-edit-close:hover {
+  background: var(--dt-shadow-sm);
+  color: var(--dt-text);
+}
+
+/* Body */
+.dt-derived-edit-body {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dt-derived-edit-section label {
+  display: block;
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.dt-derived-edit-vector-text {
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text-secondary);
+  padding: 0.5rem;
+  background: var(--dt-bg-secondary);
+  border-radius: var(--dt-radius-sm);
+}
+
+.dt-derived-edit-name-error {
+  color: var(--dt-error);
+  font-size: var(--dt-font-size-xs);
+  margin-top: 0.25rem;
+  display: none;
+}
+
+/* Actions row */
+.dt-derived-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dt-derived-edit-validate {
+  padding: 0.3rem 0.75rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-bg);
+  color: var(--dt-primary);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-derived-edit-validate:hover {
+  background: var(--dt-primary-light);
+  border-color: var(--dt-primary-hover);
+  color: var(--dt-primary-hover);
+}
+
+.dt-derived-edit-validate:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-derived-edit-validate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dt-derived-edit-type-preview {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ink inverts with the fill — see `.dt-filter-chip-remove:hover` (02-shell). */
+.dt-derived-edit-update {
+  padding: 0.3rem 0.75rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-derived-edit-update:hover:not(:disabled) {
+  background: var(--dt-primary-hover);
+  border-color: var(--dt-primary-hover);
+}
+
+.dt-derived-edit-update:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-derived-edit-update:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Danger zone */
+.dt-derived-edit-divider {
+  border: none;
+  border-top: 1px solid var(--dt-border);
+  margin: 0;
+}
+
+.dt-derived-edit-danger-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dt-derived-edit-delete {
+  padding: 0.3rem 0.75rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  border: 1px solid var(--dt-error-dark);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-error-dark);
+  color: var(--dt-on-error);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-derived-edit-delete:hover {
+  background: var(--dt-error-darker);
+  border-color: var(--dt-error-darker);
+}
+
+.dt-derived-edit-delete:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-derived-edit-delete-confirm {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--dt-font-size-sm);
+}
+
+.dt-derived-edit-delete-confirm span {
+  color: var(--dt-text-secondary);
+}
+
+.dt-derived-edit-delete-confirm-btn {
+  padding: 0.3rem 0.5rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-xs);
+  font-weight: 500;
+  border-radius: var(--dt-radius-sm);
+  cursor: pointer;
+  border: 1px solid;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-derived-edit-delete-confirm-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-derived-edit-delete-confirm-yes {
+  border-color: var(--dt-error-dark);
+  background: var(--dt-error-dark);
+  color: var(--dt-on-error);
+}
+
+.dt-derived-edit-delete-confirm-yes:hover {
+  background: var(--dt-error-darker);
+  border-color: var(--dt-error-darker);
+}
+
+.dt-derived-edit-delete-confirm-no {
+  border-color: var(--dt-border);
+  background: var(--dt-bg);
+  color: var(--dt-text-secondary);
+}
+
+.dt-derived-edit-delete-confirm-no:hover {
+  border-color: var(--dt-text-secondary);
+  color: var(--dt-text);
+}
+
+/* ===========================================
+   Expression Editor
+   =========================================== */
+
+.dt-expr-editor-input {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  padding: 0.5rem;
+  background: var(--dt-bg);
+  color: var(--dt-text);
+  box-sizing: border-box;
+}
+
+.dt-expr-editor-input:focus {
+  outline: none;
+  border-color: var(--dt-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dt-primary) 20%, transparent);
+}
+
+.dt-expr-editor-input--error {
+  border-color: var(--dt-error);
+}
+
+.dt-expr-editor-input--error:focus {
+  border-color: var(--dt-error);
+  box-shadow: 0 0 0 2px var(--dt-error-soft);
+}
+
+.dt-expr-editor-error {
+  color: var(--dt-error);
+  font-size: var(--dt-font-size-xs);
+  margin-top: 0.25rem;
+  display: none;
+}
+
+/* Same `scrollable-region-focusable` shape as `.dt-col-stats`. This one is
+   library-owned DOM (one text node), so it can take the line clamp the stats
+   slot cannot: 5 lines is what 80px of 11px/1.4 holds, and the ellipsis
+   signals the truncation the scrollbar used to. */
+.dt-expr-editor-context {
+  color: var(--dt-text-secondary);
+  font-size: 11px;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+  max-height: 80px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  padding-right: 0.25rem;
+}
+
+/* === CodeMirror Expression Editor === */
+
+.dt-cm-expr-editor .cm-editor {
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+}
+
+.dt-cm-expr-editor .cm-editor.cm-focused {
+  border-color: var(--dt-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dt-primary) 20%, transparent);
+}
+
+.dt-cm-expr-editor--error .cm-editor {
+  border-color: var(--dt-error);
+}
+
+.dt-cm-expr-editor--error .cm-editor.cm-focused {
+  border-color: var(--dt-error);
+  box-shadow: 0 0 0 2px var(--dt-error-soft);
+}
+
+/*
+ * Autocomplete tooltip (rendered at document.body level by CodeMirror).
+ *
+ * We attach a library-specific class (`.dt-cm-autocomplete`) to our
+ * tooltip via `autocompletion({ tooltipClass })` in CodeMirrorExpressionEditor.
+ * Scoping the selector to that class prevents our styles from leaking into
+ * any other CodeMirror instance the host app may render.
+ */
+.dt-cm-autocomplete.cm-tooltip-autocomplete {
+  z-index: var(--dt-z-autocomplete, 60);
+  background: var(--dt-bg);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  box-shadow: 0 4px 12px var(--dt-shadow-md);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+}
+
+.dt-cm-autocomplete.cm-tooltip-autocomplete ul li[aria-selected] {
+  background: var(--dt-primary-light);
+  color: var(--dt-text);
+}
+
+/* Dark mode — autocomplete tooltip. Portalled to <body>; the attribute is
+   not copied onto the tooltip (it's a CodeMirror tooltip, not ModalHost-
+   managed), so attribute-based scoping applies only if an ancestor carries
+   the attribute. OS dark mode still works via the bare `.cm-tooltip-autocomplete`
+   selector using CSS vars cascaded from `:root`. */
+@media (prefers-color-scheme: dark) {
+  .dt-cm-autocomplete.cm-tooltip-autocomplete {
+    box-shadow: 0 4px 12px var(--dt-shadow-md);
+  }
+}
+[data-dt-color-scheme='dark'] .dt-cm-autocomplete.cm-tooltip-autocomplete {
+  box-shadow: 0 4px 12px var(--dt-shadow-md);
+}
+
+/* Dark mode — derived-column edit panel. Lives inside .dt-root. */
+@media (prefers-color-scheme: dark) {
+  .dt-root:not([data-dt-color-scheme='light']) .dt-derived-edit-panel {
+    box-shadow: 0 4px 16px var(--dt-shadow-md);
+  }
+  .dt-root:not([data-dt-color-scheme='light']) .dt-derived-edit-close:hover {
+    /* keep: dark-mode subtle light highlight; no semantic variable */
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+.dt-root[data-dt-color-scheme='dark'] .dt-derived-edit-panel,
+[data-dt-color-scheme='dark'] .dt-derived-edit-panel {
+  box-shadow: 0 4px 16px var(--dt-shadow-md);
+}
+.dt-root[data-dt-color-scheme='dark'] .dt-derived-edit-close:hover,
+[data-dt-color-scheme='dark'] .dt-derived-edit-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ===========================================
+   Add Column Button (+)
+   =========================================== */
+
+/* Flex wrapper: table root + add-column button side by side */
+.dt-table-wrapper {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius);
+  overflow: hidden;
+  background: var(--dt-bg);
+}
+
+.dt-table-wrapper > .dt-root {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.dt-add-column-btn {
+  flex-shrink: 0;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: var(--dt-bg);
+  color: var(--dt-text-tertiary);
+  cursor: pointer;
+  border-radius: 0 var(--dt-radius) var(--dt-radius) 0;
+  box-shadow: inset 1px 0 0 0 var(--dt-border);
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition),
+    box-shadow var(--dt-transition);
+}
+
+.dt-add-column-btn:hover {
+  background: var(--dt-primary-light);
+  color: var(--dt-primary);
+  box-shadow:
+    inset 1px 0 0 0 var(--dt-primary),
+    inset -1px 0 0 0 var(--dt-primary),
+    inset 0 1px 0 0 var(--dt-primary),
+    inset 0 -1px 0 0 var(--dt-primary);
+}
+
+.dt-add-column-btn:focus-visible {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: -2px;
+}
+
+.dt-add-column-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ===========================================
+   Column header — annotation overlay
+   ===========================================
+
+   Applied when a column has one or more column-scope annotations. We paint:
+   - A tinted background on the header container.
+   - A strong underline at the bottom edge so it stays visible even when
+     pinned headers stick next to filter chrome.
+
+   `dt-col-header--filtered` already draws an inset top border via
+   `--dt-primary`, so the two states compose without conflict (top = filtered,
+   bottom = annotated). */
+.dt-col-header--annotated {
+  transition: background-color var(--dt-transition, 0.15s ease);
+}
+.dt-col-header--annotation-error {
+  background-color: color-mix(in srgb, var(--dt-annotation-error-bg) 70%, transparent);
+  box-shadow: inset 0 -3px 0 0 var(--dt-annotation-error-bdr);
+}
+.dt-col-header--annotation-warning {
+  background-color: color-mix(in srgb, var(--dt-annotation-warning-bg) 70%, transparent);
+  box-shadow: inset 0 -3px 0 0 var(--dt-annotation-warning-bdr);
+}
+.dt-col-header--annotation-info {
+  background-color: color-mix(in srgb, var(--dt-annotation-info-bg) 70%, transparent);
+  box-shadow: inset 0 -3px 0 0 var(--dt-annotation-info-bdr);
+}
+
+/* Coexist with the active-filter inset top border. Stack both insets so
+   neither signal is lost on a column that is both filtered and annotated. */
+.dt-col-header--filtered.dt-col-header--annotation-error {
+  box-shadow:
+    inset 0 3px 0 0 var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-error-bdr);
+}
+.dt-col-header--filtered.dt-col-header--annotation-warning {
+  box-shadow:
+    inset 0 3px 0 0 var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-warning-bdr);
+}
+.dt-col-header--filtered.dt-col-header--annotation-info {
+  box-shadow:
+    inset 0 3px 0 0 var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-info-bdr);
+}
+
+/* Keyboard cursor on an annotated header. The rules above set `box-shadow`
+   outright and win on source order against `.dt-col-header--focused`, which
+   would leave the cursor with no visible indicator on exactly the columns a
+   user most needs to inspect — a WCAG 2.4.7 failure. Re-compose every
+   combination, mirroring `.dt-cell--*-annotation-*.dt-cell--focused` in
+   05-data-grid.css. */
+.dt-col-header--annotation-error.dt-col-header--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-error-bdr);
+}
+.dt-col-header--annotation-warning.dt-col-header--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-warning-bdr);
+}
+.dt-col-header--annotation-info.dt-col-header--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-info-bdr);
+}
+.dt-col-header--filtered.dt-col-header--annotation-error.dt-col-header--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 0 3px 0 0 var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-error-bdr);
+}
+.dt-col-header--filtered.dt-col-header--annotation-warning.dt-col-header--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 0 3px 0 0 var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-warning-bdr);
+}
+.dt-col-header--filtered.dt-col-header--annotation-info.dt-col-header--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 0 3px 0 0 var(--dt-primary),
+    inset 0 -3px 0 0 var(--dt-annotation-info-bdr);
+}
+
+/*
+ * Authoring modals — full-screen dialogs for creating derived columns and
+ * composing raw SQL WHERE clauses. Share the .dt-backdrop scrim.
+ */
+
+/* ===========================================
+   Derived Column Modal
+   =========================================== */
+
+/* Backdrop */
+.dt-derived-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dt-z-modal, 1000);
+  align-items: center;
+  justify-content: center;
+  background: var(--dt-backdrop);
+  display: none;
+}
+
+.dt-derived-modal-backdrop--open {
+  display: flex;
+}
+
+/* Dialog */
+.dt-derived-modal-dialog {
+  width: 480px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--dt-bg);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius);
+  box-shadow: 0 8px 32px var(--dt-shadow-md);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size);
+  color: var(--dt-text);
+}
+
+/* Header */
+.dt-derived-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border);
+}
+
+.dt-derived-modal-title {
+  font-weight: 600;
+  font-size: var(--dt-font-size);
+}
+
+.dt-derived-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--dt-radius-sm);
+  background: transparent;
+  color: var(--dt-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-derived-modal-close:hover {
+  background: var(--dt-bg-tertiary);
+  color: var(--dt-text);
+}
+
+/* Body */
+.dt-derived-modal-body {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dt-derived-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dt-derived-modal-section > label {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  font-weight: 500;
+}
+
+.dt-derived-modal-name-error {
+  color: var(--dt-error);
+  font-size: var(--dt-font-size-xs);
+  margin-top: 0.125rem;
+  display: none;
+}
+
+/* Mode toggle */
+.dt-derived-modal-mode-group {
+  display: flex;
+  gap: 1rem;
+  padding: 0;
+  border: none;
+  margin: 0;
+}
+
+.dt-derived-modal-mode-group legend {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.dt-derived-modal-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text);
+  cursor: pointer;
+}
+
+.dt-derived-modal-mode-option input[type='radio'] {
+  margin: 0;
+  accent-color: var(--dt-primary);
+}
+
+/* Expression section */
+.dt-derived-modal-editor-container {
+  min-height: 100px;
+}
+
+.dt-derived-modal-expr-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.dt-derived-modal-validate {
+  padding: 0.3rem 0.75rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-bg);
+  color: var(--dt-primary);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-derived-modal-validate:hover:not(:disabled) {
+  background: var(--dt-primary-light);
+  border-color: var(--dt-primary-hover);
+  color: var(--dt-primary-hover);
+}
+
+.dt-derived-modal-validate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dt-derived-modal-type-preview {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Vector section */
+.dt-derived-modal-vector-textarea {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  padding: 0.5rem;
+  background: var(--dt-bg);
+  color: var(--dt-text);
+  box-sizing: border-box;
+}
+
+.dt-derived-modal-vector-textarea:focus {
+  outline: none;
+  border-color: var(--dt-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dt-primary) 20%, transparent);
+}
+
+.dt-derived-modal-vector-info {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  margin-top: 0.125rem;
+}
+
+.dt-derived-modal-vector-error {
+  color: var(--dt-error);
+  font-size: var(--dt-font-size-xs);
+  display: none;
+}
+
+/* Footer */
+.dt-derived-modal-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding: 0.625rem 0.75rem;
+  border-top: 1px solid var(--dt-border);
+}
+
+.dt-derived-modal-cancel {
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  background: transparent;
+  color: var(--dt-text-secondary);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-derived-modal-cancel:hover {
+  background: var(--dt-bg-tertiary);
+  color: var(--dt-text);
+}
+
+/* Ink inverts with the fill — see `.dt-filter-chip-remove:hover` (02-shell). */
+.dt-derived-modal-create {
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 80px;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-derived-modal-create:hover:not(:disabled) {
+  background: var(--dt-primary-hover);
+  border-color: var(--dt-primary-hover);
+}
+
+.dt-derived-modal-create:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* General error area. --dt-error-text-strong in both schemes: it is the token
+   cut for error text on --dt-error-bg, red-600 (the fill red) manages only
+   4.41:1 on the light tint, and one token retires the dark-mode override. */
+.dt-derived-modal-error {
+  padding: 0.375rem 0.5rem;
+  background: var(--dt-error-bg);
+  border: 1px solid var(--dt-error-border-soft);
+  border-radius: var(--dt-radius-sm);
+  color: var(--dt-error-text-strong);
+  font-size: var(--dt-font-size-sm);
+  display: none;
+}
+
+/* Dark mode — derived-column modal. Portalled to <body>; ModalHost copies
+   the owning table's `data-dt-color-scheme` attribute onto the backdrop
+   element on open. The `@media` rules are gated with
+   `:not([data-dt-color-scheme="light"])` so a forced-light instance in
+   OS-dark mode still renders light. Explicit `[data-dt-color-scheme="dark"]`
+   selectors cover forced-dark in OS-light. */
+@media (prefers-color-scheme: dark) {
+  .dt-derived-modal-backdrop:not([data-dt-color-scheme='light']) {
+    background: var(--dt-backdrop);
+  }
+  .dt-derived-modal-backdrop:not([data-dt-color-scheme='light']) .dt-derived-modal-dialog {
+    box-shadow: 0 8px 32px var(--dt-shadow-md);
+  }
+  .dt-derived-modal-backdrop:not([data-dt-color-scheme='light']) .dt-derived-modal-close:hover {
+    /* keep: dark-mode subtle light highlight; no semantic variable */
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .dt-root:not([data-dt-color-scheme='light']) .dt-add-column-btn:hover {
+    background: var(--dt-primary-alpha-10);
+  }
+}
+.dt-derived-modal-backdrop[data-dt-color-scheme='dark'] {
+  background: var(--dt-backdrop);
+}
+.dt-derived-modal-backdrop[data-dt-color-scheme='dark'] .dt-derived-modal-dialog {
+  box-shadow: 0 8px 32px var(--dt-shadow-md);
+}
+.dt-derived-modal-backdrop[data-dt-color-scheme='dark'] .dt-derived-modal-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.dt-root[data-dt-color-scheme='dark'] .dt-add-column-btn:hover {
+  background: var(--dt-primary-alpha-10);
+}
+/* ===========================================
+   SQL Filter Expression Modal
+   =========================================== */
+
+/* Backdrop */
+.dt-sql-filter-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dt-z-modal, 1000);
+  align-items: center;
+  justify-content: center;
+  background: var(--dt-backdrop);
+  display: none;
+}
+
+.dt-sql-filter-modal-backdrop--open {
+  display: flex;
+}
+
+/* Dialog */
+.dt-sql-filter-modal-dialog {
+  width: 520px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--dt-bg);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius);
+  box-shadow: 0 8px 32px var(--dt-shadow-md);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size);
+  color: var(--dt-text);
+}
+
+/* Header */
+.dt-sql-filter-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border);
+}
+
+.dt-sql-filter-modal-title {
+  font-weight: 600;
+  font-size: var(--dt-font-size);
+}
+
+.dt-sql-filter-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--dt-radius-sm);
+  background: transparent;
+  color: var(--dt-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-sql-filter-modal-close:hover {
+  background: var(--dt-bg-tertiary);
+  color: var(--dt-text);
+}
+
+/* Body */
+.dt-sql-filter-modal-body {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dt-sql-filter-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dt-sql-filter-modal-section > label {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  font-weight: 500;
+}
+
+.dt-sql-filter-modal-hint {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-tertiary);
+  margin-top: 0.125rem;
+}
+
+/* Editor container */
+.dt-sql-filter-modal-editor-container {
+  min-height: 100px;
+}
+
+/* Actions row */
+.dt-sql-filter-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.dt-sql-filter-modal-validate {
+  padding: 0.3rem 0.75rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-bg);
+  color: var(--dt-primary);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-sql-filter-modal-validate:hover:not(:disabled) {
+  background: var(--dt-primary-light);
+  border-color: var(--dt-primary-hover);
+  color: var(--dt-primary-hover);
+}
+
+.dt-sql-filter-modal-validate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dt-sql-filter-modal-preview {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Divider */
+.dt-sql-filter-modal-divider {
+  border: none;
+  border-top: 1px solid var(--dt-border);
+  margin: 0;
+}
+
+/* Remove section (danger zone) */
+.dt-sql-filter-modal-remove-section {
+  display: none;
+}
+
+.dt-sql-filter-modal-danger-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dt-sql-filter-modal-remove {
+  padding: 0.3rem 0.75rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  border: 1px solid var(--dt-error-dark);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-error-dark);
+  color: var(--dt-on-error);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-sql-filter-modal-remove:hover {
+  background: var(--dt-error-darker);
+  border-color: var(--dt-error-darker);
+}
+
+.dt-sql-filter-modal-remove:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-sql-filter-modal-remove-confirm {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--dt-font-size-sm);
+}
+
+.dt-sql-filter-modal-remove-confirm span {
+  color: var(--dt-text-secondary);
+}
+
+.dt-sql-filter-modal-remove-confirm-btn {
+  padding: 0.3rem 0.5rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-xs);
+  font-weight: 500;
+  border-radius: var(--dt-radius-sm);
+  cursor: pointer;
+  border: 1px solid;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-sql-filter-modal-remove-confirm-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-sql-filter-modal-remove-confirm-yes {
+  border-color: var(--dt-error-dark);
+  background: var(--dt-error-dark);
+  color: var(--dt-on-error);
+}
+
+.dt-sql-filter-modal-remove-confirm-yes:hover {
+  background: var(--dt-error-darker);
+  border-color: var(--dt-error-darker);
+}
+
+.dt-sql-filter-modal-remove-confirm-no {
+  border-color: var(--dt-border);
+  background: var(--dt-bg);
+  color: var(--dt-text-secondary);
+}
+
+.dt-sql-filter-modal-remove-confirm-no:hover {
+  border-color: var(--dt-text-secondary);
+  color: var(--dt-text);
+}
+
+/* Footer */
+.dt-sql-filter-modal-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding: 0.625rem 0.75rem;
+  border-top: 1px solid var(--dt-border);
+}
+
+.dt-sql-filter-modal-cancel {
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  background: transparent;
+  color: var(--dt-text-secondary);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-sql-filter-modal-cancel:hover {
+  background: var(--dt-bg-tertiary);
+  color: var(--dt-text);
+}
+
+.dt-sql-filter-modal-apply {
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 80px;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-sql-filter-modal-apply:hover:not(:disabled) {
+  background: var(--dt-primary-hover);
+  border-color: var(--dt-primary-hover);
+}
+
+.dt-sql-filter-modal-apply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Dark mode — SQL filter modal. Portalled to <body>; attribute is copied
+   onto the backdrop by ModalHost. Same dual-scoping pattern as the derived-
+   column modal above. */
+@media (prefers-color-scheme: dark) {
+  .dt-sql-filter-modal-backdrop:not([data-dt-color-scheme='light']) {
+    background: var(--dt-backdrop);
+  }
+  .dt-sql-filter-modal-backdrop:not([data-dt-color-scheme='light']) .dt-sql-filter-modal-dialog {
+    box-shadow: 0 8px 32px var(--dt-shadow-md);
+  }
+  .dt-sql-filter-modal-backdrop:not([data-dt-color-scheme='light'])
+    .dt-sql-filter-modal-close:hover {
+    /* keep: dark-mode subtle light highlight; no semantic variable */
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+.dt-sql-filter-modal-backdrop[data-dt-color-scheme='dark'] {
+  background: var(--dt-backdrop);
+}
+.dt-sql-filter-modal-backdrop[data-dt-color-scheme='dark'] .dt-sql-filter-modal-dialog {
+  box-shadow: 0 8px 32px var(--dt-shadow-md);
+}
+.dt-sql-filter-modal-backdrop[data-dt-color-scheme='dark'] .dt-sql-filter-modal-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/*
+ * Data grid — column divider, pinned (frozen) columns, sort button, virtual
+ * scroller wrapper, rows, cells (including pinned-cell stacking + focused
+ * indicator), column reordering drop indicators.
+ */
+
+/* ===========================================
+   Column Divider
+   =========================================== */
+
+.dt-col-divider {
+  height: 1px;
+  background: var(--dt-border);
+  margin: 0.25rem 0;
+  opacity: 0.6;
+}
+
+/* ===========================================
+   Pinned Columns (Freeze Panes)
+   =========================================== */
+
+.dt-col-header--pinned {
+  background: var(--dt-bg-secondary);
+}
+
+.dt-col-header--pinned:hover {
+  background: var(--dt-bg-tertiary);
+}
+
+.dt-cell--pinned {
+  background: var(--dt-bg);
+}
+
+.dt-row:hover .dt-cell--pinned,
+.dt-row--hover .dt-cell--pinned {
+  background: var(--dt-bg-secondary);
+}
+
+.dt-row--selected .dt-cell--pinned {
+  background: var(--dt-primary-light);
+}
+
+.dt-row--selected:hover .dt-cell--pinned,
+.dt-row--selected.dt-row--hover .dt-cell--pinned {
+  background: var(--dt-primary-lighter);
+}
+
+/* Continuous vertical demarcation line for pinned column boundary */
+.dt-pinned-demarcation {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--dt-primary-alpha-20);
+  z-index: var(--dt-z-pinned-col, 20);
+  pointer-events: none;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark mode — pinned column demarcation line. */
+@media (prefers-color-scheme: dark) {
+  .dt-root:not([data-dt-color-scheme='light']) .dt-pinned-demarcation {
+    background: var(--dt-primary-alpha-30);
+  }
+}
+.dt-root[data-dt-color-scheme='dark'] .dt-pinned-demarcation {
+  background: var(--dt-primary-alpha-30);
+}
+
+/* ===========================================
+   Sort Button (in action panel)
+   =========================================== */
+
+.dt-col-sort-btn {
+  flex-shrink: 0; /* Don't shrink in flex container */
+  position: relative; /* Positioning context for badge overlay */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--dt-radius-sm);
+  cursor: pointer;
+  transition: background var(--dt-transition);
+}
+
+.dt-col-sort-btn:hover {
+  background: var(--dt-shadow-sm);
+}
+
+.dt-col-sort-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-col-sort-btn svg {
+  width: 12px;
+  height: 16px;
+}
+
+.dt-col-sort-btn .arrow-up,
+.dt-col-sort-btn .arrow-down {
+  fill: var(--dt-arrow-default);
+  transition: fill var(--dt-transition);
+}
+
+.dt-col-sort-btn:hover .arrow-up,
+.dt-col-sort-btn:hover .arrow-down {
+  fill: var(--dt-arrow-hover);
+}
+
+/* Sorted ascending - arrow up stays blue even on hover */
+.dt-col-sort-btn--asc .arrow-up,
+.dt-col-sort-btn--asc:hover .arrow-up {
+  fill: var(--dt-primary);
+}
+
+/* Sorted descending - arrow down stays blue even on hover */
+.dt-col-sort-btn--desc .arrow-down,
+.dt-col-sort-btn--desc:hover .arrow-down {
+  fill: var(--dt-primary);
+}
+
+.dt-col-sort-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dt-primary);
+  /* Ink inverts with the fill (see 02-shell.css); at 0.55rem this is the
+     smallest type in the library and has the least room to spare. */
+  color: var(--dt-bg);
+  font-size: 0.55rem;
+  font-weight: 600;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  border-radius: 50%;
+  text-align: center;
+}
+
+/* ===========================================
+   Virtual Scroller
+   =========================================== */
+
+.dt-virtual-content {
+  position: relative;
+  /* Height set dynamically via JavaScript = min(totalRows * rowHeight, height cap) */
+}
+
+.dt-virtual-viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Positioned via inline style.top; layout-unit precision is exact under
+     the height cap, unlike float32 compositor transforms */
+}
+
+.dt-width-spacer {
+  height: 1px;
+  pointer-events: none;
+  /* Width set dynamically via JavaScript to force horizontal scroll */
+}
+
+/* ===========================================
+   Rows
+   =========================================== */
+
+.dt-row {
+  display: flex;
+  align-items: center;
+  height: var(--dt-row-height);
+  border-bottom: 1px solid var(--dt-border-light);
+  cursor: pointer;
+  background: var(--dt-bg);
+  transition: background 0.1s ease;
+  user-select: none; /* Prevent text selection on Shift+click */
+}
+
+.dt-row:hover,
+.dt-row--hover {
+  background: var(--dt-bg-secondary);
+}
+
+.dt-row--selected {
+  background: var(--dt-primary-light);
+}
+
+.dt-row--selected:hover,
+.dt-row--selected.dt-row--hover {
+  background: var(--dt-primary-lighter);
+}
+
+.dt-row--loading {
+  background: var(--dt-bg-secondary);
+}
+
+/* ===========================================
+   Cells
+   =========================================== */
+
+.dt-cell {
+  padding: 0 0.75rem;
+  width: var(--dt-col-width);
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--dt-font-size);
+  color: var(--dt-text);
+  border-right: 1px solid var(--dt-border-light);
+}
+
+.dt-cell:last-child {
+  border-right: none;
+}
+
+.dt-cell.dt-col-resetting {
+  transition: width 0.2s ease-out;
+}
+
+.dt-cell--null {
+  color: var(--dt-text-tertiary);
+  font-style: italic;
+}
+
+.dt-cell--placeholder {
+  color: var(--dt-text-tertiary);
+}
+
+.dt-cell--number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focused cell indicator (keyboard navigation) */
+.dt-cell--focused {
+  box-shadow: inset 0 0 0 2px var(--dt-primary);
+  align-self: stretch;
+  line-height: var(--dt-row-height);
+  z-index: var(--dt-z-table-body, 1);
+}
+
+/* ===========================================
+   Column Reordering
+   =========================================== */
+
+/* Scoped to the table root so the grabbing cursor never leaks onto the host page. */
+.dt-root.dt-column-potential-drag,
+.dt-root.dt-column-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.dt-root.dt-column-potential-drag *,
+.dt-root.dt-column-dragging * {
+  cursor: grabbing;
+}
+
+/* Active column-resize drag. Scoped to the table root so the cursor / selection lock
+   never leaks onto the host page. The `!important` on cursor is required because
+   `.dt-col-resize-handle` itself declares `cursor: col-resize !important`, and we need
+   the same cursor to win on every descendant (cells, header chrome) during the drag. */
+.dt-root.dt-resizing,
+.dt-root.dt-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.dt-drop-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--dt-primary);
+  pointer-events: none;
+  z-index: var(--dt-z-floating-panel, 50);
+  border-radius: 2px;
+  box-shadow: 0 0 4px var(--dt-primary-alpha-50);
+}
+
+/* ===========================================
+   Annotation overlay — rows and cells
+   ===========================================
+
+   Hierarchy (cell > col > row) — CSS source order is the mechanism. Row
+   rules come first, column rules second, cell rules last, so whichever
+   scope applies last to a given cell wins the bg / stripe / hover
+   cascade at intersections. The same precedence is mirrored in
+   `TableBody.resolveAnnotatedCell` so the popover list matches what the
+   viewer sees.
+
+   Per-cell, per-scope classes (no union propagation):
+   - `.dt-cell--row-annotated` + severity — applied to every cell in a
+     row-annotated row. Makes row annotations paint with the same
+     per-cell signature as columns (left-stripe on every cell; row-hover
+     darkens each cell independently instead of being overridden by
+     `.dt-row:hover`'s bg).
+   - `.dt-cell--col-annotated` + severity — applied to every cell in a
+     column-annotated column.
+   - `.dt-cell--annotated` + severity — applied only to a cell with its
+     own cell-scope annotation (strict `(rowId, colName)` match).
+
+   All three families use `align-self: stretch` + `line-height:
+   var(--dt-row-height)` (the `.dt-cell--focused` pattern) so the
+   background and left stripe fill the entire cell — padding included —
+   instead of only the text line-box.
+
+   `.dt-row--annotated` + `.dt-row--annotation-<sev>` remain as
+   marker classes on the row element for backward compat and DOM/CSS
+   hooks, but no longer paint anything. All tint lives on cells.
+
+   Severity filter (example 11): hosts call
+   `table.annotations.setSeverityFilter({ error?, warning?, info? })`
+   to suppress a tier's tint. The library drops the matching severity
+   class from cells / rows / headers at render time so the next-highest
+   enabled severity in the hierarchy paints through. No CSS opt-out
+   exists — the filter is purely a DOM-class decision in TS. */
+
+/* Row element marker — no paint. Kept as a DOM/CSS hook. */
+.dt-row--annotated {
+  transition: background-color var(--dt-transition, 0.15s ease);
+}
+
+/* Row-scope cell — every cell in an annotated row. */
+.dt-cell--row-annotated {
+  align-self: stretch;
+  line-height: var(--dt-row-height);
+}
+.dt-cell--row-annotation-error {
+  background-color: var(--dt-annotation-error-bg);
+  color: var(--dt-annotation-error-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-error-bdr);
+}
+.dt-cell--row-annotation-warning {
+  background-color: var(--dt-annotation-warning-bg);
+  color: var(--dt-annotation-warning-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-warning-bdr);
+}
+.dt-cell--row-annotation-info {
+  background-color: var(--dt-annotation-info-bg);
+  color: var(--dt-annotation-info-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-info-bdr);
+}
+
+/* Column-scope cell — every cell in an annotated column. Ordered AFTER
+   row-scope so col wins the cascade at row+col intersections. */
+.dt-cell--col-annotated {
+  align-self: stretch;
+  line-height: var(--dt-row-height);
+}
+.dt-cell--col-annotation-error {
+  background-color: var(--dt-annotation-error-bg);
+  color: var(--dt-annotation-error-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-error-bdr);
+}
+.dt-cell--col-annotation-warning {
+  background-color: var(--dt-annotation-warning-bg);
+  color: var(--dt-annotation-warning-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-warning-bdr);
+}
+.dt-cell--col-annotation-info {
+  background-color: var(--dt-annotation-info-bg);
+  color: var(--dt-annotation-info-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-info-bdr);
+}
+
+/* Cell-scope cell — this rule block must stay AFTER the col-scope block
+   so `.dt-cell--annotated` wins at row+cell, col+cell, and row+col+cell
+   intersections. */
+.dt-cell--annotated {
+  align-self: stretch;
+  line-height: var(--dt-row-height);
+}
+.dt-cell--annotation-error {
+  background-color: var(--dt-annotation-error-bg);
+  color: var(--dt-annotation-error-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-error-bdr);
+}
+.dt-cell--annotation-warning {
+  background-color: var(--dt-annotation-warning-bg);
+  color: var(--dt-annotation-warning-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-warning-bdr);
+}
+.dt-cell--annotation-info {
+  background-color: var(--dt-annotation-info-bg);
+  color: var(--dt-annotation-info-fg);
+  box-shadow: inset 3px 0 0 0 var(--dt-annotation-info-bdr);
+}
+
+/* Hover — slightly darker, on-theme shade for the annotation bg. Same
+   row → col → cell cascade order as the base rules so the most-specific
+   scope's severity wins the hover color at intersections. The row
+   family uses a descendant selector rooted at `.dt-row:hover` so every
+   annotated cell in the hovered row darkens together, mirroring the
+   existing row-hover semantics. Col and cell use direct `:hover` on the
+   cell.
+
+   `:where(.dt-row:hover, .dt-row--hover)` flattens the row-hover
+   selector's specificity to (0,1,0) so the col/cell `:hover` rules
+   (0,2,0) outrank it on intersection cells. Without :where(), the
+   row-hover rule's natural specificity (0,3,0) would beat cell hover
+   and break the cell > col > row hierarchy at hover. */
+:where(.dt-row:hover, .dt-row--hover) .dt-cell--row-annotation-error {
+  background-color: var(--dt-annotation-error-bg-hover);
+}
+:where(.dt-row:hover, .dt-row--hover) .dt-cell--row-annotation-warning {
+  background-color: var(--dt-annotation-warning-bg-hover);
+}
+:where(.dt-row:hover, .dt-row--hover) .dt-cell--row-annotation-info {
+  background-color: var(--dt-annotation-info-bg-hover);
+}
+
+.dt-cell--col-annotation-error:hover {
+  background-color: var(--dt-annotation-error-bg-hover);
+}
+.dt-cell--col-annotation-warning:hover {
+  background-color: var(--dt-annotation-warning-bg-hover);
+}
+.dt-cell--col-annotation-info:hover {
+  background-color: var(--dt-annotation-info-bg-hover);
+}
+
+.dt-cell--annotation-error:hover {
+  background-color: var(--dt-annotation-error-bg-hover);
+}
+.dt-cell--annotation-warning:hover {
+  background-color: var(--dt-annotation-warning-bg-hover);
+}
+.dt-cell--annotation-info:hover {
+  background-color: var(--dt-annotation-info-bg-hover);
+}
+
+/* Focus ring compound — keep the blue 2px inset on top of the
+   annotation stripe. Covers all three cell-level class families so
+   keyboard focus stays visible whichever tint the cell carries. */
+.dt-cell--row-annotated.dt-cell--focused,
+.dt-cell--col-annotated.dt-cell--focused,
+.dt-cell--annotated.dt-cell--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 3px 0 0 0 currentColor;
+}
+.dt-cell--row-annotation-error.dt-cell--focused,
+.dt-cell--col-annotation-error.dt-cell--focused,
+.dt-cell--annotation-error.dt-cell--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 3px 0 0 0 var(--dt-annotation-error-bdr);
+}
+.dt-cell--row-annotation-warning.dt-cell--focused,
+.dt-cell--col-annotation-warning.dt-cell--focused,
+.dt-cell--annotation-warning.dt-cell--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 3px 0 0 0 var(--dt-annotation-warning-bdr);
+}
+.dt-cell--row-annotation-info.dt-cell--focused,
+.dt-cell--col-annotation-info.dt-cell--focused,
+.dt-cell--annotation-info.dt-cell--focused {
+  box-shadow:
+    inset 0 0 0 2px var(--dt-primary),
+    inset 3px 0 0 0 var(--dt-annotation-info-bdr);
+}
+
+/*
+ * Filters — per-column filter panel (range, point, set, null, regex),
+ * filter-preset save/load UI, placeholder / empty-state chrome.
+ */
+
+/* ===========================================
+   Filter Panel
+   =========================================== */
+
+.dt-filter-panel {
+  position: absolute;
+  z-index: var(--dt-z-floating-panel, 50);
+  width: var(--dt-panel-width, 320px);
+  display: flex;
+  flex-direction: column;
+  background: var(--dt-bg);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius);
+  box-shadow: 0 4px 16px var(--dt-shadow-md);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size);
+}
+
+/* Panel header */
+.dt-filter-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border);
+  flex-shrink: 0;
+}
+
+.dt-filter-panel-title {
+  font-weight: 600;
+  font-size: var(--dt-font-size);
+  color: var(--dt-text);
+}
+
+.dt-filter-panel-type {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-tertiary);
+  background: var(--dt-bg-tertiary);
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--dt-radius-sm);
+  flex-shrink: 0;
+}
+
+.dt-filter-panel-clear {
+  flex-shrink: 0;
+  padding: 0.125rem 0.375rem;
+  border: none;
+  background: transparent;
+  color: var(--dt-primary);
+  font-size: var(--dt-font-size-xs);
+  font-family: var(--dt-font-family);
+  cursor: pointer;
+  border-radius: var(--dt-radius-sm);
+  transition:
+    color var(--dt-transition),
+    background var(--dt-transition);
+}
+
+.dt-filter-panel-clear:hover {
+  color: var(--dt-primary-hover);
+  background: var(--dt-primary-light);
+}
+
+.dt-filter-panel-clear--hidden {
+  display: none;
+}
+
+.dt-filter-panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--dt-radius-sm);
+  cursor: pointer;
+  color: var(--dt-text-secondary);
+  transition:
+    color var(--dt-transition),
+    background var(--dt-transition);
+}
+
+.dt-filter-panel-close:hover {
+  color: var(--dt-text);
+  background: var(--dt-bg-tertiary);
+}
+
+.dt-filter-panel-close:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+/* Scrollable body */
+.dt-filter-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+/* Individual field row */
+.dt-filter-field {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border-light);
+  transition: background 0.5s ease;
+}
+
+.dt-filter-field:last-child {
+  border-bottom: none;
+}
+
+.dt-filter-field--highlighted {
+  background: var(--dt-primary-light);
+}
+
+/* Controls area */
+.dt-filter-field-controls {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.dt-filter-field-label {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  flex-shrink: 0;
+}
+
+/* Shared form input styles */
+.dt-filter-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-bg);
+  color: var(--dt-text);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  transition: border-color var(--dt-transition);
+}
+
+.dt-filter-input:focus {
+  outline: none;
+  border-color: var(--dt-primary);
+  box-shadow: 0 0 0 2px var(--dt-primary-alpha-20);
+}
+
+.dt-filter-input::placeholder {
+  color: var(--dt-text-tertiary);
+}
+
+.dt-filter-input[type='date'] {
+  min-width: 130px;
+}
+
+.dt-filter-input[type='datetime-local'] {
+  min-width: 11rem;
+}
+
+.dt-filter-select {
+  padding: 0.25rem 0.375rem;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-bg);
+  color: var(--dt-text);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--dt-transition);
+  flex-shrink: 0;
+}
+
+.dt-filter-select:focus {
+  outline: none;
+  border-color: var(--dt-primary);
+  box-shadow: 0 0 0 2px var(--dt-primary-alpha-20);
+}
+
+/* Null toggle radio group */
+.dt-filter-field-null {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.375rem;
+}
+
+.dt-filter-null-option {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  cursor: pointer;
+}
+
+.dt-filter-null-option input[type='radio'] {
+  margin: 0;
+  accent-color: var(--dt-primary);
+}
+
+/* Boolean checkboxes */
+.dt-filter-bool-group {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.dt-filter-bool-option {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text);
+  cursor: pointer;
+}
+
+.dt-filter-bool-option input[type='checkbox'] {
+  margin: 0;
+  accent-color: var(--dt-primary);
+}
+
+/* Apply button. Ink inverts with the fill — see 02-shell.css. */
+.dt-filter-field-apply {
+  display: block;
+  width: 100%;
+  padding: 0.3rem 0.75rem;
+  margin-top: 0.375rem;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-filter-field-apply:hover {
+  background: var(--dt-primary-hover);
+  border-color: var(--dt-primary-hover);
+}
+
+.dt-filter-field-apply:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+/* Dark mode adjustments for filter panel. Lives inside .dt-root. */
+@media (prefers-color-scheme: dark) {
+  .dt-root:not([data-dt-color-scheme='light']) .dt-filter-panel {
+    box-shadow: 0 4px 16px var(--dt-shadow-md);
+  }
+
+  .dt-root:not([data-dt-color-scheme='light']) .dt-filter-input:focus,
+  .dt-root:not([data-dt-color-scheme='light']) .dt-filter-select:focus {
+    box-shadow: 0 0 0 2px var(--dt-primary-alpha-30);
+  }
+}
+.dt-root[data-dt-color-scheme='dark'] .dt-filter-panel {
+  box-shadow: 0 4px 16px var(--dt-shadow-md);
+}
+.dt-root[data-dt-color-scheme='dark'] .dt-filter-input:focus,
+.dt-root[data-dt-color-scheme='dark'] .dt-filter-select:focus {
+  box-shadow: 0 0 0 2px var(--dt-primary-alpha-30);
+}
+
+/* ===========================================
+   Filter Preset Panel
+   =========================================== */
+
+/* Presets button (in filter bar, next to Expression) */
+.dt-filter-presets-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--dt-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dt-text-secondary);
+  font-size: var(--dt-font-size-sm);
+  font-family: var(--dt-font-family);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--dt-transition),
+    color var(--dt-transition),
+    background var(--dt-transition);
+}
+
+.dt-filter-presets-btn:hover {
+  border-color: var(--dt-primary);
+  color: var(--dt-primary);
+  background: var(--dt-primary-light);
+}
+
+.dt-filter-presets-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-filter-presets-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Panel container */
+.dt-filter-preset-panel {
+  position: absolute;
+  z-index: var(--dt-z-floating-panel, 50);
+  width: var(--dt-panel-width, 320px);
+  display: flex;
+  flex-direction: column;
+  background: var(--dt-bg);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius);
+  box-shadow: 0 4px 16px var(--dt-shadow-md);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size);
+}
+
+/* Header */
+.dt-filter-preset-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border);
+  flex-shrink: 0;
+}
+
+.dt-filter-preset-title {
+  font-weight: 600;
+  font-size: var(--dt-font-size);
+  color: var(--dt-text);
+  flex: 1;
+}
+
+.dt-filter-preset-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--dt-radius-sm);
+  cursor: pointer;
+  color: var(--dt-text-secondary);
+  transition:
+    color var(--dt-transition),
+    background var(--dt-transition);
+}
+
+.dt-filter-preset-close:hover {
+  color: var(--dt-text);
+  background: var(--dt-bg-tertiary);
+}
+
+.dt-filter-preset-close:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+/* Body */
+.dt-filter-preset-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Save section */
+.dt-filter-preset-save-section {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dt-filter-preset-save-section textarea.dt-filter-input {
+  resize: vertical;
+  min-height: 2.5em;
+  font-family: var(--dt-font-family);
+}
+
+.dt-filter-preset-save-btn {
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  font-family: var(--dt-font-family);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition),
+    opacity var(--dt-transition);
+}
+
+.dt-filter-preset-save-btn:hover:not(:disabled) {
+  background: var(--dt-primary-hover);
+  border-color: var(--dt-primary-hover);
+}
+
+.dt-filter-preset-save-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+.dt-filter-preset-save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Input error flash. Higher specificity (.dt-root + double class) wins over
+   .dt-filter-input:focus without needing !important. Requires that any element
+   receiving --error also carries the base .dt-filter-input class. */
+.dt-root .dt-filter-input.dt-filter-input--error {
+  border-color: var(--dt-error);
+  box-shadow: 0 0 0 2px var(--dt-error-soft);
+}
+
+/* Dividers */
+.dt-filter-preset-divider {
+  border-top: 1px solid var(--dt-border);
+}
+
+/* Preset list */
+.dt-filter-preset-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dt-filter-preset-empty {
+  padding: 1.25rem 0.75rem;
+  text-align: center;
+  color: var(--dt-text-tertiary);
+  font-size: var(--dt-font-size-sm);
+}
+
+/* Individual preset item */
+.dt-filter-preset-item {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border-light);
+  transition: background var(--dt-transition);
+}
+
+.dt-filter-preset-item:last-child {
+  border-bottom: none;
+}
+
+.dt-filter-preset-item:hover {
+  background: var(--dt-bg-secondary);
+}
+
+.dt-filter-preset-item-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dt-filter-preset-item-name {
+  font-weight: 600;
+  font-size: var(--dt-font-size);
+  color: var(--dt-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.dt-filter-preset-item-meta {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dt-filter-preset-item-desc {
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+  margin-top: 0.125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Action buttons row */
+.dt-filter-preset-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+}
+
+.dt-filter-preset-action-btn {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  background: transparent;
+  font-size: var(--dt-font-size-xs);
+  font-weight: 500;
+  font-family: var(--dt-font-family);
+  cursor: pointer;
+  transition:
+    border-color var(--dt-transition),
+    color var(--dt-transition),
+    background var(--dt-transition);
+}
+
+.dt-filter-preset-action-btn--load {
+  color: var(--dt-primary);
+  border-color: var(--dt-primary);
+}
+
+.dt-filter-preset-action-btn--load:hover {
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+}
+
+.dt-filter-preset-action-btn--delete {
+  color: var(--dt-text-tertiary);
+  border-color: var(--dt-border);
+}
+
+/* The danger tint is --dt-error-bg, the error *surface* token, not an alpha
+   stop of the text colour: --dt-error on --dt-error-soft is one hue at two
+   opacities and never cleared 4:1. Foreground pairs as the error boxes do. */
+.dt-filter-preset-action-btn--delete:hover {
+  color: var(--dt-error-text-strong);
+  border-color: var(--dt-error);
+  background: var(--dt-error-bg);
+}
+
+.dt-filter-preset-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--dt-font-size-xs);
+  color: var(--dt-text-secondary);
+}
+
+.dt-filter-preset-action-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+/* Import/Export section */
+.dt-filter-preset-io {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dt-filter-preset-io-btn {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius-sm);
+  background: transparent;
+  color: var(--dt-text-secondary);
+  font-size: var(--dt-font-size-xs);
+  font-weight: 500;
+  font-family: var(--dt-font-family);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--dt-transition),
+    color var(--dt-transition),
+    background var(--dt-transition);
+}
+
+.dt-filter-preset-io-btn:hover:not(:disabled) {
+  border-color: var(--dt-primary);
+  color: var(--dt-primary);
+  background: var(--dt-primary-light);
+}
+
+.dt-filter-preset-io-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dt-filter-preset-io-btn:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: 1px;
+}
+
+/* Import status feedback */
+.dt-filter-preset-import-status {
+  font-size: var(--dt-font-size-xs);
+  white-space: nowrap;
+}
+
+.dt-filter-preset-import-status--success {
+  color: var(--dt-success);
+}
+
+/* --dt-annotation-warning-fg, not --dt-accent-hover: the accent family is
+   tuned for canvas bar fills and amber-600 reads 3.18:1 as text on --dt-bg.
+   The annotation `fg` stop is the one amber cut for text, and it flips. */
+.dt-filter-preset-import-status--warning {
+  color: var(--dt-annotation-warning-fg);
+}
+
+/* Dark mode for preset panel. Lives inside .dt-root. */
+@media (prefers-color-scheme: dark) {
+  .dt-root:not([data-dt-color-scheme='light']) .dt-filter-preset-panel {
+    box-shadow: 0 4px 16px var(--dt-shadow-md);
+  }
+}
+.dt-root[data-dt-color-scheme='dark'] .dt-filter-preset-panel {
+  box-shadow: 0 4px 16px var(--dt-shadow-md);
+}
+
+/* ===========================================
+   Placeholder States
+   =========================================== */
+
+.dt-placeholder,
+.dt-body-placeholder {
+  padding: 2rem;
+  text-align: center;
+  color: var(--dt-text-secondary);
+}
+
+.dt-scroll-info {
+  padding: 1rem;
+  text-align: center;
+  color: var(--dt-text-secondary);
+  font-size: var(--dt-font-size);
+}
+
+/*
+ * Export dialog — CSV / JSON / Parquet export modal + backdrop.
+ */
+
+/* ===========================================
+   Export Dialog Modal
+   =========================================== */
+
+.dt-export-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dt-z-modal, 1000);
+  align-items: center;
+  justify-content: center;
+  background: var(--dt-backdrop);
+  display: none;
+}
+
+.dt-export-backdrop--open {
+  display: flex;
+}
+
+.dt-export-dialog {
+  width: 420px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--dt-bg);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius);
+  box-shadow: 0 8px 32px var(--dt-shadow-md);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size);
+  color: var(--dt-text);
+}
+
+.dt-export-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--dt-border);
+}
+
+.dt-export-title {
+  font-weight: 600;
+  font-size: var(--dt-font-size);
+}
+
+.dt-export-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--dt-radius-sm);
+  background: transparent;
+  color: var(--dt-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-export-close:hover {
+  background: var(--dt-bg-tertiary);
+  color: var(--dt-text);
+}
+
+.dt-export-body {
+  padding: 0.75rem;
+}
+
+.dt-export-section {
+  border: none;
+  padding: 0;
+  margin: 0 0 0.625rem 0;
+}
+
+.dt-export-section legend {
+  font-weight: 600;
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text);
+  margin-bottom: 0.25rem;
+}
+
+.dt-export-option {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0;
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text);
+  cursor: pointer;
+}
+
+.dt-export-option--disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.dt-export-option input[type='radio'],
+.dt-export-option input[type='checkbox'] {
+  margin: 0;
+  accent-color: var(--dt-primary);
+}
+
+.dt-export-count {
+  color: var(--dt-text-tertiary);
+  font-size: var(--dt-font-size-xs);
+}
+
+.dt-export-format-options {
+  margin-bottom: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--dt-bg-secondary);
+  border-radius: var(--dt-radius-sm);
+  border: 1px solid var(--dt-border-light);
+}
+
+.dt-export-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.dt-export-field > label {
+  font-size: var(--dt-font-size-sm);
+  color: var(--dt-text-secondary);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.dt-export-field > select,
+.dt-export-field > input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.dt-export-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding: 0.625rem 0.75rem;
+  border-top: 1px solid var(--dt-border);
+}
+
+/* Ink inverts with the fill — see `.dt-filter-chip-remove:hover` (02-shell). */
+.dt-export-btn {
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: var(--dt-primary);
+  color: var(--dt-bg);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 100px;
+  transition:
+    background var(--dt-transition),
+    border-color var(--dt-transition);
+}
+
+.dt-export-btn:hover {
+  background: var(--dt-primary-hover);
+  border-color: var(--dt-primary-hover);
+}
+
+.dt-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The busy state drops to a neutral *surface*, not to a text token: filling
+   with --dt-text-secondary / -tertiary left the white label at 1.47:1 and
+   1.85:1 in dark. A surface plus its own ink is legible in both schemes, and
+   hover repeats it so the button stops responding while the export runs. */
+.dt-export-btn--loading,
+.dt-export-btn--loading:hover {
+  background: var(--dt-bg-tertiary);
+  border-color: var(--dt-border);
+  color: var(--dt-text-secondary);
+}
+
+.dt-export-copy-btn {
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--dt-primary);
+  border-radius: var(--dt-radius-sm);
+  background: transparent;
+  color: var(--dt-primary);
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--dt-transition),
+    color var(--dt-transition);
+}
+
+.dt-export-copy-btn:hover {
+  background: var(--dt-primary-light);
+}
+
+.dt-export-copy-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --dt-error-text-strong in both schemes, as `.dt-derived-modal-error`. */
+.dt-export-error {
+  padding: 0.375rem 0.5rem;
+  margin-top: 0.5rem;
+  background: var(--dt-error-bg);
+  border: 1px solid var(--dt-error-border-soft);
+  border-radius: var(--dt-radius-sm);
+  color: var(--dt-error-text-strong);
+  font-size: var(--dt-font-size-sm);
+  display: none;
+}
+
+/* Dark mode — export dialog. Portalled to <body>; ModalHost copies the
+   `data-dt-color-scheme` attribute onto the backdrop on open. */
+@media (prefers-color-scheme: dark) {
+  .dt-export-backdrop:not([data-dt-color-scheme='light']) {
+    background: var(--dt-backdrop);
+  }
+
+  .dt-export-backdrop:not([data-dt-color-scheme='light']) .dt-export-dialog {
+    box-shadow: 0 8px 32px var(--dt-shadow-md);
+  }
+}
+.dt-export-backdrop[data-dt-color-scheme='dark'] {
+  background: var(--dt-backdrop);
+}
+.dt-export-backdrop[data-dt-color-scheme='dark'] .dt-export-dialog {
+  box-shadow: 0 8px 32px var(--dt-shadow-md);
+}
+
+/*
+ * Responsive + accessibility — @container dt-root breakpoints (749px / 549px),
+ * .dt-sr-only visually-hidden utility, @media (prefers-reduced-motion: reduce).
+ * MUST be last in cascade order.
+ */
+
+/* ===========================================
+   Responsive Container Queries
+   =========================================== */
+
+/* --- Narrow: container width 550px–749px --- */
+@container dt-root (max-width: 749px) {
+  /* Hide gutter labels ("Active filters", "Hidden columns") */
+  .dt-gutter-label {
+    display: none;
+  }
+
+  /* Expression & Presets buttons: icon-only */
+  .dt-filter-expression-btn span,
+  .dt-filter-presets-btn span {
+    display: none;
+  }
+
+  .dt-filter-expression-btn,
+  .dt-filter-presets-btn {
+    padding: 0.125rem 0.375rem;
+  }
+
+  /* Filter chips: hide detail text, reduce max-width */
+  .dt-filter-chip-detail {
+    display: none;
+  }
+
+  .dt-filter-chip {
+    max-width: 180px;
+  }
+
+  /* Column stats: 2 lines instead of 4 */
+  .dt-col-stats {
+    height: 2.6em;
+  }
+
+  /* Action panel: hide pin and drag (keep filter, sort, hide) */
+  .dt-col-pin-btn,
+  .dt-col-drag-handle {
+    display: none;
+  }
+
+  /* Hidden column chips: reduce max-width */
+  .dt-hidden-chip {
+    max-width: 180px;
+  }
+}
+
+/* --- Compact: container width below 550px --- */
+@container dt-root (max-width: 549px) {
+  /* Header: allow natural height when children are hidden.
+     !important is required because TableContainer.ts:297 sets
+     `el.style.minHeight` inline from `resolvedOptions.headerHeight`;
+     inline styles outrank any selector-specificity we could write. */
+  .dt-header {
+    min-height: auto !important;
+  }
+
+  /* Filter bar: tighter spacing */
+  .dt-filter-bar {
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* Filter chips: further reduced */
+  .dt-filter-chip {
+    max-width: 140px;
+  }
+
+  /* Clear all button: smaller footprint */
+  .dt-filter-clear-all {
+    padding: 0.125rem 0.375rem;
+    font-size: var(--dt-font-size-xs);
+  }
+
+  /* Column header: compact padding */
+  .dt-col-header {
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* Column type label: hidden */
+  .dt-col-type {
+    display: none;
+  }
+
+  /* Column stats: hidden entirely */
+  .dt-col-stats {
+    display: none;
+  }
+
+  /* Column dividers: hidden to save vertical space */
+  .dt-col-divider {
+    display: none;
+  }
+
+  /* Action panel: only filter and sort remain */
+  .dt-col-hide-btn {
+    display: none;
+  }
+
+  /* Hidden columns gutter: tighter spacing */
+  .dt-hidden-gutter {
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* Hidden column chips: further reduced */
+  .dt-hidden-chip {
+    max-width: 140px;
+  }
+}
+
+/* ===========================================
+   Accessibility: Visually Hidden (Screen Reader Only)
+   =========================================== */
+
+.dt-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* -----------------------------------------------------------------------------
+   Accessibility: honor user's reduced-motion preference.
+   Scoped to .dt-root so we only tame motion inside our own widgets — never on
+   the host page. The `!important` declarations are required because many of
+   our transitions/animations set durations via inline or high-specificity
+   rules; this is the standard pattern for this a11y media query.
+   ----------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .dt-root,
+  .dt-root * {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===========================================
+   Annotation popover
+   ===========================================
+
+   Shared singleton anchored to a cell or column header via
+   `AnnotationPopover.show()`. Rendered fixed-position in `portalTarget`
+   (defaults to `document.body`), so all styling must go through CSS custom
+   properties — the popover does not inherit from `.dt-root`.
+
+   Structure:
+     .dt-annotation-popover
+       section.dt-annotation-popover__group--{row|column|cell}
+         h4.dt-annotation-popover__group-title
+         ul.dt-annotation-popover__list
+           li.dt-annotation-entry.dt-annotation-entry--{severity}
+             span.dt-annotation-pill.dt-annotation-pill--{severity}
+             div.dt-annotation-body
+               div.dt-annotation-message
+               div.dt-annotation-meta
+*/
+
+.dt-annotation-popover {
+  position: fixed;
+  z-index: var(--dt-z-annotation-popover, 55);
+  max-width: 420px;
+  min-width: 220px;
+  background: var(--dt-bg);
+  color: var(--dt-text);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius, 8px);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--dt-shadow-md) 100%, transparent);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size, 0.875rem);
+  line-height: 1.4;
+  display: none;
+}
+
+.dt-annotation-popover:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: -2px;
+}
+
+.dt-annotation-popover__group {
+  padding: 0.25rem 0;
+}
+
+.dt-annotation-popover__group + .dt-annotation-popover__group {
+  border-top: 1px solid var(--dt-border-light);
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+}
+
+.dt-annotation-popover__group-title {
+  margin: 0 0 0.3rem;
+  font-size: var(--dt-font-size-xs, 0.7rem);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dt-text-secondary);
+  font-weight: 600;
+}
+
+.dt-annotation-popover__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dt-annotation-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.dt-annotation-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
+  min-width: 3.5em;
+  height: 1.35em;
+  border-radius: 999px;
+  font-size: var(--dt-font-size-xs, 0.7rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+
+.dt-annotation-pill--error {
+  background: var(--dt-annotation-error-bg);
+  color: var(--dt-annotation-error-fg);
+  border-color: var(--dt-annotation-error-bdr);
+}
+
+.dt-annotation-pill--warning {
+  background: var(--dt-annotation-warning-bg);
+  color: var(--dt-annotation-warning-fg);
+  border-color: var(--dt-annotation-warning-bdr);
+}
+
+.dt-annotation-pill--info {
+  background: var(--dt-annotation-info-bg);
+  color: var(--dt-annotation-info-fg);
+  border-color: var(--dt-annotation-info-bdr);
+}
+
+.dt-annotation-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dt-annotation-message {
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.dt-annotation-meta {
+  margin-top: 0.15rem;
+  font-size: var(--dt-font-size-xs, 0.7rem);
+  color: var(--dt-text-tertiary);
+}
+
+/* ===========================================
+   Column-header tooltip popover
+   ===========================================
+
+   Shared singleton anchored to a column-name span via
+   `ColumnHeaderTooltipPopover.show()`. Rendered fixed-position in
+   `portalTarget` (defaults to `document.body`), so all styling must go
+   through CSS custom properties — the popover does not inherit from
+   `.dt-root`.
+
+   Structure:
+     .dt-col-tooltip
+       .dt-col-tooltip__title           (optional, bold heading)
+       .dt-col-tooltip__description     (optional, free-text body)
+       ul.dt-col-tooltip__items         (optional, label/value rows)
+         li.dt-col-tooltip__item
+           span.dt-col-tooltip__item-label
+           span.dt-col-tooltip__item-value     (string value)
+           OR
+           span.dt-col-tooltip__item-values    (string[] value)
+             span.dt-col-tooltip__chip
+*/
+
+.dt-col-tooltip {
+  position: fixed;
+  z-index: var(--dt-z-col-tooltip, 56);
+  max-width: 420px;
+  min-width: 240px;
+  background: var(--dt-bg);
+  color: var(--dt-text);
+  border: 1px solid var(--dt-border);
+  border-radius: var(--dt-radius, 8px);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--dt-shadow-md) 100%, transparent);
+  padding: 0.55rem 0.75rem;
+  font-family: var(--dt-font-family);
+  font-size: var(--dt-font-size, 0.875rem);
+  line-height: 1.4;
+  display: none;
+}
+
+.dt-col-tooltip:focus {
+  outline: 2px solid var(--dt-primary);
+  outline-offset: -2px;
+}
+
+.dt-col-tooltip__title {
+  margin: 0 0 0.3rem;
+  font-weight: 600;
+  color: var(--dt-text);
+  word-break: break-word;
+}
+
+.dt-col-tooltip__description {
+  margin: 0 0 0.45rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--dt-text);
+}
+
+/* When both title and description are present, the title's bottom margin
+   plus description's top margin would overstack; the description's
+   margin-bottom carries the gap to the items list, so no extra spacing
+   needed here. */
+
+.dt-col-tooltip__items {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border-top: 1px solid var(--dt-border-light);
+}
+
+/* When there's no title or description above, drop the divider/padding
+   so a items-only popover doesn't show an orphan top border. */
+.dt-col-tooltip__items:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.dt-col-tooltip__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-size: var(--dt-font-size-xs, 0.78rem);
+  line-height: 1.4;
+}
+
+.dt-col-tooltip__item-label {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--dt-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.dt-col-tooltip__item-label::after {
+  content: ':';
+  margin-left: 0;
+  color: var(--dt-text-tertiary);
+}
+
+.dt-col-tooltip__item-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--dt-text);
+  word-break: break-word;
+}
+
+.dt-col-tooltip__item-values {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.dt-col-tooltip__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.45rem;
+  height: 1.4em;
+  border-radius: 999px;
+  border: 1px solid var(--dt-border);
+  background: var(--dt-bg-tertiary);
+  color: var(--dt-text);
+  font-size: var(--dt-font-size-xs, 0.78rem);
+  line-height: 1;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/*
+ * High-contrast + forced-colors accessibility (Phase 9).
+ *
+ * MUST be last in cascade order so the contrast/forced-color overrides
+ * win against the per-component base styles in 02–10.
+ *
+ * Two scenarios:
+ *
+ *   1. `prefers-contrast: more` (Safari, Edge, Chrome) — the user has
+ *      asked the OS for higher-contrast UI. We thicken filter chip
+ *      borders so the chip boundary remains visible against the user's
+ *      preferred palette without overriding it.
+ *
+ *   2. `forced-colors: active` (Windows High Contrast Mode, "Contrast
+ *      themes" — replaces author colors with system-defined ones).
+ *      We opt the visualization canvas / SVG out of the color flattening
+ *      so brushes and histograms remain meaningful (DuckDB-driven data
+ *      vis is not decorative — losing color removes information). We
+ *      also pin filter-chip and disabled-button colors to the system
+ *      palette so they remain legible.
+ *
+ * Selectors are limited to classes verified in src/ (`.dt-filter-chip`,
+ * canvas/SVG inside visualization slots) — not all conceivable
+ * a11y-relevant elements have an existing target class. Phase 9 ships
+ * the additive surface; future a11y work can tighten the rest.
+ */
+
+@media (prefers-contrast: more) {
+  /* Filter chips: thicker borders so the chip boundary is visually distinct
+     from surrounding chips at the user's preferred contrast level. */
+  .dt-filter-chip {
+    border-width: 2px;
+  }
+}
+
+@media (forced-colors: active) {
+  /* Visualization canvas / SVG: the brush, bar fills, axis colors carry
+     real meaning — opt out of the user-agent color override so the data
+     remains legible. The user can still toggle their high-contrast theme
+     off if any individual chart is too colorful. Targets every canvas
+     and svg below the .dt-vis-canvas / .dt-stats-panel slots; the
+     selector is permissive on purpose so custom BaseVisualization
+     subclasses also benefit without per-class additions. */
+  .dt-vis-canvas,
+  .dt-vis-canvas canvas,
+  .dt-vis-canvas svg,
+  .dt-stats-panel canvas,
+  .dt-stats-panel svg {
+    forced-color-adjust: none;
+  }
+
+  /* Filter chips: explicitly map to system colors so they're guaranteed
+     visible (rather than relying on the user-agent's own choice). */
+  .dt-filter-chip {
+    border: 1px solid CanvasText;
+    color: CanvasText;
+  }
+
+  /* Buttons: ensure the disabled state is distinguishable in forced colors. */
+  .dt-btn:disabled,
+  button:disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
+}

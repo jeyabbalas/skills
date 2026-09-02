@@ -11,12 +11,12 @@
   body{margin:0;font:1rem/1.5 system-ui,sans-serif;color:#1F2328;background:#FAF9F6}
   .banner{border:1px solid #C99A2E;background:#FBF4E1;padding:.6rem 1rem;border-radius:8px;margin:1rem 0}
 </style>
-<link rel="stylesheet" href="https://esm.sh/@jeyabbalas/data-table@0.7.0/styles">
+<link rel="stylesheet" href="assets/vendor/data-table/data-table.css">
 <link rel="stylesheet" href="assets/schema-pages.css">
 <!-- the vendored dictionary library supplies the column tooltips' metadata -->
 <script src="assets/json-schema-data-dictionary.global.js"></script>
 </head>
-<body class="playground" data-fingerprint="de2ac8eb67c8">
+<body class="playground" data-fingerprint="cb08ece74e31">
 <main class="page app">
 
   <header class="masthead">
@@ -59,8 +59,9 @@
   (function () {
     if (location.protocol === 'file:') {
       document.getElementById('stage').innerHTML =
-        '<div class="banner"><strong>This page needs a local server</strong> — it loads a ' +
-        'database engine that browsers block on file://.<br>In a terminal, from this folder, run: ' +
+        '<div class="banner"><strong>This page needs a local server</strong> — its database ' +
+        'engine runs in a web worker, and browsers block workers and module scripts on ' +
+        'file://.<br>In a terminal, from this folder, run: ' +
         '<code>python3 -m http.server 8000</code><br>then open ' +
         '<a href="http://localhost:8000/">http://localhost:8000/</a> and click this page. ' +
         '(<a href="dictionary.html">dictionary.html</a> works straight from disk.)</div>';
@@ -70,9 +71,10 @@
       if (!window.__pgBooted) {
         var b = document.createElement('div');
         b.className = 'banner chrome';
-        b.textContent = 'Could not load the table libraries from the CDN (offline or blocked ' +
-          'network). The dictionary page (dictionary.html) works fully offline, and ' +
-          'tools/validate.py validates without any network.';
+        b.textContent = 'The page\u2019s scripts did not start. Serve the whole package ' +
+          'directory, not this file alone \u2014 assets/ must sit beside the page. The ' +
+          'dictionary page (dictionary.html) opens straight from disk, and tools/validate.py ' +
+          'validates with no browser at all.';
         document.getElementById('stage').prepend(b);
       }
     }, 8000);
@@ -80,9 +82,12 @@
   </script>
 
   <script type="module">
-  import { createDataTable, checkBrowserSupport } from "https://esm.sh/@jeyabbalas/data-table@0.7.0";
-  import Ajv2020 from "https://esm.sh/ajv@8.17.1/dist/2020";
-  import addFormats from "https://esm.sh/ajv-formats@3.0.1";
+  /* Vendored beside the page, never from a CDN: the table library builds its worker
+     URL from its own import.meta.url, so loaded cross-origin the worker 404s and the
+     engine dies with an empty error. Same-origin, the default construction just works. */
+  import { createDataTable, checkBrowserSupport } from "./assets/vendor/data-table/data-table.js";
+  import Ajv2020 from "./assets/vendor/ajv-2020.mjs";
+  import { fullFormats } from "./assets/vendor/ajv-formats.mjs";
   window.__pgBooted = true;
   if (location.protocol === 'file:') throw new Error('file:// — the guard banner is already shown');
   const { schemaDocumentsToTable } = window.JsonSchemaDataDictionary;
@@ -146,70 +151,71 @@
   }
 
   /* ---------- validator ---------- */
+  /* fullFormats is ajv-formats' format table without its plugin wrapper, which has no
+     self-contained build to vendor. Registering it directly asserts every `format` just as
+     addFormats did; only formatMinimum/formatMaximum are lost, and tools/validate.py's
+     jsonschema does not implement those either - so the two stay in step. */
   const ajv = new Ajv2020({ allErrors: true, strict: false });
-  addFormats(ajv);
+  for (const [name, fmt] of Object.entries(fullFormats)) ajv.addFormat(name, fmt);
   for (const d of docs) if (d.uri !== config.rootUri) ajv.addSchema(d.schema, d.uri);
   const validate = ajv.compile(root.schema);
 
   /* ---------- dictionary metadata for header tooltips ---------- */
   const dict = schemaDocumentsToTable(docs, { rootUri: config.rootUri, splitAllOfObjectCategories: true });
 
+  /* ---------- column metadata: one source for both renderings ---------- */
+  const colMeta = new Map();
+  for (const r of dict.rows) {
+    const items = [{ label: 'Type', value: String(r['Data type'] || '—') }];
+    const extra = r['Additional information'] || {};
+    if (extra['x-unit']) items.push({ label: 'Units', value: String(extra['x-unit']) });
+    if (extra['x-universe']) items.push({ label: 'Universe', value: String(extra['x-universe']) });
+    const codes = (r['Valid values'] || [])
+      .filter(v => v && v.value !== null && v.value !== undefined)
+      .map(v => String(v.value) + (v.label ? ' = ' + v.label : ''));
+    if (codes.length) {
+      items.push({ label: 'Codes', value: codes.slice(0, 12).concat(codes.length > 12 ? ['…'] : []) });
+    }
+    colMeta.set(r['Variable name'], { description: r['Description'] || '', items });
+  }
+  /* the same facts the grid puts in a header tooltip, flattened for a title= attribute */
+  function metaTitle(name) {
+    const m = colMeta.get(name);
+    if (!m) return name + '\nNot declared in the schema.';
+    const lines = [name];
+    if (m.description) lines.push(m.description);
+    for (const it of m.items) {
+      lines.push(it.label + ': ' + (Array.isArray(it.value) ? it.value.join('; ') : it.value));
+    }
+    return lines.join('\n');
+  }
+
   /* ---------- table ---------- */
   let table = null;
   const support = checkBrowserSupport();
   if (!support.supported) {
-    banner('This browser is missing: ' + support.missing.join(', ') + ' — the data grid is ' +
-      'disabled, but validation summaries below still work.');
+    banner('This browser is missing: ' + support.missing.join(', ') + ' — the interactive ' +
+      'grid is disabled. The table below is a static rendering carrying the same findings; ' +
+      'tools/validate.py gives the same verdicts.');
   } else {
-    /* The table's web worker lives cross-origin on the CDN, and the Worker
-       constructor rejects cross-origin URLs (esm.sh also doesn't serve the raw
-       dist asset at all). Self-healing fallback: learn the worker's hashed
-       filename from the first failure, then retry through a same-origin Blob
-       trampoline module that imports the real dist asset from jsDelivr —
-       imports may cross origins; constructors may not. */
-    const DT_DIST_ASSETS = 'https://cdn.jsdelivr.net/npm/@jeyabbalas/data-table@0.7.0/dist/assets/';
-    async function makeTable() {
-      const base = {
+    try {
+      table = await createDataTable({
         container: document.getElementById('table'),
         colorScheme: 'auto',
         persistence: false
-      };
-      try {
-        return await createDataTable(base);
-      } catch (err) {
-        const m = String(err && err.message || err).match(/worker[\w.-]*\.js/);
-        if (!m) throw err;
-        const workerUrl = DT_DIST_ASSETS + m[0];
-        return await createDataTable({ ...base, bridgeOptions: {
-          workerFactory: () => new Worker(
-            URL.createObjectURL(new Blob(['import ' + JSON.stringify(workerUrl) + ';'],
-              { type: 'text/javascript' })),
-            { type: 'module' })
-        } });
-      }
-    }
-    try {
-      table = await makeTable();
-      for (const r of dict.rows) {
-        const items = [{ label: 'Type', value: String(r['Data type'] || '—') }];
-        const extra = r['Additional information'] || {};
-        if (extra['x-unit']) items.push({ label: 'Units', value: String(extra['x-unit']) });
-        if (extra['x-universe']) items.push({ label: 'Universe', value: String(extra['x-universe']) });
-        const codes = (r['Valid values'] || [])
-          .filter(v => v && v.value !== null && v.value !== undefined)
-          .map(v => String(v.value) + (v.label ? ' = ' + v.label : ''));
-        if (codes.length) {
-          items.push({ label: 'Codes', value: codes.slice(0, 12).concat(codes.length > 12 ? ['…'] : []) });
-        }
-        table.actions.setColumnHeaderTooltip(r['Variable name'], {
-          title: r['Variable name'],
-          description: r['Description'] || undefined,
-          items
+      });
+      for (const [name, m] of colMeta) {
+        table.actions.setColumnHeaderTooltip(name, {
+          title: name,
+          description: m.description || undefined,
+          items: m.items
         });
       }
     } catch (err) {
-      banner('The table engine failed to start (' + (err && err.message || err) + '). ' +
-        'Validation summaries below still work; tools/validate.py gives the same verdicts.');
+      banner('The table engine could not start (' + (err && err.message || err) + '). Its ' +
+        'database engine is fetched once from cdn.jsdelivr.net, so an offline or restricted ' +
+        'network is the usual cause. The table below is a static rendering carrying the ' +
+        'same findings; tools/validate.py gives the same verdicts.');
       table = null;
     }
   }
@@ -308,6 +314,83 @@
       (extra ? ' ' + extra : '')));
   }
 
+  /* ---------- static fallback table ---------- */
+  /* Shown whenever the interactive grid is unavailable - an unsupported browser, or a
+     network that blocks the engine's one download. It reads the very findings the grid's
+     annotations are built from, so the two renderings cannot disagree about which cell
+     broke which rule, and a steward without the grid still sees the data and the catches. */
+  const FALLBACK_ROW_CAP = 200;
+  function renderFallbackTable(rows, cells) {
+    const host = document.getElementById('table');
+    host.replaceChildren();
+    /* schema order first, then anything the data carries that the schema does not -
+       an undeclared column is itself a finding, so it has to be visible. */
+    const columns = Object.keys(rowProps);
+    const known = new Set(columns);
+    for (const r of rows) {
+      if (!r || typeof r !== 'object') continue;
+      for (const k of Object.keys(r)) if (!known.has(k)) { known.add(k); columns.push(k); }
+    }
+    const byCell = new Map();
+    const byRow = new Map();
+    for (const c of cells) {
+      if (c.col === null) byRow.set(c.row, c.best);
+      else byCell.set(c.row + ' ' + c.col, c.best);
+    }
+
+    const t = el('table', 'pg-fallback');
+    const headRow = el('tr');
+    headRow.append(el('th', 'pg-rownum', '#'));
+    for (const name of columns) {
+      const th = el('th', colMeta.has(name) ? null : 'undeclared', name);
+      th.title = metaTitle(name);
+      headRow.append(th);
+    }
+    const thead = el('thead');
+    thead.append(headRow);
+    t.append(thead);
+
+    const tbody = el('tbody');
+    const shown = Math.min(rows.length, FALLBACK_ROW_CAP);
+    for (let i = 0; i < shown; i += 1) {
+      const row = (rows[i] && typeof rows[i] === 'object') ? rows[i] : {};
+      const tr = el('tr');
+      const rowFinding = byRow.get(i);
+      if (rowFinding) {
+        tr.className = 'bad-row';
+        tr.title = rowFinding.message;
+      }
+      tr.append(el('th', 'pg-rownum', String(i + 1)));
+      for (const name of columns) {
+        const present = Object.prototype.hasOwnProperty.call(row, name);
+        const raw = row[name];
+        /* JSON literals, not coerced text: a string "58" in a numeric column is
+           itself the violation, and String() would hide the quotes that show it. */
+        const text = !present ? ''
+          : (typeof raw === 'string' || (raw !== null && typeof raw === 'object'))
+            ? JSON.stringify(raw) : String(raw);
+        const td = el('td', !present ? 'absent' : (raw === null ? 'nullish' : null), text);
+        const f = byCell.get(i + ' ' + name);
+        if (f) {
+          td.classList.add('bad');
+          td.title = (f.rule ? f.rule + ' — ' : '') + f.message;
+        }
+        tr.append(td);
+      }
+      tbody.append(tr);
+    }
+    t.append(tbody);
+
+    const wrap = el('div', 'pg-fallback-wrap');
+    wrap.append(t);
+    host.append(wrap);
+    if (rows.length > shown) {
+      host.append(el('div', 'pg-fallback-note',
+        'Showing the first ' + shown + ' of ' + rows.length + ' rows. Every row was ' +
+        'validated - the summary above counts them all.'));
+    }
+  }
+
   /* ---------- load + validate ---------- */
   async function loadAndValidate(rows, label, note) {
     document.getElementById('dataset-name').textContent = label;
@@ -315,6 +398,7 @@
       b.setAttribute('aria-pressed', String(b.dataset.label === label));
     }
     if (!Array.isArray(rows) || rows.length === 0) {
+      if (!table) document.getElementById('table').replaceChildren();
       summaryEmpty(label, 'Author toy fixtures per the package README, or upload a file.');
       return;
     }
@@ -339,6 +423,7 @@
         message: c.best.message
       }))));
     }
+    if (!table) renderFallbackTable(rows, cells);
     renderSummary(label, rows.length, cells, rowLevel, note);
   }
 
@@ -429,7 +514,7 @@
   </script>
 
   <footer class="colophon chrome">Made with <a class="brand-name" href="https://github.com/jeyabbalas/skills/tree/main/skills/schemify">/schemify</a>
-  · 2026-09-02 · package json_schema · assets a7119390d5f8 · page de2ac8eb67c8.
+  · 2026-09-02 · package json_schema · assets e509fe990e37 · page cb08ece74e31.
   Written by an AI conversion assistant. The JSON Schema files are the source of truth — this page is a disposable render; regenerate it rather than editing it.
   Files you check are validated entirely in your browser and never leave your machine.
   · <a href="README.md">Package README</a> · <a href="dictionary.html">Data dictionary</a></footer>

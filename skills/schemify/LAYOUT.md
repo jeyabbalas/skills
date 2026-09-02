@@ -40,6 +40,7 @@ json_schema/                          ← package root (name agreed at intake)
 └── assets/
     ├── json-schema-data-dictionary.global.js   ← vendored rendering library (render.py init)
     ├── embed-worker.js                         ← the dictionary's semantic-search worker (render.py init)
+    ├── vendor/                                 ← the playground's table engine + validator, vendored
     ├── schema-pages.css                        ← the pages' stylesheet
     └── VERSION                                 ← hash stamp; render.py check flags drift
 ```
