@@ -40,8 +40,14 @@ jobs:
       # `skills add --list` against the published repo -- the end-to-end check
       # that users can install what the tree claims to ship.
       - name: Every skill is listed by the installer
+        env:
+          NO_COLOR: "1"
         run: |
-          npx -y skills@latest add "${GITHUB_REPOSITORY}" --list 2>&1 | tee listing.txt
+          # The CLI colorizes even when piped under CI, so strip ANSI escapes
+          # before matching -- otherwise every name arrives wrapped in \e[36m.
+          npx -y skills@latest add "${GITHUB_REPOSITORY}" --list 2>&1 \
+            | perl -pe 's/\e\[[0-9;?]*[a-zA-Z]//g' \
+            | tee listing.txt
           status=0
           for d in skills/*/; do
             name=$(basename "$d")
