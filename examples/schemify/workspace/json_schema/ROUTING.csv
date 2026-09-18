@@ -1,0 +1,3 @@
+id,table,trigger,targets,rule,evidence,source,decision,status,notes
+R001,,nap_yesterday,nap_minutes,nap_yesterday=0 → nap_minutes=-666 (=1 → not -666),quoted,"source/dictionary.csv row 9 ""Asked only if nap_yesterday=1""",D010,encoded,
+R002,,,sleep_minutes,-666 in sleep_minutes means no diary entry that night; no trigger column exists to route it,implied,"source/dictionary.csv row 6 ""-666 - N/A (no diary entry)""",D015,not-enforceable,README "Documented but not enforced"

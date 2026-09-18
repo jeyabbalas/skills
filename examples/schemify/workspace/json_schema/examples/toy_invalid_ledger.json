@@ -21,14 +21,14 @@
       "column": "nap_minutes",
       "kind": "skip-break",
       "value": 45,
-      "reason": "nap_yesterday=0 but a real duration is present (must be -666)"
+      "reason": "R001: nap_yesterday=0 but a real duration is present (must be -666)"
     },
     {
       "row": 3,
       "column": "nap_minutes",
       "kind": "applicability-break",
       "value": -666,
-      "reason": "nap_yesterday=1 but the structural-NA code is recorded"
+      "reason": "R001: nap_yesterday=1 but the structural-NA code is recorded"
     },
     {
       "row": 4,

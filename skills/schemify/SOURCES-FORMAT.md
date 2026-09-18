@@ -11,7 +11,7 @@
 
 ## External sources
 
-- {Study site — data documentation} · {URL} · {what it offers: questionnaire PDFs, release notes} · {suggested | steward-approved | consulted YYYY-MM-DD | rejected ({why})}
+- {Study site — data documentation} · {URL} · {what it offers: questionnaire PDFs, branching logic, release notes} · {suggested | steward-approved | consulted YYYY-MM-DD | rejected ({why})}
 
 ## The steward
 

@@ -21,6 +21,7 @@ json_schema/                          ← package root (name agreed at intake)
 ├── DECISIONS.md                      ← the judgment ledger (DECISIONS-FORMAT.md)
 ├── SOURCES.md                        ← provenance map (SOURCES-FORMAT.md)
 ├── VARIABLES.csv                     ← the variables inventory (format in VALIDATE.md); coverage ground truth
+├── ROUTING.csv                       ← the routing register (ROUTING-FORMAT.md); the routing check's ground truth
 ├── common/
 │   └── defs.json                     ← shared $defs: invariant sentinels, id and date patterns
 ├── sleep_diary/                      ← one directory per table
@@ -45,7 +46,7 @@ json_schema/                          ← package root (name agreed at intake)
     └── VERSION                                 ← hash stamp; render.py check flags drift
 ```
 
-State files sit in the package root so the whole story travels together in version control. The state trio is scaffolding — the steward may clean it away at review; `VARIABLES.csv` is not scaffolding: it stays, so the coverage check runs for as long as the package lives.
+State files sit in the package root so the whole story travels together in version control. The state trio is scaffolding — the steward may clean it away at review; `VARIABLES.csv` and `ROUTING.csv` are not scaffolding: they stay, so the coverage and routing checks run for as long as the package lives.
 
 ## Multi-package roots
 
@@ -81,11 +82,12 @@ State files sit in the package root so the whole story travels together in versi
 
 | Script | Use |
 |---|---|
-| `validate.py check PKG` | Every schema file parses and meta-validates against draft 2020-12; the `$id` policy is linted (one base, path-mirroring — warnings name the fix); every `$ref` in every file resolves. Run after any schema edit. |
+| `validate.py check PKG` | Every schema file parses and meta-validates against draft 2020-12; the `$id` policy is linted (one base, path-mirroring — warnings name the fix); every `$ref` in every file resolves; every conditional is linted — declared variables and trigger levels only (an error), three keys, guarded `if`, prefixed `$comment`. Run after any schema edit. |
 | `validate.py data PKG --file F [--table T] [--format json\|csv] [--max-errors N]` | Validate a data file (JSON array of objects, or CSV with in-band sentinel literals) against a table's mother schema. Findings carry row, column, message, a hint — and, when a routing rule fired, that conditional's own `$comment` text. `--table` required when the package has several. |
 | `validate.py fixtures PKG [--table T]` | The unit test: `toy_valid` must yield zero findings; every `toy_invalid` row must fail with an error on exactly the column its ledger names. Per-row verdicts (`caught`, `missed-passed`, `missed-wrong-column`) with hints; ledger and data must match one-to-one. |
 | `validate.py coverage PKG [--inventory PATH]` | Reconcile `VARIABLES.csv` against the schemas: every `converted` row has its property, every property has its row (`converted` or `added`), `deferred`/`dropped`/`pending` rows appear in no schema. |
-| `validate.py summary PKG` | check + fixtures + coverage in one rollup, with a one-line `headline` fit to relay to the steward. Missing fixtures or inventory are reported as skipped, not failed. |
+| `validate.py routing PKG [--table T]` | Reconcile `ROUTING.csv` against each mother's conditionals: every `encoded` row's id is in a `$comment` and vice versa; every `waiting` row whose variables are now converted is `ready`; every encoded rule fired on a fixture case; every property carrying the structural-NA code is in a rule or in a row that says why not. Missing register → `skipped` with a migrate hint; id-less `$comment` → warning. |
+| `validate.py summary PKG` | check + fixtures + coverage + routing in one rollup, with a one-line `headline` fit to relay to the steward. Missing fixtures, inventory, or register are reported as skipped, not failed. |
 | `render.py init PKG` | Create `assets/` and `tools/` — the vendored dictionary library, its embedding worker, the stylesheet, the validator copy, `requirements.txt` — and stamp `assets/VERSION`. Idempotent; reports when the package's copies are older than the skill's. |
 | `render.py refresh-assets PKG` | Overwrite the shipped copies from the skill and re-stamp VERSION — upgrades the package's whole executable surface at once. Re-render pages afterwards if it says templates changed. |
 | `render.py dictionary PKG [--title T]` | Build `dictionary.html` from every schema file in the package. The page opens straight from disk; keyword search is built in, semantic search is a switch on the page (PAGES.md). The title is the mother file's with one table, else `manifest.json`'s `study`, else the package name — `--title` overrides. |

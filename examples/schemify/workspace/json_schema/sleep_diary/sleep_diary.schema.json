@@ -18,7 +18,7 @@
         "$ref": "categories/sleep.json"
       },
       {
-        "$comment": "Skip pattern: no nap yesterday means nap duration is structurally not applicable.",
+        "$comment": "Skip pattern R001: no nap yesterday means nap duration is structurally not applicable.",
         "if": {
           "required": [
             "nap_yesterday"
@@ -38,7 +38,7 @@
         }
       },
       {
-        "$comment": "Applicability: a reported nap must have a duration or an item-missing code — never the structural-NA code.",
+        "$comment": "Applicability R001: a reported nap must have a duration or an item-missing code — never the structural-NA code.",
         "if": {
           "required": [
             "nap_yesterday"

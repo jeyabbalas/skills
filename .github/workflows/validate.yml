@@ -21,6 +21,17 @@ jobs:
       - name: Validate skills
         run: uv run scripts/validate_skills.py
 
+      # schemify's validator is executed, never read, so its behaviour is
+      # pinned by tests; the example package is the integration fixture and
+      # must stay green, with its shipped tools and pages current.
+      - name: Test schemify validator
+        run: uv run tests/test_schemify_validate.py
+
+      - name: Validate the schemify example package
+        run: |
+          uv run skills/schemify/scripts/validate.py summary examples/schemify/workspace/json_schema
+          uv run skills/schemify/scripts/render.py check examples/schemify/workspace/json_schema
+
       # Second opinion from the Claude Code CLI on the plugin/marketplace
       # manifests, which validate_skills.py only cross-checks against disk.
       - name: Validate plugin manifest

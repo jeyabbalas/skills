@@ -7,12 +7,13 @@ Table of contents
 - [The violation ledger](#the-violation-ledger)
 - [Running the validator](#running-the-validator)
 - [Coverage and VARIABLES.csv](#coverage-and-variablescsv)
+- [The routing check](#the-routing-check)
 - [When a file you didn't touch fails](#when-a-file-you-didnt-touch-fails)
 - [Real data](#real-data)
 
 ## What a green run proves
 
-`validate.py summary` green means, and only means: every schema file parses and meta-validates under draft 2020-12; every `$ref` resolves; the `$id` policy holds; `toy_valid.json` yields **zero** findings; every seeded violation in `toy_invalid.json` is caught on exactly the column its ledger names; and `VARIABLES.csv` reconciles one-to-one with the schemas. Each clause is a different way a package rots; the summary checks them all so no session has to remember to.
+`validate.py summary` green means, and only means: every schema file parses and meta-validates under draft 2020-12; every `$ref` resolves; the `$id` policy holds; `toy_valid.json` yields **zero** findings; every seeded violation in `toy_invalid.json` is caught on exactly the column its ledger names; `VARIABLES.csv` reconciles one-to-one with the schemas; every conditional names only declared properties; and `ROUTING.csv`, when present, reconciles with the mothers' conditionals. Each clause is a different way a package rots; the summary checks them all so no session has to remember to.
 
 ## Toy fixtures
 
@@ -23,7 +24,7 @@ Toy rows are **authored, never sampled** — built from the dictionary's value s
 - every sentinel of every variable, at least once;
 - every level of every categorical with ≤ 12 levels; for larger code lists: first, last, one middle, and every sentinel level;
 - for every continuous variable: the exact `minimum`, the exact `maximum`, one interior value, and each sentinel;
-- **both halves of every skip pair**: one row with the trigger on and the skipped field pinned to its NA code, one row with the trigger off and the field carrying a substantive value — plus, somewhere, an in-universe row answering with an item-missing code (the pattern the applicability rule must *permit*);
+- **both halves of every skip pair, and the pinned value of every substantive pin**: one row with the trigger on and the skipped field pinned to its NA code, one row with the trigger off and the field carrying a substantive value — plus, somewhere, an in-universe row answering with an item-missing code (the pattern the applicability rule must *permit*);
 - one canonical match for every `pattern`, including a leading-zero case where zeros matter.
 
 Keys in schema property order; sentinels as literal in-band values (`-666`, not `null`).
@@ -52,7 +53,7 @@ Keys in schema property order; sentinels as literal in-band values (`-666`, not 
 }
 ```
 
-`kind`, `value`, and `reason` are documentation; the assertion matches on `row` + `column`. The kind vocabulary is fixed, one per construct the style emits: `wrong-type · unknown-level · range-break · invented-sentinel · pattern-break · skip-break · applicability-break · missing-key · undeclared-column` (plus `duplicate-row` where the package uses `uniqueItems`). Minimum bar: one case per kind the package's constructs use, and one `skip-break` plus one `applicability-break` **per conditional**. Past ~25 conditionals, cover each trigger-variable family once and say so in the ledger's `$comment`.
+`kind`, `value`, and `reason` are documentation; the assertion matches on `row` + `column`. The kind vocabulary is fixed, one per construct the style emits: `wrong-type · unknown-level · range-break · invented-sentinel · pattern-break · skip-break · applicability-break · routing-break · missing-key · undeclared-column` (plus `duplicate-row` where the package uses `uniqueItems`); `routing-break` is a `<Domain> routing` rule — a `then` that pins or narrows a substantive value — fired on a row carrying another. Minimum bar: one case per kind the package's constructs use, and **per rule id** a `skip-break` plus an `applicability-break` for each pair, a `routing-break` for each twinless pin or narrowing; the `reason` names the id ("R012: nap_yesterday=0 but …") so a failed row points at its register row. Past ~25 conditionals, cover each trigger-variable family once and say so in the ledger's `$comment`.
 
 ## Running the validator
 
@@ -72,6 +73,10 @@ melatonin_use,,sleep,deferred,"dictionary.csv row 14","source coding ambiguous �
 ```
 
 Fixed six-column header. `table` stays blank in single-table packages. `status` is one of `pending · converted · deferred · dropped · added`. The reconciliation: every `converted` row has its property in the named category file; every schema property has a row (`converted`, or `added` with its origin in `source`); `pending`, `deferred`, and `dropped` rows appear in no schema. Coverage green plus fixtures green is what "the schemas say what the dictionary says" means mechanically.
+
+## The routing check
+
+`validate.py routing` (rolled into `summary`) reconciles `ROUTING.csv` against the mother the way coverage reconciles `VARIABLES.csv`: every `encoded` row's id is on a conditional in its table's mother and every id in the mother has its `encoded` row; every conditional names only declared properties and declared trigger levels; every `waiting` row whose variables have since been converted is reported `ready`; every `confirmed` row still absent from the mother is a warning; every encoded rule fired on a seeded fixture case, or the check says `rule-unfixtured`; every property carrying the structural-NA code is either in a rule or in a register row of some status, or the check names it (informational — the policy may be `declined`). `unconfirmed-encoded` is the tenet made mechanical: an `inferred` rule may not be `encoded` without the steward's decision. A missing register reports `skipped` with a migrate hint (ROUTING.md); an id-less `$comment` is a warning. The register's format and statuses: ROUTING-FORMAT.md.
 
 ## When a file you didn't touch fails
 

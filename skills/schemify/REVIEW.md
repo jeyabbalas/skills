@@ -20,8 +20,8 @@ Normally: every category `confirmed` and only the review milestone open. On requ
 Complete is a checklist, not a feeling:
 
 - **Intake complete**: sources registered · grain and categories user-confirmed · Conventions filled, each row citing its D-number · scaffold validates · How to continue written · the log says the method was introduced.
-- **Category complete** (`confirmed`): every variable in its slice is a property (coverage green) · fixtures cover its levels, bounds, sentinels, and both halves of its skips · validation green · both pages carry it · the steward said yes to the rendered result.
-- **Package complete**: every category confirmed · every conditional has its PASS/FAIL fixture pair · coverage reconciles with deliberate additions listed · `summary` fully green · pages current · README finished (sections below) · the ledger walked — zero `open` lines, or each survivor migrated with the steward's acknowledgment · the real-data offer made and its outcome logged.
+- **Category complete** (`confirmed`): every variable in its slice is a property (coverage green) · fixtures cover its levels, bounds, sentinels, and both halves of its skips · every rule its variables trigger or target is a register row — `encoded`, or `waiting`/`proposed` with its D-number · validation green · both pages carry it · the steward said yes to the rendered result.
+- **Package complete**: every category confirmed · every conditional has its PASS/FAIL fixture pair · routing policy decided and, unless declined, the skip audit passed (ROUTING.md: no `waiting` or `proposed` rows, `routing` green) · coverage reconciles with deliberate additions listed · `summary` fully green · pages current · README finished (sections below) · the ledger walked — zero `open` lines, or each survivor migrated with the steward's acknowledgment · the real-data offer made and its outcome logged.
 
 Check them by running the checks, not by recalling that they passed.
 
@@ -30,10 +30,10 @@ Check them by running the checks, not by recalling that they passed.
 The review is a conversation about judgment, not a reading of the ledger. Present in three groups, in this order:
 
 1. **Open** — the unresolved questions, walked one by one. An item stays open past the review only by the steward's explicit choice, and then it migrates to the README's open-items list; nothing stays open silently.
-2. **Agent-decided** — every call you made that the steward hasn't ratified. Group by theme — sentinel handling, plausibility bounds, naming, category assignments, skip patterns — and present each theme as a short numbered list: scope · the call · the one-line why. Close each theme with: "Say a number to change it, or 'fine' to accept the group." Acceptance flips the group to `user-confirmed (review {date})`; a challenge becomes a revision unit and its category reopens.
+2. **Agent-decided** — every call you made that the steward hasn't ratified. Group by theme — sentinel handling, plausibility bounds, naming, category assignments, routing rules by evidence — and present each theme as a short numbered list: scope · the call · the one-line why. Close each theme with: "Say a number to change it, or 'fine' to accept the group." Acceptance flips the group to `user-confirmed (review {date})`; a challenge becomes a revision unit and its category reopens.
 3. **User-confirmed** — a one-line-each recap with no question attached. The steward already decided these; reopen one only if they do.
 
-At most ten items per message; a large ledger walks over more than one sitting, and the review milestone stays open until it finishes.
+Pacing per ELICIT.md's batch rule — and the Conventions row, if the steward asked for one at a time; a large ledger walks over more than one sitting, and the review milestone stays open until it finishes. A declined routing policy gets its one revisit offer here — "the register holds N rules your documents state; say the word and they are enforced" — and never again unprompted.
 
 ## Revisions
 
@@ -47,8 +47,8 @@ The package README is the deliverable's front door — written for a consumer wh
 2. **Layout and composition** — the tree in brief; that a row is the `allOf` union of its categories; why unknown columns are rejected by the mother's single `unevaluatedProperties: false`.
 3. **Value-encoding conventions** — codes get `oneOf`, measures get `anyOf`; bounds reject the impossible, not the merely rare; the chosen unit and title conventions.
 4. **Sentinel semantics** — the code table: code · meaning · where it applies; the wide year variants; any per-field meanings worth a caller's attention.
-5. **Enforced routing rules** — each conditional's `$comment` line, enumerated. This list is generated knowledge: it must match the mother file, so derive it from the mother file.
-6. **Documented but not enforced** — every `not-enforceable` ledger line, stated as rules a consumer should check downstream.
+5. **Enforced routing rules** — the routing policy in one line, then each conditional's `$comment` line with its `R` id, enumerated. This list is generated knowledge: it must match the mother file, so derive it from the mother file.
+6. **Documented but not enforced** — every `not-enforceable` ledger line, stated as rules a consumer should check downstream, plus every `declined` and `not-enforceable` register row with its why; a declined policy says so here and names `ROUTING.csv` as where the rules wait.
 7. **Known source issues handled** — dictionary defects, corrected typos, coding inversions, each with what the schema does about it.
 8. **Sources and provenance** — the dictionary files and consulted external sources with URLs and dates, distilled from SOURCES.md.
 9. **Validating and browsing** — exactly these commands, current for this package:
@@ -60,7 +60,7 @@ The package README is the deliverable's front door — written for a consumer wh
    ```
 
    plus one line each: double-click `dictionary.html` (keyword search built in; the Semantic search switch fetches a small model once, then also finds related variables by meaning); `python3 -m http.server 8000` from the package root (serving the whole directory, so `assets/vendor/` travels with the page) then open `playground.html`. Note that the `$id` namespace is a placeholder to replace before publishing the schemas anywhere public.
-10. **Open items to confirm with the data provider** — the surviving opens, one line each.
+10. **Open items to confirm with the data provider** — the surviving opens, one line each, routing proposals left unanswered by id among them.
 
 ## Cleanup
 
@@ -68,11 +68,11 @@ Offer once, after the milestones are all checked, in the steward's terms — bot
 
 > The schemas, the toy data, the validator, and the web pages are the deliverable — they stand on their own now. My three working files (progress, decisions, sources) were scaffolding. I can fold what still matters into the package README — the sources we used, anything left open — and delete them; or leave them in place if you want the full working record in version control. Which do you prefer?
 
-On "clean": finish the README first — provenance, open items, the not-enforced list; nothing migrates *after* deletion — run `summary` one last time, delete `PROGRESS.md`, `DECISIONS.md`, and `SOURCES.md` (VARIABLES.csv stays — the coverage check needs it), and say in one line what the package now contains. On "keep": append the final log line `next: — (complete)` and stop — never raise cleanup again; a later session finding a complete PROGRESS.md treats the package as finished and works in revision mode. Either way the deliverable is identical: cleanup changes the scaffolding, never the package.
+On "clean": finish the README first — provenance, open items, the not-enforced list; nothing migrates *after* deletion — run `summary` one last time, delete `PROGRESS.md`, `DECISIONS.md`, and `SOURCES.md` (VARIABLES.csv and ROUTING.csv stay — the coverage and routing checks need them), and say in one line what the package now contains. On "keep": append the final log line `next: — (complete)` and stop — never raise cleanup again; a later session finding a complete PROGRESS.md treats the package as finished and works in revision mode. Either way the deliverable is identical: cleanup changes the scaffolding, never the package.
 
 ## Working on a finished package
 
-A finished package has no state files, by design — the README is the front door. For a question or a targeted change: read the README and only the schema files the change touches; encode per SCHEMA-PATTERNS.md; land new judgment calls directly in the README (open items, or a dated line under a `Changes` heading); update VARIABLES.csv if variables moved; re-run `summary`; re-render what changed. Do not resurrect the state trio for a one-line change. A steward asking for a second table, a re-planned category structure, or a rework across many categories is different — that is a re-plan: recreate the state files via INTAKE.md's relevant steps, say why, and work the loop again.
+A finished package has no state files, by design — the README is the front door. For a question or a targeted change: read the README and only the schema files the change touches; encode per SCHEMA-PATTERNS.md; land new judgment calls directly in the README (open items, or a dated line under a `Changes` heading); update VARIABLES.csv if variables moved; re-run `summary`; re-render what changed. Do not resurrect the state trio for a one-line change. One routing rule added later follows the same path plus its register row and fixtures, and the README's enforced list is re-derived; a package with conditionals but no `ROUTING.csv` is migrated first (ROUTING.md); enabling routing wholesale on a package that declined it is a re-plan. A steward asking for a second table, a re-planned category structure, or a rework across many categories is different — that is a re-plan: recreate the state files via INTAKE.md's relevant steps, say why, and work the loop again.
 
 ## Handoff
 

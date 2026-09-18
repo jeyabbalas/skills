@@ -14,3 +14,5 @@
 - D012 · 2026-08-21 · not-enforceable · sleep_minutes ≤ bedtime-to-wake interval · arithmetic across columns; JSON Schema cannot compare fields · agent-decided · active
 - D013 · 2026-08-21 · sleep_diary/sleep.melatonin_use · what are the supplement codes? · dictionary row 11 points at a coding sheet missing from this version · open · active
 - D014 · 2026-08-21 · package · no real data in the repo; toy fixtures are the only test data · steward interview · user-confirmed · active
+- D015 · 2026-09-18 · not-enforceable · sleep_minutes -666 means "no diary entry" — a row-level fact with no trigger column to route it; registered R002 · dictionary row 6 wording; nothing in the row routes it · agent-decided · active
+- D016 · 2026-09-18 · package · routing policy: full — source-stated and implied rules enforced, study-design proposals asked · set at migration of a pre-routing package; steward not yet asked · agent-decided · active

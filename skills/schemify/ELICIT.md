@@ -22,13 +22,15 @@ Match their register as it reveals itself: an epidemiologist hears "skip pattern
 
 ## Batch, don't ping-pong
 
-Questions accumulate; sessions ask them in batches. Mid-conversion, an unknown never stops the line: give it a safe provisional encoding — the loosest reading the source supports — log an `open` decision, and keep going. Ask at natural pauses — a category finished, a session closing, five opens pending — as one numbered message grouped by topic, each question answerable in a line, each ending with its D-number so answers file mechanically.
+Questions accumulate; sessions ask them in batches. Mid-conversion, an unknown never stops the line: give it a safe provisional encoding — the loosest reading the source supports (for a routing rule, no conditional; which evidence licenses one is ROUTING.md's call) — log an `open` decision, and keep going. Ask at natural pauses — a category finished, a session closing, five opens pending — as one numbered message grouped by topic, each question answerable in a line, each ending with its D-number so answers file mechanically.
 
 One exception asks alone and immediately: a blocker that gates the whole unit — the grain is ambiguous, two sheets disagree on the primary key. Everything else waits for the batch. Never make the steward hunt through prose for the question marks.
 
+Batching is the default for every review this skill runs — open questions, routing proposals, the ledger walk, category confirmations: numbered, grouped by topic, at most ten items per message and fewer when each needs thought. One item at a time only when the steward asks for it, and then it persists: record `questions: one at a time · D{NNN}` in PROGRESS.md's Conventions and every later session honors it until the steward lifts it. Never infer the preference from a slow reply.
+
 ## The ledger is the queue
 
-`grep "· open ·" DECISIONS.md` *is* the question list — there is no second one. Presenting a batch:
+`grep "· open ·" DECISIONS.md` *is* the question list — there is no second one. A routing proposal *is* its open line; the register only points at it (ROUTING-FORMAT.md). Presenting a batch:
 
 > Three things only you can settle, quickest first:
 > 1. `cigs_day` — could 777 ever be a real daily count, or is it always "not asked"? (D014)
@@ -39,7 +41,7 @@ On each answer: flip the line's confidence to `user-confirmed ({date})` in place
 
 ## Hunting external sources
 
-Before asking the steward what the public record already answers, search for it: the study's name plus "data dictionary", "codebook", "questionnaire"; the study's own website; national data archives; the funder's or publisher's repository. Well-known studies usually have official documentation online — find it rather than making the steward retype it.
+Before asking the steward what the public record already answers, search for it: the study's name plus "data dictionary", "codebook", "questionnaire"; the study's own website; national data archives; the funder's or publisher's repository. Well-known studies usually have official documentation online — find it rather than making the steward retype it. Routing documentation hides in study-specific places — questionnaire skip arrows, REDCap branching-logic exports, interviewer manuals, cleaning code; ROUTING-CATALOG.md lists where by data type.
 
 Present findings as a suggested list — name · URL · what it would resolve — and let the steward approve before anything from it becomes provenance. In SOURCES.md a source moves `suggested → steward-approved → consulted {date}`; only a consulted source may be cited in a schema's `$comment` or a decision's why. Date the consultation — the web moves.
 

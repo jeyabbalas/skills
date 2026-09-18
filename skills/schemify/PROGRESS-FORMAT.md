@@ -26,6 +26,8 @@ a question, the final review.
 - $id base: {https://…/} (replace before publishing) · D{NNN}
 - grain: see header · title separator: {char} · formatting: 2-space, one key per line
 - real data: {none in repo | at {path} — read only with consent, never quoted} · D{NNN}
+- routing: {full | faithful | declined | undecided} · D{NNN}
+- questions: one at a time · D{NNN}
 
 ## Categories
 
@@ -39,7 +41,7 @@ a question, the final review.
 - [ ] intake: sources registered · grain confirmed · categories confirmed
 - [ ] common/defs.json + mother scaffold validate green
 - [ ] every category confirmed
-- [ ] cross-category skip audit
+- [ ] skip audit (ROUTING.md) — or waived: routing declined (D{NNN})
 - [ ] coverage audit 1:1
 - [ ] pages current for the whole package
 - [ ] review walked · cleanup decided
@@ -54,6 +56,6 @@ a question, the final review.
 - **An index, not a store.** Rows gist and point — variable detail lives in the schemas and VARIABLES.csv, rulings in DECISIONS.md, source detail in SOURCES.md. A cell that wants a second sentence is telling you the content belongs elsewhere.
 - **How to continue is written once, at creation, for the steward** — plain words, no token talk beyond "a session holds only so much". Edit it only if the package moves.
 - **Statuses move only on their events**: `pending → drafted` when the category file exists and meta-validates; `→ validated` when its fixtures pass and fail as designed; `→ rendered` when both pages carry it; `→ confirmed` only when the steward says so — never on your own. `blocked(D{NNN})` may stand in for any status while an open decision gates the work; restore the earned status when it resolves. A review overturn sets `drafted` — the loop re-runs from there.
-- **The log only appends** — one line per session, `·`-separated, ending in `next:`. The pointer vocabulary: `intake` · `convert {category}` · `skips {scope}` · `fixtures {scope}` · `pages` · `elicit ({N} open)` · `revise {category}` · `review` · `— (complete)`.
-- **Conventions cite their decision** (`D{NNN}`) so the review can walk them — a convention with no ledger line is an invention.
+- **The log only appends** — one line per session, `·`-separated, ending in `next:`. The pointer vocabulary: `intake` · `convert {category}` · `skips {category | audit | migrate}` · `fixtures {scope}` · `pages` · `elicit ({N} open)` · `revise {category}` · `review` · `— (complete)` — `skips {category}` encodes that category's `confirmed` and no-longer-`waiting` rules, `skips audit` is the package-wide check, `skips migrate` builds the register for a pre-routing package (ROUTING.md).
+- **Conventions cite their decision** (`D{NNN}`) so the review can walk them — a convention with no ledger line is an invention. The `routing` row is mandatory — its absence marks a package that predates the register (ROUTING.md); the `questions` row appears only when the steward asked for one item at a time — its absence means batched (ELICIT.md).
 - **Multi-table packages** add a `table` column to Categories; milestones repeat per table only when the tables truly stagger.

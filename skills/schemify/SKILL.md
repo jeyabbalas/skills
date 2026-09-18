@@ -1,6 +1,6 @@
 ---
 name: schemify
-description: "Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: it interviews you for what the files don't say, tests every rule against toy data, renders browsable web pages for feedback, and remembers progress across sessions. Give it the path to your data dictionary."
+description: "Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: it interviews you for what the files don't say, tests every rule against toy data, hunts the skip logic the dictionary never states, renders browsable web pages for feedback, and remembers progress across sessions. Give it the path to your data dictionary."
 disable-model-invocation: true
 argument-hint: "data dictionary path(s), or a request — a category, a change, review"
 ---
@@ -9,14 +9,15 @@ The steward has asked you to turn their data dictionary — however it arrives: 
 
 ## The package
 
-The package is one directory (default `json_schema/`) holding the schemas and everything that ships with them. Until cleanup it also holds three working state files:
+The package is one directory (default `json_schema/`) holding the schemas and everything that ships with them. Until cleanup it also holds three working state files, plus two inventories the validator keeps checking after cleanup — `VARIABLES.csv` (format in VALIDATE.md) and `ROUTING.csv`:
 
 - `PROGRESS.md` — the plan: package conventions, the category table with statuses, the session log, and the steward-facing How to continue. Read [PROGRESS-FORMAT.md](./PROGRESS-FORMAT.md) when creating it, adding or re-planning categories or tables, or unsure what a status value means.
 - `DECISIONS.md` — the append-only ledger of every judgment call, each tagged `user-confirmed`, `agent-decided`, or `open`. Read [DECISIONS-FORMAT.md](./DECISIONS-FORMAT.md) before your first append of the session, and again at review.
 - `SOURCES.md` — what feeds the package: dictionary files with parse notes, external sources with URLs and approval status, and what the steward can answer first-hand. Read [SOURCES-FORMAT.md](./SOURCES-FORMAT.md) when registering a source or recording who knows what.
+- `ROUTING.csv` — the routing register: every rule the sources state, the steward told you, or you expect, and where each stands. Read [ROUTING-FORMAT.md](./ROUTING-FORMAT.md) when adding or changing a row.
 - The schemas, fixtures, tools, and pages — the deliverable tree, its naming, multi-package roots, and the contracts for the two bundled scripts: read [LAYOUT.md](./LAYOUT.md) when creating anything new in the package, running a script, or unsure where something lives.
 
-Four laws hold everywhere: **the schemas are the source of truth** — every `.html` page is a disposable render of them, and a fact that lives only in chat does not exist: it lands in a schema keyword, a state file, or the package README, or it is lost; **never invent metadata** — every title, code, sentinel, bound, and rule traces to the source dictionary, a named external source, or the steward, and DECISIONS.md remembers which; **missingness lives in-band** — a missing or inapplicable value is a documented sentinel code with its own schema branch, never an absent key, never `null`, never a loosened type, and every column is required in every row; **case is ownership** — `UPPERCASE.md` files are working state with a `*-FORMAT.md` schema in this skill, scaffolding the steward may clean away at the end, while everything lowercase plus the `.json` schemas is the deliverable, built to stand alone.
+Four laws hold everywhere: **the schemas are the source of truth** — every `.html` page is a disposable render of them, and a fact that lives only in chat does not exist: it lands in a schema keyword, a state file, or the package README, or it is lost; **never invent metadata** — every title, code, sentinel, bound, and rule traces to the source dictionary, a named external source, or the steward, and DECISIONS.md remembers which; **missingness lives in-band** — a missing or inapplicable value is a documented sentinel code with its own schema branch, never an absent key, never `null`, never a loosened type, and every column is required in every row; **case is ownership** — `UPPERCASE.md` files are working state with a `*-FORMAT.md` schema in this skill, scaffolding the steward may clean away at the end, while everything lowercase plus the `.json` schemas is the deliverable, built to stand alone; **silence about routing is not absence** — dictionaries seldom state skip logic, so routing is hunted and recorded by default and only the steward switches it off; a structural-NA code without a stated rule is a question for the steward, and so is every rule you expect from the study design: domain knowledge is a question, never a source.
 
 ## Invocation
 
@@ -39,9 +40,9 @@ Then dispatch:
 
 1. Read `PROGRESS.md` — the whole file; it is built to stay small.
 2. Propose the session in one line from the last log line's `next:` pointer — "Pick up the reproductive-history category?" The steward may redirect anywhere.
-3. Read the one playbook for the agreed unit — and nothing else. Open only what the unit names: the category's own source slice (its plan row says where), `common/defs.json` when `$ref`-ing it, the mother file when appending to it. Never re-read the whole dictionary; never read DECISIONS.md end to end (grep it for a ruling — the standing ones are already in PROGRESS.md's Conventions); never open finished categories' files.
+3. Read the one playbook for the agreed unit — and nothing else. Open only what the unit names: the category's own source slice (its plan row says where), `common/defs.json` when `$ref`-ing it, the mother file when appending to it. Never re-read the whole dictionary; never read DECISIONS.md end to end (grep it for a ruling — the standing ones are already in PROGRESS.md's Conventions); grep `ROUTING.csv` for the unit's variables — rules waiting on this category are part of its work; never open finished categories' files.
 
-**Resume, with a request** — the invocation names a category, a variable, a change, or a question: same one-file read, then route. A category or variable to work on becomes the session's unit; a change to something `confirmed` reopens it (Revising, in CONVERT.md); a question is answered from the schemas and the ledger — a question is not a commission; "review" goes to Review even with categories unfinished (say what is unfinished first).
+**Resume, with a request** — the invocation names a category, a variable, a change, or a question: same one-file read, then route. A category or variable to work on becomes the session's unit; a change to something `confirmed` reopens it (Revising, in CONVERT.md); a question is answered from the schemas, the ledger, and the routing register — a question is not a commission; "review" goes to Review even with categories unfinished (say what is unfinished first).
 
 **New dictionary, existing package** — the invocation brings a dictionary file while `PROGRESS.md` exists: check SOURCES.md. Listed there → it is an input to the current work; Resume. Not listed → a second study wants its own package: confirm, then Bootstrap a sibling package (multi-package roots in LAYOUT.md) — never mix two studies' variables in one package.
 
@@ -55,7 +56,7 @@ Three phases; each ends at a gate the steward holds.
 
 **Intake** — inventory the sources, learn the study, agree on the grain and the categories, scaffold the package and its state. Read [INTAKE.md](./INTAKE.md) when the package has no PROGRESS.md, or when a confirmed re-plan adds a table. Gate: the steward approves the category table.
 
-**Convert** — the loop that carries one category at a time from source slice to confirmed schema. Read [CONVERT.md](./CONVERT.md) when the session will draft or revise a category. It sends you onward: read [SCHEMA-PATTERNS.md](./SCHEMA-PATTERNS.md) whenever you are about to write or edit schema JSON — it is the house rulebook; read [SKIP-PATTERNS.md](./SKIP-PATTERNS.md) when the slice carries routing — "asked only if", universe statements, skip logic; read [VALIDATE.md](./VALIDATE.md) when authoring or extending toy fixtures or interpreting a validation run; read [PAGES.md](./PAGES.md) when building, refreshing, serving, or presenting the web pages. Read [ELICIT.md](./ELICIT.md) before asking the steward any batch of questions and before hunting external sources — during intake included. Gate, per category: the steward confirms the rendered result.
+**Convert** — the loop that carries one category at a time from source slice to confirmed schema. Read [CONVERT.md](./CONVERT.md) when the session will draft or revise a category. It sends you onward: read [SCHEMA-PATTERNS.md](./SCHEMA-PATTERNS.md) whenever you are about to write or edit schema JSON — it is the house rulebook; read [ROUTING.md](./ROUTING.md) at intake's source survey, before drafting any category, whenever a routing rule is noticed, proposed, answered, declined, or audited, and when PROGRESS.md's Conventions have no `routing` row (a package that predates it — migrate) — it owns the routing policy, the register, and which evidence licenses a rule; read [SKIP-PATTERNS.md](./SKIP-PATTERNS.md) when a licensed rule is about to be written into the mother — it owns only the JSON; read [ROUTING-CATALOG.md](./ROUTING-CATALOG.md) when a slice carries gate-shaped variables or NA-type labels the source never explains — to recognize implied routing under any policy, and to draft proposals only under `full`; read [VALIDATE.md](./VALIDATE.md) when authoring or extending toy fixtures or interpreting a validation run; read [PAGES.md](./PAGES.md) when building, refreshing, serving, or presenting the web pages. Read [ELICIT.md](./ELICIT.md) before asking the steward any batch of questions and before hunting external sources — during intake included. Gate, per category: the steward confirms the rendered result.
 
 **Review** — walk the ledger by confidence, revise what the steward dislikes, finish the package README, offer cleanup. Read [REVIEW.md](./REVIEW.md) when every category is confirmed, when the steward asks, or when working on a finished package. Gate: the steward accepts the package; cleanup is their call.
 
@@ -67,7 +68,7 @@ Everything you put in a schema is one of three things: transcribed from the sour
 - Verbatim source text goes in `$comment`, typos preserved in brackets (`[source: 'United Kingdon']`).
 - "The dictionary does not say" is a finding — record it as an `open` decision rather than filling the silence.
 - External facts carry their source's row in SOURCES.md; steward facts carry a dated ledger line.
-- Whatever you add beyond all three — a plausibility bound, a normalized name, an inferred skip — is a judgment call, and the ledger remembers it (`agent-decided`) until the steward ratifies it.
+- Whatever you add beyond all three — a plausibility bound, a normalized name, an applicability twin built from a one-directional statement — is a judgment call, and the ledger remembers it (`agent-decided`) until the steward ratifies it.
 
 ## Session budget
 
@@ -75,7 +76,7 @@ Defaults; exceed only when the steward explicitly asks and the dictionary is sma
 
 - **Intake**: one session — inventory, interview, category proposal, scaffold. A very large dictionary may need a full session for the inventory alone; propose the split rather than rushing the proposal.
 - **Convert**: one category, carried through its whole loop — drafted, validated, rendered — per session. Several categories of under ~10 variables each may share one. A category carried to `validated` beats three left `drafted`.
-- **Skip audit, fixture extension, pages refresh, review**: each is its own unit.
+- **Skip units (`skips {category}`, the audit, a migration), fixture extension, pages refresh, review**: each is its own unit.
 
 The budget is what makes every session end in a resumable state — depth over coverage, and a clean `next:` pointer beats a half-drafted sprawl. The steward likely doesn't know a session has limits: when one must end, say why in one line — "long dictionaries convert best in sittings; everything so far is saved" — and point them at PROGRESS.md's How to continue. Never end silently mid-unit, and close early rather than letting the limit arrive before the log line does.
 
@@ -86,14 +87,15 @@ Before ending any session that touched the package, run this checklist — copy 
 ```
 - [ ] Session-log line appended to PROGRESS.md:
       - YYYY-MM-DD · {unit} · {what happened, telegraphic} · next: {concrete unit}
-- [ ] Category rows current for everything touched (status moved only on its event, date updated)
+- [ ] Category rows and ROUTING.csv rows current for everything touched (status moved only on its event, date updated)
 - [ ] Every judgment call this session made is a DECISIONS.md line — a silent decision is an invention
 - [ ] validate.py ran green after the last schema edit (or the failure itself is the next: unit)
+- [ ] No ROUTING.csv row left confirmed with the mother unedited (that is the next: unit)
 - [ ] The next: pointer names something a stranger could pick up cold
       (a finished package writes: next: — (complete))
 ```
 
-Only end when all five are checked. A session that appends no log line did not happen.
+Only end when all six are checked. A session that appends no log line did not happen.
 
 ## Gotchas
 

@@ -12,11 +12,11 @@ Table of contents
 
 ## Steps
 
-1. **Survey the sources.** Register every dictionary file, extract the variables inventory, estimate the size. Done when: SOURCES.md rows exist for every input, VARIABLES.csv lists every variable, and you can say "N variables, roughly M sittings" out loud.
+1. **Survey the sources.** Register every dictionary file, extract the variables inventory, estimate the size. Done when: SOURCES.md rows exist for every input, VARIABLES.csv lists every variable, and you can say "N variables, roughly M sittings" out loud — and the routing scan (ROUTING.md) has run, its hits in the parse notes.
 2. **Introduce the method.** The short version of how this will work, in the steward's terms. Done when: they know the work runs in sittings, where state lives, and how to continue.
-3. **Interview the steward.** Seven questions, one message, read-back confirmation. Done when: grain, tables, sentinel policy, real-data ruling, external leads, and the steward's own domains are recorded.
+3. **Interview the steward.** Eight questions, one message, read-back confirmation. Done when: grain, tables, sentinel policy, real-data ruling, external leads, the steward's own domains, and the routing policy are recorded.
 4. **Propose categories.** Derived from the source's own structure, iterated until approved whole. Done when: the steward has said yes to the category table as a whole.
-5. **Scaffold.** The package skeleton, the state trio, a green validation run. Done when: `validate.py check` passes on the scaffold and all three state files exist.
+5. **Scaffold.** The package skeleton, the state trio, a green validation run. Done when: `validate.py check` passes on the scaffold and the state trio, VARIABLES.csv, and ROUTING.csv exist.
 6. **Continue into the first category** if the session's budget allows — otherwise close per SKILL.md with `next: convert <first category>`. A very large dictionary may spend this whole session on steps 1–2 and interview next time; propose the split rather than rushing the proposal.
 
 ## Surveying the sources
@@ -30,6 +30,8 @@ Register each dictionary file in SOURCES.md *before* deep reading — the parse 
 - **A website**: it is an external source — record the URL in SOURCES.md and treat pages you consult like PDF pages.
 
 While surveying, write `VARIABLES.csv` in the package root — one row per variable the source defines, category left `unassigned` until the proposal, status `pending` (format in VALIDATE.md). This inventory is the coverage check's ground truth: a variable missing from it is a variable the package will silently forget. Count it honestly and state the estimate to the steward — variable count is what decides between "one sitting" and "a phased plan".
+
+While surveying, run ROUTING.md's scan on each file — an NA-type label, a gate-and-detail name pair, a branching-logic column, a questionnaire among the inputs — and note the hits in that file's parse notes. Register what the source *states* as `waiting` rows in `ROUTING.csv` now, without encoding; the hits decide how the routing question is asked and where to send the hunt.
 
 Everything registered here is input, not yet truth: parse notes describe the files; the interview establishes what they mean.
 
@@ -47,7 +49,7 @@ Small dictionary, likely one sitting? Say that instead — the sittings paragrap
 
 ## The interview
 
-One message, numbered, conducted per ELICIT.md's craft (speak the study, offer readings, read back what you heard). The seven:
+One message, numbered, conducted per ELICIT.md's craft (speak the study, offer readings, read back what you heard). The eight:
 
 1. **Grain** — "What is one row in this data: one participant? one visit? one household at one wave?" The answer becomes the mother file's description and never changes silently.
 2. **Tables** — "Is this one dataset, or several related ones (a main table, a diagnosis table, a measurements table)?" Each distinct grain is its own table directory.
@@ -56,8 +58,9 @@ One message, numbered, conducted per ELICIT.md's craft (speak the study, offer r
 5. **Public documentation** — "Does the study have a website, a published codebook, questionnaire forms?" Any lead triggers ELICIT.md's hunt; suggest likely sources yourself from what the study's name and field imply.
 6. **Their own knowledge** — "Which parts of this data do you know first-hand, and where do you defer to someone else?" This fills SOURCES.md's steward map and tells you where `open` questions can actually be settled.
 7. **Downstream consumer** — "Who will validate against these schemas, with what tooling?" A constraining answer (a specific validator, a required draft) becomes a Conventions row.
+8. **Routing** — "Were some questions asked only of some people — smoking details of ever-smokers, pregnancy items of women, follow-ups only of those who said yes? Where is that written down: the questionnaire's skip instructions, a REDCap or survey-tool export, the interviewer manual, your cleaning code? And what sits in the cell for someone who wasn't asked — a code such as 777, a blank, a zero? I'll encode every rule your documents state or imply. Beyond that I can propose rules I'd expect from the study design for you to accept or reject, or stay strictly faithful to your documentation and propose nothing — which do you prefer?" Lead with the scan's hits when there are any ("your codes list '777 = N/A (never smoker)' on eleven variables — that reads as a rule; is it one?") and suggest sources from ROUTING-CATALOG.md's table for this data type. Silence or "sure" is `full`; "stay faithful" is `faithful`; "later" is `undecided`; only an explicit no is `declined` (ROUTING.md). The answer is the `routing` Conventions row and its ledger line; named sources enter SOURCES.md as `suggested`; "a blank" is not a code, so that answer reopens question 3.
 
-Push back once on a vague answer — "roughly how many rows per participant?" — then record what you got and move on; a residual unknown is an `open` decision, not a stalled intake.
+Push back once on a vague answer — "roughly how many rows per participant?" — then record what you got and move on; a residual unknown is an `open` decision, not a stalled intake. The routing question in particular may get "later" — that is the policy `undecided`, and ROUTING.md says what proceeds meanwhile.
 
 ## Proposing categories
 
@@ -74,7 +77,7 @@ A dictionary under ~20 variables with no natural grouping is one category — sa
 
 1. EXECUTE `render.py init <package>` (contract and fallbacks in LAYOUT.md) — assets, tools, VERSION.
 2. Write `common/defs.json` — the sentinel policy's invariant codes and any id or date patterns already known — and each table's mother file with its category `$ref`s pointing at files that will exist, per SCHEMA-PATTERNS.md. Category files themselves are convert-phase work; scaffold none of them.
-3. Write the state trio per PROGRESS-FORMAT.md, DECISIONS-FORMAT.md, SOURCES-FORMAT.md — Conventions filled from the interview, each row citing its D-number; the interview's decisions are the ledger's first lines.
+3. Write the state trio per PROGRESS-FORMAT.md, DECISIONS-FORMAT.md, SOURCES-FORMAT.md — Conventions filled from the interview, each row citing its D-number, the `routing` row among them; the interview's decisions are the ledger's first lines. Write `ROUTING.csv` with its header only (ROUTING-FORMAT.md), even when no routing is expected — a header-only register means "audited, none".
 4. EXECUTE `validate.py check <package>` — green before anything else happens. A scaffold that doesn't validate is not a scaffold.
 
 ## Handing off

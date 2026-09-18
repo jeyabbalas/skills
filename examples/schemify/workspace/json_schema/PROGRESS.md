@@ -21,6 +21,7 @@ a question, the final review.
 - $id base: https://schemas.example.org/lark/ (replace before publishing) · D007
 - grain: see header · title separator: — · formatting: 2-space, one key per line
 - real data: none in repo — toy fixtures only · D014
+- routing: full · D016
 
 ## Categories
 
@@ -34,7 +35,7 @@ a question, the final review.
 - [x] intake: sources registered · grain confirmed · categories confirmed
 - [x] common/defs.json + mother scaffold validate green
 - [x] every category confirmed
-- [x] cross-category skip audit
+- [x] skip audit (ROUTING.md)
 - [x] coverage audit 1:1
 - [x] pages current for the whole package
 - [x] review walked · cleanup decided
@@ -44,3 +45,4 @@ a question, the final review.
 - 2026-08-21 · intake · dictionary.csv registered; interview done; sentinel policy and grain confirmed; 2 categories approved (D001–D004); scaffold green; participant drafted → confirmed · next: convert sleep
 - 2026-08-21 · convert sleep · sleep drafted; nap routing pair written (D010); bedtime encoding revised (D009 supersedes D008); fixtures 9/9 caught; both pages built; sleep confirmed; coverage 11/12 (melatonin_use deferred, D013) · next: review
 - 2026-08-21 · review · ledger walked; agent-decided group accepted; melatonin_use stays open by the steward's choice → README open items; README finished; steward keeps the working files · next: — (complete)
+- 2026-09-18 · skips migrate · ROUTING.csv added (R001 encoded, R002 not-enforceable, D015); rule ids on both conditionals; routing policy recorded (D016); tools refreshed; pages re-rendered · next: — (complete)

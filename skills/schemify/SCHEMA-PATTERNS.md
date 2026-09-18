@@ -52,7 +52,7 @@ The mother file (`<table>/<table>.schema.json`) declares the table: an array who
       { "$ref": "categories/participant.json" },
       { "$ref": "categories/sleep.json" },
 
-      { "$comment": "Skip pattern: …", "if": { "…": "…" }, "then": { "…": "…" } }
+      { "$comment": "Skip pattern R001: …", "if": { "…": "…" }, "then": { "…": "…" } }
     ],
     "unevaluatedProperties": false
   }

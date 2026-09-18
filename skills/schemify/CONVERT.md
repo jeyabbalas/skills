@@ -10,14 +10,14 @@ Table of contents
 
 ## The loop
 
-1. **Read the plan row.** Its source slice says exactly where this category's variables live; SOURCES.md's parse notes say how to read that file. Open only the slice.
+1. **Read the plan row.** Its source slice says exactly where this category's variables live; SOURCES.md's parse notes say how to read that file. Open only the slice. Then grep `ROUTING.csv` for the category's name and every variable in the slice — rules `waiting` on this category are its work (ROUTING.md).
 2. **Draft the category file** — SCHEMA-PATTERNS.md open beside you. Every variable in the slice becomes a property; every property gets its title, its constraint, its provenance. Flip each variable's VARIABLES.csv row to `converted` as it lands (`deferred` with a note if it must wait).
-3. **Routing in the slice** — "asked only if", a universe statement, a skip — is mother-file work: read SKIP-PATTERNS.md and write the conditional pair there, not here.
+3. **Routing** — a rule the slice states or implies, one the steward told you, or — under a `full` policy — one you expect from the study design: register it in `ROUTING.csv` the moment it is noticed (ROUTING.md), gate seen or detail seen. Only licensed rules reach the mother, written per SKIP-PATTERNS.md, never in the category file; a rule naming a variable that is not yet a property waits in the register — never encode against a property that does not exist. When the slice is silent but gate-shaped, ROUTING-CATALOG.md says what to suspect.
 4. **Log judgment calls as they happen**, not at the end — what earns a line is in DECISIONS-FORMAT.md. An unknown gets the loosest encoding the source supports plus an `open` line, and the loop keeps moving.
 5. **Wire the mother file**: the category's `$ref` joins `items.allOf` in reading order, before the conditionals.
 6. **Validate** — extend the toy fixtures to cover the new category and run per VALIDATE.md. Green moves the plan row to `validated`.
 7. **Render** — refresh both pages per PAGES.md. The plan row moves to `rendered`.
-8. **Present** (below), batching any opens per ELICIT.md. The row moves to `confirmed` only on the steward's yes.
+8. **Present** (below), batching any opens — this category's routing proposals among them — per ELICIT.md. The row moves to `confirmed` only on the steward's yes.
 9. **Close** per SKILL.md's checklist.
 
 Steps 6–8 are the category's finish line, not garnish: a category that validates against fixtures it never got, or renders on a page nobody refreshed, is still `drafted` no matter how complete its JSON looks.
@@ -32,10 +32,10 @@ The dictionary will state rules JSON Schema cannot express — a sum that must r
 
 ## Presenting a category
 
-Give the steward two things: a chat gist in their language — N variables converted, the notable judgment calls by D-number, anything odd found in the source — and the rendered page: `dictionary.html`, opened at this category's section (serving in PAGES.md). Ask for the confirmation explicitly: "If the names, labels, and value meanings in this section match how you'd document the study, I'll mark it confirmed."
+Give the steward two things: a chat gist in their language — N variables converted, the notable judgment calls by D-number, the routing rules encoded and any proposals awaiting an answer, anything odd found in the source — and the rendered page: `dictionary.html`, opened at this category's section (serving in PAGES.md). Ask for the confirmation explicitly: "If the names, labels, and value meanings in this section match how you'd document the study, I'll mark it confirmed." Routing proposals ride this message, after the gist — never their own round trip.
 
 The page is how a steward who has never read JSON gives real feedback — offer it every time. If they confirm from the gist without opening it, accept that; the offer, once, is the obligation. "Looks fine" in response to nothing at all is not confirmation — there must be something in front of them, gist or page.
 
 ## Revising a category
 
-A steward request or a review overturn reopens a category: its plan row goes back to `drafted`, and the loop re-runs from step 2 scoped to the change. Supersede the overturned ledger lines per DECISIONS-FORMAT.md — never rewrite them. Fixtures and pages must catch up before the row earns `validated` and `rendered` again; re-present only what changed.
+A steward request or a review overturn reopens a category: its plan row goes back to `drafted`, and the loop re-runs from step 2 scoped to the change. Supersede the overturned ledger lines per DECISIONS-FORMAT.md — never rewrite them. Fixtures and pages must catch up before the row earns `validated` and `rendered` again; re-present only what changed. Every `ROUTING.csv` row naming a revised variable is in the revision's scope — a recoded trigger level or a renamed target silently breaks its conditional; re-check each and re-run its fixtures; the id stays, and only a changed fact supersedes the D-line.

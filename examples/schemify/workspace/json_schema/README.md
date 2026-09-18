@@ -18,6 +18,7 @@ examples/                             toy PASS/FAIL fixtures + ground-truth ledg
 tools/validate.py                     standalone validator (see below)
 dictionary.html · playground.html     browsable renders of the schemas
 VARIABLES.csv                         source-variable inventory for the coverage check
+ROUTING.csv                           routing register for the routing check
 ```
 
 A row is the `allOf` union of the category files. Unknown columns are rejected by the single `"unevaluatedProperties": false` on the mother file's row object — category files never close themselves, or they would reject each other's columns.
@@ -41,10 +42,10 @@ No other missing codes exist in this source, and none were invented.
 
 ## Enforced routing rules
 
-Derived from the mother file's conditionals (each rule's `$comment` is shown by the validator and the playground when it fires):
+Routing policy: full — rules the sources state or imply are enforced, and rules expected from the study design are proposed for confirmation (D016). Derived from the mother file's conditionals (each rule's `$comment` is shown by the validator and the playground when it fires); the `R` id is the rule's row in `ROUTING.csv`:
 
-1. Skip pattern: no nap yesterday means nap duration is structurally not applicable.
-2. Applicability: a reported nap must have a duration or an item-missing code — never the structural-NA code.
+1. Skip pattern R001: no nap yesterday means nap duration is structurally not applicable.
+2. Applicability R001: a reported nap must have a duration or an item-missing code — never the structural-NA code.
 
 ## Documented but not enforced
 
@@ -52,6 +53,7 @@ Rules the source states (or good practice demands) that JSON Schema cannot expre
 
 - `participant_id` + `diary_date` must be unique across rows (D011). The schema's `uniqueItems` only rejects fully identical records.
 - `sleep_minutes` should not exceed the bedtime-to-wake interval reported in the full diary (D012).
+- `sleep_minutes` = -666 means the night has no diary entry — a row-level fact with no trigger column to route it, so it is documented, not enforced (D015, R002).
 
 ## Known source issues handled
 
@@ -68,7 +70,7 @@ Rules the source states (or good practice demands) that JSON Schema cannot expre
 
 ```
 pip install -r tools/requirements.txt      # or use: uv run tools/validate.py …
-python3 tools/validate.py summary .        # schemas, fixtures, coverage — everything
+python3 tools/validate.py summary .        # schemas, fixtures, coverage, routing — everything
 python3 tools/validate.py data . --file your_export.csv
 ```
 
