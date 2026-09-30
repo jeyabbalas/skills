@@ -1,0 +1,40 @@
+name: links
+
+# Pages move and anchors get renamed without anything in this repo changing,
+# so the link check runs on a clock rather than on push -- and stays out of
+# validate.yml, where a third-party outage would block unrelated work.
+on:
+  schedule:
+    # 14:23 UTC on the 1st of each month; off the top of the hour, when
+    # GitHub delays scheduled runs. A failed run emails whoever last edited
+    # this line. GitHub pauses schedules in public repos after 60 days with
+    # no commits; re-enable from the Actions tab.
+    - cron: "23 14 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: Links and anchors
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      # One recheck after a pause, so a site that is briefly down does not
+      # raise the alarm; a link that is really broken fails both passes and
+      # lands in the run's summary.
+      - name: Check every URL and anchor in the skills
+        run: |
+          uv run scripts/check_links.py > report.txt && { cat report.txt; exit 0; }
+          cat report.txt
+          echo "::notice::Problems found; rechecking in 10 minutes in case a site was briefly down."
+          sleep 600
+          uv run scripts/check_links.py > report.txt && { cat report.txt; exit 0; }
+          cat report.txt
+          { echo "### Broken links"; echo; echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

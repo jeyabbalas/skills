@@ -9,7 +9,8 @@ A skill that routes agents to outside documentation rots quietly: pages move,
 anchors get renamed, and the agent lands on a 404, a "this page has moved"
 stub, or the top of a long page instead of the section it was sent to.
 biowulf alone links some 300 hpc.nih.gov pages and anchors. Third-party sites
-flake, so this stays out of CI -- run it periodically and after editing links.
+flake, so this stays out of push and PR checks; .github/workflows/links.yml
+runs it monthly instead. Run it by hand after editing links.
 
 Usage:  uv run scripts/check_links.py [SKILL ...] [--json]
         (fallback: pip install httpx && python3 scripts/check_links.py [SKILL ...])
