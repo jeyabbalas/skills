@@ -28,7 +28,10 @@ Problems reported:
           on the page, or for a bare anchor on any page linked on its line
 Not fetched: templated URLs (..., $VAR, {x}, [x], <x>, *), hosts that do not
 resolve publicly (localhost, 127.0.0.1, compute nodes such as cn0619, the
-reserved example.* domains), and the pages in UNCHECKABLE.
+reserved example.* domains), and the pages in UNCHECKABLE. A page that
+answers 401 or 403 has refused this client rather than moved -- pages
+restricted to the NIH network do this everywhere else, CI included -- so it
+is listed as unverified, not as a problem.
 
 Prints one line per problem, with every file:line that uses it (--json: one
 JSON object on stdout instead), and exits 1 if there are any, 0 otherwise.
@@ -206,9 +209,12 @@ def main() -> int:
         problems.append({"kind": kind, "url": url, "detail": detail, "where": list(dict.fromkeys(where))})
 
     bad: set[str] = set()
+    refused: list[str] = []
     for page in pages:
         status, html, error = fetched[page]
-        if error or status >= 400:
+        if status in (401, 403):
+            refused.append(page)
+        elif error or status >= 400:
             report("http" if status else "error", page, error or f"HTTP {status}", by_page[page])
         elif why := moved(html):
             report("moved", page, why, by_page[page])
@@ -221,15 +227,22 @@ def main() -> int:
             report("anchor", url, f'no id or name "{fragment}" on the page', where)
     for (anchor, on), where in sorted(bare.items()):
         htmls = [fetched[p][1] for p in on if p not in bad and fetched[p][1]]
-        if htmls and not any(has_anchor(h, anchor) for h in htmls):
+        # Silent while any page on the line is unreadable: the anchor may be there.
+        if htmls and not bad.intersection(on) and not any(has_anchor(h, anchor) for h in htmls):
             report("anchor", f"#{anchor}", f'no id or name "{anchor}" on {" or ".join(on)}', where)
 
     if args.json:
-        print(json.dumps({"urls": len(urls), "bare_anchors": len(bare), "pages": len(pages), "skipped": skipped, "problems": problems}, indent=2))
+        print(json.dumps({"urls": len(urls), "bare_anchors": len(bare), "pages": len(pages), "skipped": skipped,
+                          "unverified": refused, "problems": problems}, indent=2))
     else:
         for p in problems:
             print(f"{p['kind']}: {p['url']} -- {p['detail']}\n    in {', '.join(p['where'])}")
-        print(f"checked {len(urls)} URLs and {len(bare)} bare anchors on {len(pages)} pages ({skipped} URLs skipped); {len(problems)} problem(s)")
+        if refused:
+            print(f"unverified: {len(refused)} page(s) answered HTTP 401/403, refusing this client"
+                  " (NIH-network-only pages do this off the NIH network):")
+            print("".join(f"    {page}\n" for page in refused), end="")
+        print(f"checked {len(urls)} URLs and {len(bare)} bare anchors on {len(pages)} pages"
+              f" ({skipped} URLs skipped, {len(refused)} pages unverified); {len(problems)} problem(s)")
     return 1 if problems else 0
 
 
