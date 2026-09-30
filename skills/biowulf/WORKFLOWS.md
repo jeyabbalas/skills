@@ -34,11 +34,12 @@ Every NIH setup throttles submissions and status checks (values as of Sept 2026)
 | Setup | Settings |
 |---|---|
 | snakemake.html command line | `--max-jobs-per-second 1 --max-status-checks-per-second 0.01` |
-| NIH Snakemake profile | `main`: `max-jobs-per-second: 1`, `max-status-checks-per-second: 1`, `jobs: 50` · `snakemake8`: `max-jobs-per-timespan: "60/1m"`, `max-status-checks-per-second: 1`, `jobs: 50` · `snakemake9`: `max-jobs-per-second: 1`, `max-status-checks-per-second: 0.1`, `jobs: 500` |
+| NIH Snakemake profile | `main`: `max-jobs-per-second: 1`, `max-status-checks-per-second: 1`, `jobs: 50` · `snakemake8`: `max-jobs-per-timespan: "60/1m"`, `max-status-checks-per-second: 1`, `jobs: 50` · `snakemake9`: `max-jobs-per-second: 1` (ignored by Snakemake 9: below), `max-status-checks-per-second: 0.1`, `jobs: 500` |
 | NIH Nextflow config, `biowulf` profile | `submitRateLimit = '6/1min'`, `pollInterval = '2 min'`, `queueStatInterval = '5 min'`, `queueSize = 200` |
 | `$CROMWELL_CONFIG` | `job-rate-control { jobs = 1  per = 1 second }`, `concurrent-job-limit = 10` |
 
 - NIH: "please don't change settings for job submission and querying (`pollInterval, queueStatInterval, and submitRateLimit`)"; any config that defines its own `slurm` executor must carry them ([Common Pitfalls](https://hpc.nih.gov/apps/nextflow.html#gotcha)).
+- Snakemake 9 ignores the `snakemake9` branch's `max-jobs-per-second: 1`. The option is deprecated, and `--max-jobs-per-timespan` always carries its own default, 100/1s, which overrides it, so submissions run at up to 100 per second (checked against Snakemake 9.23.1's source and a test profile, Sept 2026). Add `max-jobs-per-timespan: "1/1s"` to the clone's `config.yaml` (setup below): it restores NIH's rate and only tightens the profile.
 - Concurrency caps (`jobs`, `queueSize`, `concurrent-job-limit`) are not rate limits; the Cromwell page suggests raising its "low 10 jobs" for bigger workflows. The `main`/`snakemake8` profiles and the Cromwell config read job state from `dashboard_cli` to spare Slurm; never swap that for `squeue` or `sacct` polling.
 
 ## Snakemake
@@ -57,6 +58,8 @@ Setup for ≥ 9 (cloning submits nothing, so you may do it) and a rule; `config.
 # on the compute node (inside the session)
 module load snakemake/9.23.1    # the README's version; confirm: module -r spider '^snakemake$'
 git clone --branch snakemake9 https://github.com/NIH-HPC/snakemake_profile.git ~/.config/snakemake/biowulf
+grep -q '^max-jobs-per-timespan:' ~/.config/snakemake/biowulf/config.yaml ||
+  echo 'max-jobs-per-timespan: "1/1s"' >> ~/.config/snakemake/biowulf/config.yaml   # the branch's max-jobs-per-second is ignored (Rate limits)
 ```
 ```python
 import os
