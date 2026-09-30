@@ -1,0 +1,5 @@
+interface:
+  display_name: "FRCE"
+  short_description: "Work on NCI's FRCE HPC cluster at NCI-Frederick"
+policy:
+  allow_implicit_invocation: true

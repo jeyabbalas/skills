@@ -28,6 +28,7 @@ Agent skills I use for my own work, shared so you (or your agent) can install th
 | Skill | What it does | Invocation |
 |---|---|---|
 | [`biowulf`](./skills/biowulf/SKILL.md) | Work on NIH's Biowulf HPC cluster the way NIH HPC's policies expect: your agent checks where it is running before it touches anything, writes and right-sizes sbatch scripts and swarmfiles for you to submit, and knows Biowulf's partitions, GPUs, storage, modules, conda, containers, Jupyter tunnels, Globus, and workflow managers — with links to the official docs, and the stale advice on them flagged. | Model-invoked |
+| [`frce`](./skills/frce/SKILL.md) | Work on NCI's FRCE cluster at NCI-Frederick with your agent kept off the shared login hosts: it checks where it is running, writes and right-sizes sbatch scripts and job arrays for you to submit, and knows FRCE's partitions, GPUs, storage, Environment Modules, conda, containers, OnDemand and VS Code sessions, Ollama endpoints, Globus, and how Biowulf habits translate — with links to the official docs, and the errors in them fixed. | Model-invoked |
 
 ## Install
 
@@ -124,6 +125,18 @@ Where your agent runs matters. NIH HPC [bans AI agents on the Biowulf login node
 - **On the login node or Helix**, it stops and tells you how to restart it inside a session.
 
 The guide was compiled from hpc.nih.gov in September 2026. Its SKILL.md holds the policy, the ground rules, a storage map, and a router; nineteen topic files — jobs, swarm, utilities, hardware, workflows, modules, conda, Python, R, containers, development, Jupyter, tunneling, deep learning, storage, transfer, Globus, access, troubleshooting — load only when the task needs them. Cluster facts change (new GPU partitions, retired nodes, module defaults), so when a live page, `--help`, or a command like `batchlim` disagrees with the skill, the agent trusts the live source.
+
+## Using `frce`
+
+There is nothing to invoke: describe FRCE work and your agent loads the skill — "write an array job to align these 40 samples on FRCE", "why is my GPU job still pending?", "port this Biowulf swarm to FRCE", "set up a conda env with PyTorch for the L40s", "serve a model with Ollama on an FRCE GPU and call it from my notebook". You can also call it by name (`/frce` in Claude Code, `$frce` in Codex).
+
+Where your agent runs matters. FRCE has no AI-agent policy, but its login node kills any process that passes 10 CPU-minutes, and NIH HPC [bans AI agents on Biowulf's login node](https://hpc.nih.gov/policies/index.html#AI); the skill applies that rule to FRCE by analogy and leaves every job submission to you:
+
+- **On your own computer**, it writes job scripts, arrays, and pipeline configs, and hands you each cluster command labeled with where to run it.
+- **Inside an allocation on a compute node** (an `srun --pty` session, an OnDemand app, or VS Code attached through `frce-cpu`/`frce-gpu`), it can also run, test, and debug code within that allocation — but submitting, cancelling, and changing jobs stays with you.
+- **On a login host** (`batch`, `batch2`, `nx`), it stops and tells you how to restart it inside a session.
+
+The guide was compiled from the [FRCE documentation](https://ncifrederick.cancer.gov/staff/FRCE) in September 2026 and checked against the live cluster — partitions, limits, GPUs, modules, storage — on 30 September 2026. Those pages are thin in places and wrong in others — three GPU types listed where five are in service, a home quota given as both 48 and 256 GB, example scripts that don't run — so each topic file ends with the fixes for its topic. Its SKILL.md holds the where-am-I check, the ground rules, a storage map, and a router; nineteen topic files — access, porting from Biowulf, jobs, arrays, monitoring, hardware, workflows, interactive sessions, OnDemand, modules, Python and R, containers, development, applications, deep learning, LLM inference, storage, transfer, troubleshooting — load only when the task needs them. When a live command such as `sinfo`, `scontrol show partition`, `freen`, or `module avail` disagrees with the skill, the agent trusts the live source.
 
 ## Credits
 
