@@ -1,0 +1,5 @@
+interface:
+  display_name: "Biowulf"
+  short_description: "Work on NIH's Biowulf HPC cluster, within its AI-agent policy"
+policy:
+  allow_implicit_invocation: true

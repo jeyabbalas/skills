@@ -23,6 +23,12 @@ Agent skills I use for my own work, shared so you (or your agent) can install th
 |---|---|---|
 | [`schemify`](./skills/schemify/SKILL.md) | Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: interviews for what the files don't say, toy-data unit tests for every rule (skip patterns and sentinel codes included), a hunt for the skip logic dictionaries never state — proposed for your confirmation, never invented — browsable web pages for feedback, and progress that persists across sessions. | User-invoked |
 
+### Research Computing
+
+| Skill | What it does | Invocation |
+|---|---|---|
+| [`biowulf`](./skills/biowulf/SKILL.md) | Work on NIH's Biowulf HPC cluster the way NIH HPC's policies expect: your agent checks where it is running before it touches anything, writes and right-sizes sbatch scripts and swarmfiles for you to submit, and knows Biowulf's partitions, GPUs, storage, modules, conda, containers, Jupyter tunnels, Globus, and workflow managers — with links to the official docs, and the stale advice on them flagged. | Model-invoked |
+
 ## Install
 
 Two routes, two philosophies. The **Claude Code plugin** installs the whole set as a managed, read-only bundle that updates when I ship. **[skills.sh](https://skills.sh)** copies editable skill files into your project, so you can hack on them and make them your own. Pick one — installing both leaves you with every skill twice.
@@ -39,7 +45,7 @@ Update later with `/plugin marketplace update jeyabbalas`.
 ### Any agent (Claude Code, Codex, Cursor, …) — via skills.sh
 
 ```bash
-npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify chapterhouse
+npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify chapterhouse biowulf
 ```
 
 Names are space-separated after one `--skill`; drop the ones you don't want. This copies the skills into your project as files you own. Pull updates with `npx skills@latest update`.
@@ -48,7 +54,7 @@ Names are space-separated after one `--skill`; drop the ones you don't want. Thi
 
 Paste this to any coding agent and it will install the skills itself:
 
-> Install the agent skills `three-pass`, `handoff`, `schemify`, and `chapterhouse` from the GitHub repo `jeyabbalas/skills`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify chapterhouse` and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy the folders `skills/three-pass/` (including its `scripts/`, `templates/`, and `assets/`), `skills/handoff/`, `skills/schemify/` (including its `scripts/`, `templates/`, and `assets/`), and `skills/chapterhouse/` (including its `scripts/`, `templates/`, and `assets/`) into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying all four skills are listed as available and telling me the exact phrase to invoke each one.
+> Install the agent skills `three-pass`, `handoff`, `schemify`, `chapterhouse`, and `biowulf` from the GitHub repo `jeyabbalas/skills`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify chapterhouse biowulf` and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy the folders `skills/three-pass/` (including its `scripts/`, `templates/`, and `assets/`), `skills/handoff/`, `skills/schemify/` (including its `scripts/`, `templates/`, and `assets/`), `skills/chapterhouse/` (including its `scripts/`, `templates/`, and `assets/`), and `skills/biowulf/` (including its `agents/`) into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying all five skills are listed as available and telling me the exact phrase to invoke each one (`biowulf` also loads on its own whenever the work involves Biowulf).
 
 ## Using `handoff`
 
@@ -106,6 +112,18 @@ Invoke it in the repository where the JSON Schema package should live, pointing 
 The first run inventories the dictionary, interviews you about the study — what is one row? which codes mean missing or not-applicable? — proposes topic categories for you to approve, then converts category by category — hunting the skip logic your dictionary never states and proposing each rule for your confirmation rather than inventing it — validating each against toy PASS/FAIL data (survey skip patterns and sentinel codes included) and re-rendering two web pages for your review: `dictionary.html`, a searchable, printable data dictionary that opens by double-click — keyword search built in, semantic search a switch away — and `playground.html`, a live validator you can drop your own JSON or CSV into, entirely in your browser. Large dictionaries deliberately run over several sittings: progress, every judgment call, and every source live as markdown beside the schemas, so any later `/schemify` picks up exactly where the last session stopped, and the closing review walks each decision with you before the working files are cleaned away. The finished package stands alone — schemas, toy data, a bundled validator, and the pages — usable by collaborators and CI without this skill installed.
 
 A complete example package — a small synthetic sleep-diary study, source dictionary included — lives in [`examples/schemify/`](./examples/schemify/), with a README of copy-able prompts.
+
+## Using `biowulf`
+
+There is nothing to invoke: describe Biowulf work and your agent loads the skill — "write a swarm to align these 40 samples on Biowulf", "why has my job been pending all day?", "set up a conda env with PyTorch for the A100s", "get me a Jupyter notebook on a GPU node". You can also call it by name (`/biowulf` in Claude Code, `$biowulf` in Codex).
+
+Where your agent runs matters. NIH HPC [bans AI agents on the Biowulf login node and Helix](https://hpc.nih.gov/policies/index.html#AI), and its [agent guidance](https://hpc.nih.gov/nih/codex.html) says agents must not submit jobs. So the skill has the agent check where it is before doing anything:
+
+- **On your own computer** — NIH HPC's recommendation — it writes job scripts, swarmfiles, and pipeline configs, and hands you each cluster command labeled with where to run it.
+- **Inside an interactive session on a compute node** (`sinteractive`, or an HPC OnDemand VS Code or Jupyter session), it can also run, test, and debug code within that session's allocation — but submitting, cancelling, and changing jobs stays with you.
+- **On the login node or Helix**, it stops and tells you how to restart it inside a session.
+
+The guide was compiled from hpc.nih.gov in September 2026. Its SKILL.md holds the policy, the ground rules, a storage map, and a router; nineteen topic files — jobs, swarm, utilities, hardware, workflows, modules, conda, Python, R, containers, development, Jupyter, tunneling, deep learning, storage, transfer, Globus, access, troubleshooting — load only when the task needs them. Cluster facts change (new GPU partitions, retired nodes, module defaults), so when a live page, `--help`, or a command like `batchlim` disagrees with the skill, the agent trusts the live source.
 
 ## Credits
 
