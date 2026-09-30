@@ -45,16 +45,16 @@ Update later with `/plugin marketplace update jeyabbalas`.
 ### Any agent (Claude Code, Codex, Cursor, …) — via skills.sh
 
 ```bash
-npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify chapterhouse biowulf
+npx skills@latest add jeyabbalas/skills --skill <skill-name>
 ```
 
-Names are space-separated after one `--skill`; drop the ones you don't want. This copies the skills into your project as files you own. Pull updates with `npx skills@latest update`.
+Replace `<skill-name>` with a name from the tables above, such as `biowulf`. To install several at once, list them after the one `--skill`, separated by spaces: `--skill three-pass chapterhouse`. To see every skill the repo offers, run `npx skills@latest add jeyabbalas/skills --list`. This copies the skills into your project as files you own. Pull updates with `npx skills@latest update`.
 
 ### Or just tell your agent
 
-Paste this to any coding agent and it will install the skills itself:
+Replace `<skill-names>` with the names you want, separated by spaces, then paste this to any coding agent and it will install them itself:
 
-> Install the agent skills `three-pass`, `handoff`, `schemify`, `chapterhouse`, and `biowulf` from the GitHub repo `jeyabbalas/skills`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill three-pass handoff schemify chapterhouse biowulf` and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy the folders `skills/three-pass/` (including its `scripts/`, `templates/`, and `assets/`), `skills/handoff/`, `skills/schemify/` (including its `scripts/`, `templates/`, and `assets/`), `skills/chapterhouse/` (including its `scripts/`, `templates/`, and `assets/`), and `skills/biowulf/` (including its `agents/`) into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying all five skills are listed as available and telling me the exact phrase to invoke each one (`biowulf` also loads on its own whenever the work involves Biowulf).
+> Install these agent skills from the GitHub repo `jeyabbalas/skills`: `<skill-names>`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill` followed by those names, separated by spaces, and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`, which installs every skill in the repo. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy each named skill's whole folder under `skills/`, subfolders included, into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying the skills are listed as available and telling me the exact phrase to invoke each one (a model-invoked skill such as `biowulf` also loads on its own when the work calls for it).
 
 ## Using `handoff`
 
