@@ -31,7 +31,9 @@ resolve publicly (localhost, 127.0.0.1, compute nodes such as cn0619, the
 reserved example.* domains), and the pages in UNCHECKABLE. A page that
 answers 401 or 403 has refused this client rather than moved -- pages
 restricted to the NIH network do this everywhere else, CI included -- so it
-is listed as unverified, not as a problem.
+is listed as unverified, not as a problem. So is a page on a domain in
+NIH_NETWORK_ONLY whose host name does not resolve here: those names exist
+only inside the NIH network.
 
 Prints one line per problem, with every file:line that uses it (--json: one
 JSON object on stdout instead), and exits 1 if there are any, 0 otherwise.
@@ -42,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import socket
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -71,6 +74,8 @@ UNCHECKABLE = (
     "hpc.nih.gov/~",
     "hpcnihapps.cit.nih.gov",
     "hpcondemand.nih.gov",
+    "ondemand.ncifcrf.gov",
+    "nx.ncifcrf.gov",
     "myitsm.nih.gov",
     "itservicedesk.nih.gov",
     "password.nih.gov",
@@ -79,6 +84,12 @@ UNCHECKABLE = (
     "app.globus.org",
     "cloud.sylabs.io/auth",
 )
+
+# Domains whose host names resolve only inside the NIH network (NCI-Frederick's
+# FRCE cluster services: OnDemand, AppDB, the live status pages). Elsewhere --
+# CI included -- a DNS failure there means "off the network", not "gone"; on
+# the network these pages are checked like any other.
+NIH_NETWORK_ONLY = ("ncifcrf.gov",)
 
 WORKERS = 8
 RETRIES = 2
@@ -178,6 +189,18 @@ def moved(html: str) -> str:
     return ""
 
 
+def off_network(url: str) -> bool:
+    """True if url's host is NIH-network-only and its name does not resolve from here."""
+    host = (urlsplit(url).hostname or "").lower()
+    if not any(host == d or host.endswith("." + d) for d in NIH_NETWORK_ONLY):
+        return False
+    try:
+        socket.getaddrinfo(host, None)
+    except OSError:
+        return True
+    return False
+
+
 def has_anchor(html: str, anchor: str) -> bool:
     for a in {anchor, unquote(anchor)}:
         # GitHub renders README headings as id="user-content-<slug>".
@@ -212,7 +235,7 @@ def main() -> int:
     refused: list[str] = []
     for page in pages:
         status, html, error = fetched[page]
-        if status in (401, 403):
+        if status in (401, 403) or (status == 0 and off_network(page)):
             refused.append(page)
         elif error or status >= 400:
             report("http" if status else "error", page, error or f"HTTP {status}", by_page[page])
@@ -238,8 +261,8 @@ def main() -> int:
         for p in problems:
             print(f"{p['kind']}: {p['url']} -- {p['detail']}\n    in {', '.join(p['where'])}")
         if refused:
-            print(f"unverified: {len(refused)} page(s) answered HTTP 401/403, refusing this client"
-                  " (NIH-network-only pages do this off the NIH network):")
+            print(f"unverified: {len(refused)} page(s) answered HTTP 401/403, refusing this client, or sit on"
+                  " a host that does not resolve here (NIH-network-only pages do this off the NIH network):")
             print("".join(f"    {page}\n" for page in refused), end="")
         print(f"checked {len(urls)} URLs and {len(bare)} bare anchors on {len(pages)} pages"
               f" ({skipped} URLs skipped, {len(refused)} pages unverified); {len(problems)} problem(s)")
