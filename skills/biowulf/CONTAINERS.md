@@ -37,7 +37,7 @@ mkdir -p /data/$USER/containers                        # keep .sif files on /dat
 | cache | `SINGULARITY_CACHEDIR=/data/$USER/.singularity` | `APPTAINER_CACHEDIR=/data/$USER/.apptainer` |
 | temp space | `SINGULARITY_TMPDIR` | `APPTAINER_TMPDIR` |
 | bind list | `/usr/local/current/singularity/app_conf/sing_binds` | `/usr/local/current/apptainer/app_conf/sing_binds` |
-| bind variable | `SINGULARITY_BINDPATH` | `APPTAINER_BINDPATH` |
+| bind variable | `SINGULARITY_BINDPATH` | `APPTAINER_BINDPATH` (the apptainer page also says its sing_binds sets `SINGULARITY_BINDPATH`: `cat` the file) |
 | builds from a definition file on Biowulf | yes (proot, automatic) | no (per its page) |
 
 Versions (as of Sept 2026): singularity 4.3.7, apptainer 1.4.5. The `[+] Loading singularity …` banner shows the live version, and so does `module -r spider '^singularity$'`. The page transcripts show older versions.
@@ -50,9 +50,9 @@ singularity pull /data/$USER/containers/mytool.sif docker://quay.io/ORG/IMAGE:TA
 singularity exec /data/$USER/containers/mytool.sif mytool --version
 ```
 
-- `singularity pull docker://ubuntu:latest` with no output name writes `ubuntu_latest.sif` to the current directory. `pull` refuses to overwrite an existing file, and `build` stops to ask. Use a new name, or add `--force` once the user agrees to replace the image.
+- `singularity pull docker://ubuntu:latest` with no output name writes `ubuntu_latest.sif` to the current directory. `pull` refuses to overwrite an existing file, and so does `build` without a terminal (with one it asks). Use a new name, or add the long `--force` once the user agrees to replace the image (on `build`, `-f` means `--fakeroot`).
 - Staff list these registries: Docker Hub, Quay.io, NVIDIA NGC (`docker://nvcr.io/nvidia/<image>:<tag>`), BioContainers, and the Sylabs Cloud Library (`library://…`). Pulls work on compute nodes through the proxy, and every staff example pulls there.
-- Run commands with `exec IMAGE COMMAND`. `shell` is interactive, and `run` on a Docker-derived image with no CMD or ENTRYPOINT starts `/bin/bash`. Either can hang a non-interactive tool call.
+- Run commands with `exec IMAGE COMMAND`. `shell` is interactive, and `run` executes the image's ENTRYPOINT/CMD, often a shell or REPL (ubuntu's `/bin/bash`, python's `python3`) that hangs a non-interactive tool call; with neither, it prints the shell's variables, secrets included.
 - `singularity exec docker://…` runs without a pull, but it still converts the image and fills the cache. Pull once and reuse the SIF. Pin a tag rather than `latest`, so reruns get the same image.
 - Private registries: the Biowulf docs say nothing about them. Sylabs reads `SINGULARITY_DOCKER_USERNAME` and `SINGULARITY_DOCKER_PASSWORD`, or logs in interactively with `--docker-login`. The user runs that pull. Credentials never go into scripts, swarmfiles, or the chat.
 - Biowulf has no Docker (`docker: command not found`), because Docker "provides root access to the host system". If the project has only a Dockerfile, translate it into a definition file (`Bootstrap: docker`, `From:` its base image, its `RUN` steps in `%post`) and build that as shown below. Sylabs' `singularity build --oci` from a Dockerfile is undocumented on Biowulf.
@@ -86,15 +86,15 @@ singularity build /data/$USER/containers/mytool.sif mytool.def
 # expected: INFO:    Using proot to build unprivileged. Not all builds are supported. If build fails, use --remote or --fakeroot.
 ```
 
-- Supported bootstraps are `docker`/`oci`, `library`, `oras`, and `localimage`. `yum`, `debootstrap`, `arch`, and `zypper` don't work.
+- Supported bootstraps are `docker`/`oci`, `library`, `oras`, and `localimage`. `yum` (and its alias `dnf`), `debootstrap`, `arch`, and `zypper` don't work.
 - `%pre` and `%setup` sections aren't supported. `%post` runs as an emulated root; `%test` runs as the user.
 - proot builds are slower (ptrace), and privileged operations in `%post` can fail. Sylabs suggests `--remote` for definition files that compile large, complex software from source.
 - Staff examples built this way in `sinteractive --mem=8G` or `--mem=4G`: `From: tensorflow/tensorflow:latest` with an `%environment` section, and `From: continuumio/miniconda3:latest` with `apt-get` and `conda install -c conda-forge -c bioconda …` in `%post` ([#batch](https://hpc.nih.gov/apps/singularity.html#batch), [#docker](https://hpc.nih.gov/apps/singularity.html#docker)).
 
 **Remote builds:**
 
-1. The user's steps: log in at https://cloud.sylabs.io/auth and generate a token. Then, in a shell on a compute node (such as the session's terminal before they start you), run `module load singularity && singularity remote login SylabsCloud` and paste the token at the prompt.
-2. Your step: `singularity build --remote /data/$USER/containers/mytool.sif mytool.def`. The build runs "as the root user, inside a secure single-use virtual machine" at Sylabs, and the SIF is downloaded afterwards. Staff describe it as suited to "small and medium sized containers"; no limits are stated. The definition file goes to Sylabs, so keep credentials and controlled-access data out of it.
+1. The user's steps: log in at https://cloud.sylabs.io/auth/tokens and generate a token. Then, in a shell on a compute node (such as the session's terminal before they start you), run `module load singularity && singularity remote login SylabsCloud` and paste the token at the prompt. The token is stored unencrypted under `~/.singularity/` (`remote.yaml`); never read or print that file.
+2. Your step: `singularity build --remote /data/$USER/containers/mytool.sif mytool.def`. The build runs "as the root user, inside a secure single-use virtual machine" at Sylabs, and the SIF is downloaded afterwards. Staff describe it as suited to "small and medium sized containers"; no limits are stated. `--remote` refuses `Bootstrap: localimage`, `-B`, `--nv`, and `--build-arg` (Sylabs). The definition file goes to Sylabs, so keep credentials and controlled-access data out of it.
 
 For starting points, see the staff repo [NIH-HPC/singularity-def-files](https://github.com/NIH-HPC/singularity-def-files). Its files "are not guaranteed to reproduce the same container, or even to produce any container at all". Staff "do not have the resources to manage containers for individual users", so users build and maintain their own images.
 
@@ -113,7 +113,12 @@ singularity exec --nv /data/$USER/containers/tf-gpu.sif python train.py
 
 ## Batch jobs and swarms
 
-The user submits jobs from their own login shell, which has none of your session's exports, so make every script set up its own environment. Pull the image once in the session, and point jobs at the SIF by its `/data` path. Never put `docker://` URIs in subjobs that run in parallel: subjobs that start together each convert the image, and Sylabs warns against parallel runs from remote URLs unless the cache filesystem "supports atomic rename" (undocumented for `/data`).
+The user submits jobs from their own login shell, which has none of your session's exports. So every job script and every swarm line needs both of these itself:
+
+1. `module load singularity` (in a swarm, `--module singularity` also does this one); without it, `singularity: command not found`.
+2. `. /usr/local/current/singularity/app_conf/sing_binds`, which no swarm option does for you; without it, the container can't see `/data` or `/fdb`.
+
+The wrapper script below does both, as does the no-wrapper swarm line after it. Pull the image once in the session, and point jobs at the SIF by its `/data` path. Never put `docker://` URIs in subjobs that run in parallel: subjobs that start together each convert the image, and Sylabs warns against parallel runs from remote URLs unless the cache filesystem "supports atomic rename" (undocumented for `/data`).
 
 ```bash
 #!/bin/bash
@@ -131,11 +136,14 @@ Give the user one of these commands. Sizing is covered in JOBS.md and SWARM.md; 
 ```bash
 # on Biowulf (login node), run by the user
 sbatch --cpus-per-task=8 --mem=16g --time=4:00:00 --gres=lscratch:20 /data/$USER/project/run_tool.sh s01
-swarm -f tool.swarm -g 16 -t 8 --time=4:00:00 --gres=lscratch:20   # lines: bash /data/$USER/project/run_tool.sh s01
+swarm -g 16 -t 8 --time=4:00:00 --gres=lscratch:20 tool.swarm   # lines: bash /data/$USER/project/run_tool.sh s01
+# or with no wrapper, every line loads singularity and sources the bind list itself:
+swarm -g 16 -t 8 --time=4:00:00 --gres=lscratch:20 tool.swarm
+#   line: module load singularity && . /usr/local/current/singularity/app_conf/sing_binds && singularity exec /data/$USER/containers/mytool.sif mytool --threads $SLURM_CPUS_PER_TASK in/s01.bam out/s01
 ```
 
 - The `-B …:/tmp` remap needs the lscratch request. Drop both together. For a GPU job, add `--nv` to the command and a GPU to the request.
-- Host variables such as `OMP_NUM_THREADS` pass into the container unless you use `--cleanenv`. Size threads from `$SLURM_CPUS_PER_TASK` just as you would outside a container.
+- Host variables such as `OMP_NUM_THREADS` pass into the container unless you use `--cleanenv`, but an image's own Dockerfile `ENV` values win over host variables of the same name; override those with `--env OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK` (Sylabs). Size threads from `$SLURM_CPUS_PER_TASK` just as you would outside a container.
 - The staff swarm example ([apptainer#swarm](https://hpc.nih.gov/apps/apptainer.html#swarm)) sources `sing_binds` at the login prompt before `swarm` ("This variable will propagate to your jobs") and adds `--module apptainer`. That approach depends on the state of the user's shell, so prefer the self-contained script.
 
 ## MPI in containers
@@ -165,14 +173,14 @@ Callers need `/data/$USER/opt/hts/bin` on `PATH` (in the job script, or in a per
 |---|---|
 | `/home` full; `~/.singularity/cache` is large | Set `SINGULARITY_CACHEDIR` (setup block). The old cache stays in `/home`, and Sylabs says its contents are safe to delete: with the user's OK, `rm -rf ~/.singularity/cache`. For other causes, see STORAGE.md. |
 | `No space left on device` during a pull or build | Temp space fell back to `/tmp`. Set `SINGULARITY_TMPDIR` to lscratch, or ask the user for a session with more lscratch. |
-| `singularity cache clean` hangs | It is waiting for a confirmation. Preview with `--dry-run`, then run it with `--force` once the user agrees (`--days 30` keeps recent entries). |
+| `singularity cache clean` hangs, or fails with `could not prompt user` | It wants a confirmation, even with `--days`. Preview with `--dry-run`, then run it with `--force` once the user agrees (`--days 30` keeps recent entries). |
 | `FATAL: container creation failed: mount /gs6->/gs6 error: while mounting /gs6: mount source /gs6 doesn't exist.` | A bind source is missing; here an old bind list or config names a retired filesystem. Drop it and source `sing_binds`. A `/lscratch/$SLURM_JOB_ID` bind in a job without lscratch should fail the same way. |
 | Error when binding `/scratch` | `/scratch` is disabled on compute nodes. Use lscratch or `/data`. |
 | A `/data` or `/fdb` path is missing inside the container | The path isn't bound, or its `/vf` target isn't. Source `sing_binds`, check `$SINGULARITY_BINDPATH`, and add `-B`. |
 | `module load singularity/<version>` fails | Only one version is kept. Load the module without a version. |
 | `singularity: command not found` in a job or wrapper | The script never ran `module load singularity`. |
-| proot build fails | Check for `%pre`/`%setup` sections, a `yum`/`debootstrap` bootstrap, or privileged steps in `%post`. Otherwise use `--remote` or an off-cluster build. |
-| Errors mentioning `github.com/etcd-io/bbolt` | The layer database is corrupted (after a filesystem hiccup or a full disk). With the user's OK, run `rm ~/.local/share/containers/cache/blob-info-cache-v1.boltdb`; the file stays in `/home` whatever the cache setting. |
+| proot build fails | Check for `%pre`/`%setup` sections, a `yum`/`dnf`/`debootstrap` bootstrap, or privileged steps in `%post`. `--remote, --fakeroot, or the proot command are required` means proot isn't on PATH: `module load singularity` first. Otherwise use `--remote` or an off-cluster build. |
+| Errors mentioning `github.com/etcd-io/bbolt` (Singularity 3.x) | The layer database is corrupted (after a filesystem hiccup or a full disk). With the user's OK, run `rm ~/.local/share/containers/cache/blob-info-cache-v1.boltdb`; the file stays in `/home` whatever the cache setting. Singularity 4 keeps this cache as `blob-info-cache-v1.sqlite`. |
 | No GPU inside the container | `--nv` is missing, or the allocation has no GPU. |
 | A `.sif` is gone after the session ended | It was on lscratch, which is deleted when the job ends. Keep images in `/data/$USER`. |
 | The job exceeds its memory, then processes hang in D state and the node slows down | This is the squashFS OOM bug, "generally not a problem" since the 2023 OS upgrade ([#oomkills](https://hpc.nih.gov/apps/singularity.html#oomkills)). Request more memory. The apptainer page's workaround is `apptainer build --sandbox NAME NAME.sif` on a compute node, then running the sandbox directory instead of the SIF. If it recurs, the user emails staff@hpc.nih.gov (the singularity page's ext3 conversion needs root). |
@@ -185,7 +193,7 @@ Callers need `/data/$USER/opt/hts/bin` on `PATH` (in the job script, or in a per
 - apptainer.html#swarm runs `apptainer exec docker://python …` on every line. Instead, pull once and put the SIF path in each line.
 - The `~/.bashrc` snippet on singularity.html#bind binds lscratch whenever `[ -d /lscratch ]` is true. The per-job directory comes with an lscratch allocation, so test `[ -d /lscratch/${SLURM_JOB_ID:-none} ]` instead; that keeps jobs without lscratch from binding a missing directory.
 - The transcripts print singularity 4.2.2 and apptainer 1.0.1. Current versions are listed under Session setup; never pin a version.
-- The apptainer page links `--remote` and `--fakeroot` to the Sylabs 3.4 docs (the singularity page does so for `--fakeroot`). The apptainer page also documents `apptainer remote login SylabsCloud`, but whether that works with current apptainer is undocumented. Use the singularity module and the Sylabs "latest" docs (4.5, newer than Biowulf's 4.3.7).
+- The apptainer page links `--remote` and `--fakeroot` to the Sylabs 3.4 docs (the singularity page does so for `--fakeroot`), and documents `apptainer remote login SylabsCloud` → Apptainer no longer ships a SylabsCloud remote and doesn't support `build --remote` (Apptainer docs). Use the singularity module and the Sylabs "latest" docs (4.5, newer than Biowulf's 4.3.7).
 - The apptainer page presents the squashFS OOM hang as a current problem. The singularity page says it has been "generally not a problem" since 2023.
 - The singularity page's example definitions (DIGITS, Keras, RStudio, Theano in NIH-HPC/singularity-examples) are what the apptainer page calls Legacy, tied to the Singularity Hub archive. Start from a registry image or the staff def-files repo instead.
 - The apptainer page's install example builds `hts.sif`, but its tree and wrapper refer to `hts.simg`, and its wrapper drops `-B "${instdir}"`. Use the wrapper under Staff-containerized apps.

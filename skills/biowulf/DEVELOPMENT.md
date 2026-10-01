@@ -113,7 +113,7 @@ srun --mpi=list                       # plugins this Slurm offers (generic; R.ht
 ## CUDA and GPU code
 
 - **Modules** (as of Sept 2026; case matters): `module load CUDA` (index: 12.8; versioned like `CUDA/12.1`). cuDNN module names end in the CUDA version they pair with; load both, as NIH does: `module load cuDNN/8.9.2/CUDA-12 CUDA/12.1`. cuDNN ships static and shared libraries; for a version that isn't installed, the user asks staff. Current lists: `module avail CUDA cuDNN`.
-- **Build on CPU, test on GPU**: `nvcc` needs no GPU to compile (only `-arch=native` does; generic). Test on a GPU the user allocates, e.g. `sinteractive --gres=gpu:TYPE:1,lscratch:20 --cpus-per-task=8` (type strings and CPUs-per-GPU caps: JOBS.md).
+- **Build on CPU, test on GPU**: `nvcc` needs no GPU to compile (only `-arch=native` does; generic). Test on a GPU the user allocates, e.g. `sinteractive --gres=gpu:TYPE:1,lscratch:20 --cpus-per-task=8` (type strings: JOBS.md; per-type CPU caps: HARDWARE.md).
 - **Targets**: compile for every GPU type the job can land on, or pin the type in the request. Compute capabilities are generic knowledge, except that an NIH TensorFlow log shows 6.0 for the P100:
 
 | GPU (feature) | Compute capability | `-gencode` pair |
@@ -132,7 +132,7 @@ nvcc -O2 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_70,code=sm_70
 # CMake: -DCMAKE_CUDA_ARCHITECTURES="60-real;70-real;80-real;89-real;90" (plain numbers embed PTX for each)   PyTorch extensions: TORCH_CUDA_ARCH_LIST="6.0;7.0;8.0;8.9;9.0+PTX"
 ```
 
-- **Toolkit limits** (generic; check with `nvcc --list-gpu-arch`): sm_89 and sm_90 need CUDA ≥ 11.8; CUDA 13 drops sm_60 and sm_70, so P100, V100, and V100x code needs a 12.x toolkit.
+- **Toolkit limits** (generic; check with `nvcc --list-gpu-arch`): sm_89 and sm_90 need CUDA ≥ 11.8; CUDA 13 drops sm_60 and sm_70, so P100, V100, and V100x code needs a 12.x toolkit. `CMAKE_CUDA_ARCHITECTURES` needs CMake ≥ 3.18, and a project that hard-codes its own architectures overrides it: grep `CMakeLists.txt`, and check a binary with `cuobjdump --list-elf`. Host flags such as `-march` reach `.cu` files only through `-Xcompiler` (`CMAKE_CUDA_FLAGS`).
 - **Driver**: on a GPU node the `nvidia-smi` header shows the highest CUDA version the driver supports; binaries from a newer toolkit may fail there with `CUDA driver version is insufficient` (generic).
 - **Host code** on GPU nodes follows the CPU table: A100 nodes are Zen 3, L40 nodes Granite Rapids, H200 nodes Zen 5. Frameworks and conda CUDA stacks: DEEP-LEARNING.md.
 

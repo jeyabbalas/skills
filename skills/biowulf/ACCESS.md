@@ -1,4 +1,4 @@
-How the user gets onto Biowulf, and where you can run once they have: the NIH network and SSH, keys and Kerberos, HPC OnDemand and its Graphical Session, X11 and `svis`, VS Code, shell startup files, hpcdrive mounts, accounts, maintenance, and reaching staff. Every VPN, password, passphrase, PIV/MFA, browser, and web-form step is the user's: give them the exact command or click path, labeled with where it runs. `sinteractive` options and limits live in JOBS.md, web-app tunnels in TUNNELING.md, Jupyter in JUPYTER.md, and data movement in TRANSFER.md and GLOBUS.md.
+How the user gets onto Biowulf, and where you can run once they have: the NIH network and SSH, keys and Kerberos, HPC OnDemand and its Graphical Session, X11, VS Code, shell startup files, hpcdrive mounts, accounts, maintenance, and reaching staff. Every VPN, password, passphrase, PIV/MFA, browser, and web-form step is the user's: give them the exact command or click path, labeled with where it runs. `sinteractive` options and limits live in JOBS.md, web-app tunnels in TUNNELING.md, Jupyter in JUPYTER.md, and data movement in TRANSFER.md and GLOBUS.md.
 
 Table of contents
 
@@ -8,7 +8,7 @@ Table of contents
 - [SSH keys and Kerberos](#ssh-keys-and-kerberos)
 - [HPC OnDemand](#hpc-ondemand)
 - [VS Code](#vs-code)
-- [Graphical Session, X11, and svis](#graphical-session-x11-and-svis)
+- [Graphical Session and X11](#graphical-session-and-x11)
 - [Shell startup files](#shell-startup-files)
 - [Mounting storage locally (hpcdrive)](#mounting-storage-locally-hpcdrive)
 - [Accounts, maintenance, and staff](#accounts-maintenance-and-staff)
@@ -28,9 +28,9 @@ Each home is a compute-node session that the user creates. The policy and the wh
 
 The OnDemand home, for the user (NIH network or VPN): open the [VS Code form](https://hpcondemand.nih.gov/pun/sys/dashboard/batch_connect/sys/bc_nih_vscode/session_contexts/new) (for Jupyter, `bc_nih_jupyter` in the same URL) and sign in with PIV or MFA. Set resources and walltime, launch, and connect once the session shows Running. Then open a terminal, `cd /data/$USER/<project>`, and start the agent, or use its VS Code extension.
 
-- **An SSH login to your node lacks the job's environment.** In a Remote-SSH window, or any shell reached by `ssh` to the node, `hostname -s` shows `cnNNNN` but `$SLURM_JOB_ID`, `$SLURM_CPUS_PER_TASK`, and `$PORT1` are unset: the "no job ID" row of SKILL.md's where-am-I table. Treat the shell as on-node once the user confirms it is their session's node. Learn the allocation from the user, or check it once, read-only, with `squeue -u "$USER" -w "$(hostname -s)" -o "%i %C %m %L"`; until then, `${SLURM_CPUS_PER_TASK:-2}` falls back to 2. The `Host cn*` ProxyCommand route exists so VS Code can attach; don't `ssh` through it yourself.
+- **An SSH login to your node lacks the job's environment.** In a Remote-SSH window, or any shell reached by `ssh` to the node, `hostname -s` shows `cnNNNN` but `$SLURM_JOB_ID`, `$SLURM_CPUS_PER_TASK`, and `$PORT1` are unset: the "no job ID" row of SKILL.md's where-am-I table. Check the allocation once, read-only, with `squeue -u "$USER" -w "$(hostname -s)" -o "%i %C %m %L"` (job ID, CPUs, memory, time left); a row that is the user's job confirms the node, several mean ask which job to work in, and none means stop and ask. The memory is per CPU when the job asked per CPU or took the per-CPU default (JOBS.md); `scontrol show job JOBID` says which (`MinMemoryCPU` or `MinMemoryNode`; generic Slurm). Size work from its CPU count rather than the `${SLURM_CPUS_PER_TASK:-2}` fallback, passing the count explicitly (a thread option, or `SLURM_CPUS_PER_TASK=N` before the command), and use its job ID in paths such as `/lscratch/JOBID` (`ls -d` it first: it exists only if the job asked for lscratch). Don't run `srun` from this shell: without `$SLURM_JOB_ID` it asks for a new allocation. The `Host cn*` ProxyCommand route exists so VS Code can attach; don't `ssh` through it yourself.
 - **Approval status.** NIH HPC's Codex page says: "At the time of writing, Codex is the only NIH-approved AI tool currently possible to use outside of a web interface, as far as we are aware, though things change quickly." It adds: "We cannot endorse the use of anything beyond what is described in the hub." The [NIH AI Hub](https://nih.sharepoint.com/sites/NIH-ai) has the current status of AI tools at NIH; the user should check it.
-- **Signing an agent in inside OnDemand** ([codex.html#vscode](https://hpc.nih.gov/nih/codex.html#vscode)). A browser login that redirects to a localhost callback fails there, because the callback server runs on the compute node. The browser ends on a "site cannot be reached" page. The user copies that page's URL, opens a terminal in the session, and runs:
+- **Signing an agent in inside OnDemand** ([codex.html#vscode](https://hpc.nih.gov/nih/codex.html#vscode)). A browser login that redirects to a localhost callback fails there, because the callback server runs on the compute node. The browser ends on a "site cannot be reached" page. Leaving the login process running, the user copies that page's URL, opens a new terminal in the session (not yours: what is typed there reaches you), and runs these as two steps:
 
 ```bash
 # on the compute node (the user types this; the URL carries a login token)
@@ -39,11 +39,11 @@ read url
 http_proxy='' wget -O /dev/null "$url"
 ```
 
-`read url` keeps the token out of shell history. Keep it out of your context too: never ask for the URL. NIH documents this only for Codex; other tools with a localhost-callback login may work the same way (untested). The same page says Codex logs in "as usual" over Remote-SSH, and that the HHS subscription disables its device-code method ("as of writing"). The Codex CLI is not a module: install it personally with `npm` (install locations: DEVELOPMENT.md), or as the `x86_64-unknown-linux-musl` binary from https://github.com/openai/codex/releases/. One login covers every Codex app on that system.
+`read url` keeps the token out of shell history. Keep it out of your context too: never ask for the URL, and if something fails, ask for the error text with the URL removed (wget echoes it). Success shows in the waiting login process, not in wget's output. NIH documents this only for Codex; other tools with a localhost-callback login may work the same way (untested). The same page says Codex logs in "as usual" over Remote-SSH, and that the HHS subscription disables its device-code method ("as of writing"). The Codex CLI is not a module: install it personally with `npm` (install locations: DEVELOPMENT.md), or as the `x86_64-unknown-linux-musl` binary from https://github.com/openai/codex/releases/. One login covers every Codex app on that system.
 
 ## Connecting over SSH
 
-- **Network** (the user): the wired NIH network, the NIH-Staff wireless, or the NIH VPN; NCI users can also use NCI RemoteApps. The "NIH Guest" WiFi doesn't work. The [VPN test page](https://hpc.nih.gov/nih/test.html) shows "Access forbidden!" off the VPN. OnDemand, the account forms, the dashboard, and hpcdrive need the same network access.
+- **Network** (the user): the wired NIH network, the NIH-Staff wireless, or the NIH VPN; NCI users can also use NCI RemoteApps. The "NIH Guest" WiFi doesn't work. The [VPN test page](https://hpc.nih.gov/nih/test.html) that connect.html offers shows "Access forbidden!" off the network, but on it the page now answers "Not Found" (Sept 2026); a positive check is any NIH-only page that loads, such as the [announcements](https://hpc.nih.gov/nih/about/announcements.php). OnDemand, the account forms, the dashboard, and hpcdrive need the same network access.
 - **Credentials**: the NIH username and password; the password does not echo. The user types it, and you never ask for it: HHS rules forbid giving it "to anyone, including system administrators".
 
 ```bash
@@ -71,10 +71,11 @@ What each host tolerates from the user (agents: SKILL.md):
 
 | Symptom | Cause, and what the user does |
 |---|---|
-| `ssh` hangs or times out; OnDemand, the dashboard, or hpcdrive won't load | Off the NIH network, or on "NIH Guest". Connect the VPN and check the test page. |
+| `ssh` hangs or times out; OnDemand, the dashboard, or hpcdrive won't load | Off the NIH network, or on "NIH Guest". Connect the VPN and load an NIH-only page (Connecting over SSH). |
 | Password refused from Windows OpenSSH | The local username has a domain prefix. Use `ssh $env:username@…` or type the NIH username. |
 | Refused after weeks away | The account locks after 60 days of inactivity. Unlock it at https://hpc.nih.gov/dashboard, or email staff. |
-| Refused even with an SSH key | The password expired: keys "will not override expired passwords". Reset it at https://password.nih.gov/. |
+| Refused with the right password, or even with an SSH key | The NIH password expired (keys "will not override expired passwords"). Reset it through Password Self Service on [NIH Login Help](https://auth.nih.gov/CertAuthV3/forms/passwordlinks.html), or call the NIH IT Service Desk, (301) 496-4357. |
+| Refused after 1 November with a renewal pending | Suspended until the annual renewal is complete (Accounts, maintenance, and staff). |
 | macOS Kerberos login stopped working | The ticket wasn't renewed. Run `klist`, then `kinit`. |
 | Processes killed on biowulf; `scp`/`sftp` fail or `rsync` dies there | Login-node limits. Use `sinteractive`, OnDemand, or Helix. |
 | `module load` of an application fails | Causes and fixes: MODULES.md. |
@@ -95,15 +96,16 @@ Both spare the user from typing the password; setting either up is the user's jo
 
 ```bash
 # on the user's computer (the user runs this)
-ssh-keygen -t rsa -b 4096                      # the pages' example; ED25519 is also allowed. Set a passphrase.
+ssh-keygen -t rsa -b 4096                      # the pages' example; ED25519 (-t ed25519 → id_ed25519.pub) is also allowed. Set a passphrase.
 scp ~/.ssh/id_rsa.pub username@helix.nih.gov:~/tmp.pub
-# on Helix
+#   Windows PowerShell, which doesn't expand ~ for scp: scp $env:USERPROFILE\.ssh\id_rsa.pub username@helix.nih.gov:tmp.pub
+# on Helix (the user, after ssh username@helix.nih.gov)
 mkdir -m 700 -p ~/.ssh; cat tmp.pub >> ~/.ssh/authorized_keys; rm tmp.pub; chmod 0600 ~/.ssh/authorized_keys
 # on the user's computer, by the user (may be needed again after a reboot)
 ssh-add                                        # if no agent is running: eval "$(ssh-agent -s)" first
 ```
 
-PuTTY users generate an RSA 4096 key in PuTTYgen. Copy the public-key text from its window into a plain-text file, because the "save the public key" button writes the wrong format; copy that file to Helix and append it as above. Then load the private key under Connection → SSH → Auth.
+PuTTY users generate an RSA 4096 key in PuTTYgen. Copy the public-key text from its window into a plain-text file, because the "save the public key" button writes the wrong format; copy that file to Helix and append it as above. Then load the private key under Connection → SSH → Auth → Credentials ("Private key file for authentication"; on the Auth panel itself before PuTTY 0.78).
 
 [Kerberos (GSSAPI)](https://hpc.nih.gov/docs/gssapi_access.html) works for SSH and hpcdrive. NIH Windows workstations get a ticket at logon; PuTTY (v0.62 or later) needs GSSAPI enabled. macOS may not renew tickets on its own, so check before connecting:
 
@@ -136,7 +138,7 @@ For local VS Code over Remote-SSH ([#win](https://hpc.nih.gov/apps/vscode.html#w
 3. Add this block to the local SSH config, and point VS Code's "Remote.SSH: Config File" setting at that file:
 
 ```text
-# macOS: /Users/USERNAME/.ssh/config        Windows: C:\Users\USERNAME\.ssh\config
+# macOS: ~/.ssh/config        Windows: %USERPROFILE%\.ssh\config        (USERNAME below is the NIH username)
 Host cn*
 User USERNAME
 ProxyCommand /usr/bin/ssh -o ForwardAgent=yes USERNAME@biowulf.nih.gov nc -w 120ms %h %p
@@ -145,7 +147,7 @@ ProxyCommand /usr/bin/ssh -o ForwardAgent=yes USERNAME@biowulf.nih.gov nc -w 120
 
 For each session, the user starts `sinteractive` in a separate SSH or PuTTY login (inside tmux) and notes the node, `cnNNNN`. They then run "Remote-SSH: Connect to Host" and enter `cnNNNN`. On Windows, click the node name instead of pressing Enter, then choose "linux" and "continue". The window ends when the job does. Jupyter notebooks inside VS Code: JUPYTER.md.
 
-## Graphical Session, X11, and svis
+## Graphical Session and X11
 
 The **OnDemand Graphical Session** ([graphical.html](https://hpc.nih.gov/ondemand/graphical.html)) is an XFCE desktop in the browser. The user launches "Graphical Session" from the dashboard or the `bc_nih_desktop` form. When it shows green and Running on My Interactive Sessions (usually within a couple of minutes), they click "Launch Graphical Session".
 
@@ -156,14 +158,9 @@ The **OnDemand Graphical Session** ([graphical.html](https://hpc.nih.gov/ondeman
 
 **X11 over SSH.** Staff recommend OnDemand instead on every OS. On Linux, run `ssh -Y username@biowulf.nih.gov`, then test with `xclock`. On macOS it is unsupported, because "the required XQuartz software is no longer maintained". On Windows, PuTTY X11 forwarding plus Xming (started first) or MobaXterm can work, but direct graphical access over SSH from Windows is "not supported by HPC staff".
 
-**svis** ([svis.html](https://hpc.nih.gov/docs/svis.html)) gives GPU-accelerated rendering on the `visual` partition, for jobs that "require intensive remote data visualization"; the Graphical Session has no GPU acceleration. The steps are all the user's:
+**`svis` is retired.** The `svis` command and the `visual` partition, which gave GPU-accelerated remote rendering, were retired in January 2026 ([announcement](https://hpc.nih.gov/nih/about/announcements.php?1172)): "Please use HPC OnDemand for remote visualization needs." The Graphical Session has no GPU acceleration, so heavy 3D work runs best on the user's own computer (TROUBLESHOOTING.md, Graphics).
 
-1. Run `svis` on the login node, with no options; it allocates a whole node.
-2. In a new terminal on their computer, run the `ssh -L PORT:localhost:PORT user@biowulf.nih.gov` line it prints.
-3. Point a local TurboVNC viewer (installing it may need admin rights) at `localhost::PORT` and log in with NIH credentials.
-4. In the desktop, run `module load virtualgl` and launch apps with `vglrun <app>`; MATLAB needs `vglrun matlab -nosoftwareopengl`. Confirm the GPU with `nvidia-smi`.
-
-A black screen with "Unable to contact settings server" means a conda env was active (or auto-activated from `~/.bashrc`) when `svis` ran.
+A black remote desktop or "Unable to contact settings server" means a conda env was active, or auto-activated from `~/.bashrc`, when the desktop started (CONDA.md, Fix a broken setup).
 
 ## Shell startup files
 
@@ -174,7 +171,7 @@ bash is the standard shell. `~/.bash_profile` runs for login shells; `~/.bashrc`
 - **Other shells.** csh/tcsh work (`.cshrc`), but bash is "highly recommend[ed]"; sh, ksh, and zsh get "very limited support".
 - **umask.** The default is 027; changing it for shared data is covered in STORAGE.md.
 
-To isolate a startup-file problem, reset to the stock files ([FAQ#graphics_problem](https://hpc.nih.gov/docs/FAQ.html#graphics_problem)). This changes the user's dotfiles, so get their OK first:
+To isolate a startup-file problem, reset to the stock files ([FAQ#graphics_problem](https://hpc.nih.gov/docs/FAQ.html#graphics_problem)). This changes the user's dotfiles, so get their OK first, and run it only once: if `ls ~/.bashrc.ORIG ~/.bash_profile.ORIG` finds either file, stop and ask, since a second run overwrites the backups.
 
 ```bash
 mv ~/.bashrc ~/.bashrc.ORIG; cp -p /etc/skel/.bashrc ~
@@ -192,7 +189,7 @@ If a bad edit blocks login entirely, the fix is to revert the file (hpcdrive rea
 
 - **Paths.** On Windows (Map network drive) the path is `\\hpcdrive.nih.gov\SHARE`; on macOS (Finder → Go → Connect to Server) it is `smb://hpcdrive.nih.gov/SHARE`. SHARE is `USER` for home, `data` for `/data/USER`, `scratch` or `scratch\USER` (`scratch/USER` on macOS), or a group-area name such as `PQRlab`.
 - **Windows and macOS.** Windows signs in with the NIH login; a lab PC on an institute domain may need `NIH\username` when prompted. The disk usage Windows shows for `/home` is wrong; `/data` is right. macOS asks for the NIH username and password. A Mac that keeps retrying an old mount: [FAQ#mount-popup](https://hpc.nih.gov/docs/FAQ.html#mount-popup).
-- **Linux** needs root. Replace `/etc/krb5.conf` with the page's `NIH.GOV` config and run `kinit your_user_name@NIH.GOV`, then mount, for example: `mount -t cifs -o uid=<your_local_uid>,gid=<your_local_gid>,cruid=<your_local_system_username>,sec=krb5i //hpcdrive.nih.gov/[user] /mnt/bw-home`. An expired ticket hangs the mount; renew it with `kinit -R` (renewable for up to 7 days). On Red Hat, `mount.cifs` isn't setuid root, so user mounts fail.
+- **Linux** needs root. Replace `/etc/krb5.conf` with the page's `NIH.GOV` config and run `kinit your_user_name@NIH.GOV`, then mount, for example: `mount -t cifs -o uid=<your_local_uid>,gid=<your_local_gid>,cruid=<your_local_system_username>,sec=krb5i //hpcdrive.nih.gov/[user] /mnt/bw-home`. Tickets last about 10–12 hours, whatever krb5.conf requests (`klist` shows the expiry), and an expired one hangs the mount; renew it with `kinit -R` (renewable for up to 7 days). On Red Hat, `mount.cifs` isn't setuid root, so user mounts fail.
 
 ## Accounts, maintenance, and staff
 
@@ -200,7 +197,7 @@ If a bad edit blocks login entirely, the fix is to revert the file (hpcdrive rea
 - **Requesting.** The user fills in the [request form](https://hpcnihapps.cit.nih.gov/auth/accounts/account_request.php) (NIH network, NIH login) and picks their IC and PI. The PI approves by email, CIT gets the IC's approval for the fee, and login instructions arrive by email. If the PI isn't listed, email staff.
 - **Cost.** $40.00 per month per account (as of Sept 2026), covering Biowulf, Helix, and hpcdrive. There are no charges for CPU or storage.
 - **Renewal** is yearly, with PI approval. For the 2026–2027 cycle (Sept 2026), the user completes https://hpc.nih.gov/nih/accounts/recert.php by 1 October 2026, and PIs certify during October. Accounts not approved by 1 November are suspended until renewal is complete. PIs fill in the form too and are approved instantly. Accounts created after 1 June 2026 are exempt; the form page says whether it's needed.
-- **Locked accounts.** An account locks after 60 days of inactivity. The user unlocks it at https://hpc.nih.gov/dashboard or emails staff. Password resets: https://password.nih.gov/.
+- **Locked accounts.** An account locks after 60 days of inactivity. The user unlocks it at https://hpc.nih.gov/dashboard or emails staff. Password resets: Password Self Service, linked from [NIH Login Help](https://auth.nih.gov/CertAuthV3/forms/passwordlinks.html), or the NIH IT Service Desk.
 - **Leaving NIH.** Accounts go inactive when the user leaves NED and are deleted after more than 14 days out; what happens to the data is in STORAGE.md. To close an account, open a ticket with the [NIH IT Service Desk](http://itservicedesk.nih.gov/). Class accounts: https://hpc.nih.gov/nih/student.html (NIH only). Web tools that need no command line: https://hpcwebapps.cit.nih.gov/.
 - **Monthly reboot.** Helix and the Biowulf login node reboot, but not the cluster ([policies#reboots](https://hpc.nih.gov/policies/index.html#reboots)). The reboot is at 8 pm on the first Sunday of the month, or the following Sunday if that Monday is a holiday, with typically 15–30 minutes of downtime. Upcoming dates: the [announcements](https://hpc.nih.gov/nih/about/announcements.php). "These reboots will not affect any jobs", and OnDemand sessions are jobs. An `sinteractive` session, though, depends on its login-node shell (JOBS.md), and tmux runs on the login node too. Expect the session, and any agent in it, to end; NIMH's `spersist` sessions are [documented](https://hpc.nih.gov/docs/nimh.html#persist) to end at the reboot.
 - **Announcements.** Longer and emergency maintenance is announced separately. Users are responsible for reading announcements, which appear at login and are emailed to users. The [archive](https://hpc.nih.gov/nih/about/announcements.php) keeps past ones; live service state is at https://hpc.nih.gov/systems/status/.
@@ -209,12 +206,13 @@ If a bad edit blocks login entirely, the fix is to revert the file (hpcdrive rea
 ## Stale advice on the official pages
 
 - The login banners reproduced on ssh.html and svis.html say reboots happen on the "first Monday" at 7:00 AM (7:15AM on svis.html). The current schedule is 8 pm on the first Sunday.
+- connect.html's VPN test page answers "Not Found" from the NIH network (Sept 2026), so only its "Access forbidden!" result tells anything → check with any NIH-only page instead.
 - The FAQ's graphics entry "strongly recommends nomachine", and the MATLAB page says to use `-X` or `-Y` with ssh. NoMachine is retired and X11 on macOS is unsupported: use the Graphical Session.
 - vscode.html writes the Mac config path as `.ssh\config`; the real path is `~/.ssh/config`. It also shows only RSA keys, though ED25519 and ECDSA are allowed.
 - The Experienced User Guide says OnDemand needs "your PIV card"; an MFA authenticator app works too.
 - accounts.html says accounts are "restricted to NIH employees and contractors"; the policies page says they are for "researchers in the NIH intramural research programs". Both require a NED listing and admit Guest Researchers and Volunteers; if eligibility is unclear, the user asks staff.
-- hpcdrive.html says the ticket "will expire after 12 hours", but its own krb5.conf sets `ticket_lifetime = 24h`. Its `/data` example reuses `/mnt/bw-home`; give that mount its own directory. "Use option 2 below" points to nothing.
-- svis.html dates from 2021 (K20Xm GPU, MATLAB 2020b), and the User Guide's visualization section is commented out. Confirm with staff that the visual partition is still offered.
+- hpcdrive.html's `/data` example reuses `/mnt/bw-home`; give that mount its own directory. "Use option 2 below" points to nothing. (Its krb5.conf requests `ticket_lifetime = 24h`, but NIH's KDC grants about 10–12 hours, as the page's warning says.)
+- svis.html (2021: K20Xm GPU, MATLAB 2020b) still documents `svis` and the `visual` partition → both were retired in January 2026; use OnDemand.
 - Two account-dashboard URLs appear, https://hpc.nih.gov/dashboard and https://hpcnihapps.cit.nih.gov/auth/dashboard/; both work.
 
 ## Going further
@@ -224,6 +222,5 @@ If a bad edit blocks login entirely, the fix is to revert the file (hpcdrive rea
 - [HPC OnDemand](https://hpc.nih.gov/ondemand/) and the [Graphical Session](https://hpc.nih.gov/ondemand/graphical.html): apps, limits, and known issues.
 - [VS Code](https://hpc.nih.gov/apps/vscode.html): the OnDemand app and Remote-SSH to a node.
 - [Codex on Biowulf](https://hpc.nih.gov/nih/codex.html) (NIH-only): NIH HPC's agent guidance, and extension and CLI logins.
-- [svis](https://hpc.nih.gov/docs/svis.html): the visual-partition walkthrough and app examples (AFNI, VMD, ChimeraX, FSLeyes).
 - [Startup files](https://hpc.nih.gov/docs/startup_files.html); [hpcdrive](https://hpc.nih.gov/docs/hpcdrive.html), which has the full Linux `krb5.conf`; [Accounts](https://hpc.nih.gov/docs/accounts.html); [Policies](https://hpc.nih.gov/policies/index.html) ([#who](https://hpc.nih.gov/policies/index.html#who), [#helix](https://hpc.nih.gov/policies/index.html#helix)); and [Contact](https://hpc.nih.gov/about/contact.html).
 - Live checks: `whereami` (output forms: UTILITIES.md) and `klist`. The user's `ssh -v username@biowulf.nih.gov` prints a verbose client log worth attaching to a help request.

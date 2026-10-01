@@ -2,18 +2,18 @@ Biowulf's compute hardware as of Sept 2026: node types with their `--constraint`
 
 ## Compute nodes
 
-From the [hardware page](https://hpc.nih.gov/systems/hardware.html), Sept 2026. Hyperthreading is on everywhere, so Slurm CPUs = 2 × cores. RAM in parentheses is what `freen` reports as allocatable: the largest `--mem` a job can get on that node type. The hardware page lists no partitions; the Partition column comes from `freen`'s documented example and the announcements, so treat it as approximate.
+From the [hardware page](https://hpc.nih.gov/systems/hardware.html), Sept 2026. Hyperthreading is on everywhere, so Slurm CPUs = 2 × cores. RAM in parentheses is what `freen` reports as allocatable: the largest `--mem` a job can get on that node type. "Page source" values come from `freen` lines staff left in HTML comments on the hardware page, not its visible text. The hardware page lists no partitions; the Partition column comes from `freen`'s documented example, the announcements, and those comments, so treat it as approximate and read `freen`.
 
 | Nodes | CPU | Features | Cores / CPUs | RAM | SSD (GB) | GPUs | Partition |
 |---|---|---|---|---|---|---|---|
-| 96 | AMD Epyc 9645 (Zen5) | `e9645` `ibndr200` | 192 / 384 | 1536 GB | 7000 | — | not documented |
+| 96 | AMD Epyc 9645 (Zen5) | `e9645` `ibndr200` | 192 / 384 | 1536 GB (1502g, page source) | 7000 | — | norm, per the page source (unconfirmed) |
 | 63 | AMD Epyc 9454 | `e9454` `ibhdr200` | 96 / 192 | 768 GB (747g) | 3200 | — | norm |
 | 144 | AMD Epyc 7543 | `e7543` `ibhdr200` | 64 / 128 | 512 GB (495g) | 3200 | — | norm |
 | 72 | Intel Xeon Gold 6240 | `x6240` `ibhdr100` | 36 / 72 | 384 GB (369g) | 3200 | — | norm |
 | 294 | Intel Xeon Gold 6140 | `x6140` `ibhdr100` | 36 / 72 | 384 GB (369g) | 3200 | — | norm, multinode, unlimited |
 | 1224 | Intel E5-2680v4 | `x2680` `ibfdr` | 28 / 56 | 256 GB (243g) | 800 | — | norm, multinode |
 | 14 | AMD Epyc 9645 | `e9645` `ibndr200` | 192 / 384 | 2258 GB | 7000 | 8 × H200 | gpuh200 (7 nodes), quick (7) |
-| 20 | Intel Xeon 6787p | `x6787p` `ibndr200` | 172 / 344 | 768 GB | 7000 | 8 × L40 | gpu |
+| 20 | Intel Xeon 6787p | `x6787p` `ibndr200` | 172 / 344 | 768 GB (747g, page source) | 7000 | 8 × L40 | gpu |
 | 100 | AMD Epyc 7543p | `e7543p` `ibhdr200` | 32 / 64 | 256 GB (243g) | 3200 | 4 × A100 | gpu |
 | 60 | Intel Xeon Gold 6140 | `x6140` `ibhdr` | 36 / 72 | 384 GB (369g) | 1600 | 4 × V100x | gpu |
 | 8 | Intel E5-2680v4 | `x2680` `ibfdr` | 28 / 56 | 128 GB (117g) | 800 | 4 × V100 | gpu |
@@ -22,11 +22,11 @@ From the [hardware page](https://hpc.nih.gov/systems/hardware.html), Sept 2026. 
 | 4 | Intel E7-8860v4 | `x8860` `ibfdr` | 72 / 144 | 3 TB (3015g) | 800 | — | largemem |
 | 20 | Intel E7-8860v4 | `x8860` `ibfdr` | 72 / 144 | 1.5 TB (1503g) | 800 | — | largemem |
 
-- A CPU feature doesn't pick a partition: `x6140` covers CPU nodes and V100x nodes, `x2680` CPU, V100, and P100 nodes, `e9645` CPU and H200 nodes. Give the partition too, e.g. `--partition=multinode --constraint=x6140`.
+- A CPU feature doesn't pick a partition: `x6140` covers CPU nodes and V100x nodes, `x2680` CPU, V100, and P100 nodes, `e9645` CPU and H200 nodes, and `e7543` also tags 256 GB (243g) buy-in nodes in `quick` (so outside `norm` it doesn't guarantee 495g). Give the partition too, e.g. `--partition=multinode --constraint=x6140`.
 - `quick` also runs on idle buy-in nodes (the `freen` example shows `nhlbi` and `forgo` nodes there). Buy-in partitions (`ccr*`, `forgo`, `persist`, …) aren't on the hardware page; `freen` lists them.
 - The SSD column caps `--gres=lscratch:N` on that node type.
-- Memory ceilings: the largest documented `norm` type has 747g allocatable (the Experienced User Guide gives `norm` 243–747 GB); `largemem` nodes offer 1503g or 3015g (its rules: JOBS.md). Where the 1.5 TB `e9645` nodes sit is undocumented; `freen` shows it.
-- Removed on 24 Apr 2026: all `x2695`, `x2630`, and K80 nodes, and 40 `x2680` nodes in `norm`. Multinode jobs pinned to `x2695` need only `--constraint=x2680` (same CPUs and memory); `x2630` jobs need new `--ntasks`/`--ntasks-per-node` on `x2680` or `x6140`.
+- Memory ceilings: the largest `norm` type in the visible docs has 747g allocatable (the Experienced User Guide gives `norm` 243–747 GB), but the page source lists the 1.5 TB `e9645` nodes in `norm` at 1502g; confirm with `freen` before sending a 750–1500g job to `norm` rather than `largemem`. `largemem` nodes offer 1503g or 3015g (its rules: JOBS.md).
+- Removed 24 Apr–1 May 2026 (about half moved to 1 May): all `x2695`, `x2630`, and K80 nodes, and 40 `x2680` nodes in `norm`. Multinode jobs pinned to `x2695` need only `--constraint=x2680` (same CPUs and memory); `x2630` jobs need new `--ntasks`/`--ntasks-per-node` on `x2680` or `x6140`.
 
 ## GPUs
 

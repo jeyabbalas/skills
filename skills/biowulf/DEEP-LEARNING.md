@@ -60,7 +60,7 @@ sbatch --partition=gpu --gres=gpu:a100:1,lscratch:200 -c 16 --mem=48g --time=24:
 sbatch --partition=gpuh200 --gres=gpu:4,lscratch:500 -c 64 --mem=512g --time=24:00:00 train.sh
 ```
 
-Runs under 4 h can also use `quick`, which holds 7 H200 nodes (Sept 2026) and, in `freen`'s documented example, some A100 buy-in nodes. Whether gpuh200's minimums apply there isn't stated; check `batchlim`.
+Runs under 4 h can also use `quick`, which holds 7 H200 nodes (Sept 2026) and, in `freen`'s documented example, some A100 buy-in nodes. Whether gpuh200's 2-GPU minimum applies there isn't stated, and `batchlim` shows only maxima: request at least 2 H200s in `quick` too, or the user asks staff.
 
 ## Framework setup
 
@@ -88,7 +88,7 @@ Runs under 4 h can also use `quick`, which holds 7 H200 nodes (Sept 2026) and, i
   ```bash
   export HF_HOME=/data/$USER/.cache/huggingface TORCH_HOME=/data/$USER/.cache/torch   # [generic] upstream variables
   ```
-- **DataLoader workers**: at most `$SLURM_CPUS_PER_TASK - 1` per training process [generic]; the per-GPU CPU cap bounds this.
+- **DataLoader workers**: at most (CPUs ÷ training processes) − 1 per process [generic]: `$SLURM_CPUS_PER_TASK - 1` for one process, but with torchrun's N processes sharing one task, `$(( SLURM_CPUS_PER_TASK / N - 1 ))`. The per-GPU CPU cap bounds this.
 
 ## Single-GPU batch template
 
@@ -120,7 +120,7 @@ python -c 'import tensorflow as tf; print(tf.config.list_physical_devices("GPU")
 timeout 15m nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used --format=csv -l 10 > gpu.csv &   # [generic] sample a smoke test
 ```
 
-- NIH's pages expect `True` and the GPU count from PyTorch; TensorFlow logs "Found device 0 with properties" and "Adding visible gpu devices". `whereami -f pretty` also lists the session's GPUs (e.g. `1 a100`).
+- NIH's pages expect `True` and the GPU count from PyTorch. Current TensorFlow logs `Created device /job:localhost/replica:0/task:0/device:GPU:0 with N MB memory`; the "Found device 0 with properties" lines on the DL pages are TF 2.1-era. The reliable check is a non-empty `tf.config.list_physical_devices("GPU")`. `whereami -f pretty` also lists the session's GPUs (e.g. `1 a100`).
 - A batch job on another node: you can't log in there, so query the dashboard once (values up to a minute old; UTILITIES.md):
   ```bash
   dashboard_cli jobs --jobid JOBID --fields jobid,state,elapsed_time,gpus,gpu_avg,gpu_util,cpus,cpu_util,mem_util
@@ -165,7 +165,7 @@ Multi-node: NIH documents two patterns, both in the `gpu` partition with `--node
 ## Walltime, checkpoints, and pipelines
 
 - Most NIH DL examples omit `--time`, so they get the gpu partition default (2 h in `batchlim`'s example). Always set it; partition maxima via `batchlim` (JOBS.md).
-- NIH's DL pages are silent on checkpointing. Save to `/data` every N minutes or epochs and resume from the newest checkpoint at start. Run long training as a chain of shorter jobs, as NIH's multinode policy recommends for restartable codes: the user submits the chain with `--dependency=afterany:JOBID` (JOBS.md), and each job exits early if training is done.
+- NIH's DL pages are silent on checkpointing. Save to `/data` every N minutes or epochs and resume from the newest checkpoint at start. Run long training as a chain of shorter jobs, as NIH's multinode policy recommends for restartable codes: the user submits the chain with `--dependency=afterany:JOBID` (JOBS.md), and each job exits early if training is done, e.g. `[ -e "$CKPT/DONE" ] && exit 0` at the top, with the training script touching `DONE` when it finishes [generic].
 - **Split CPU and GPU phases.** NIH's AlphaFold3 guidance: "use CPU nodes for the creation of alignments ... and use GPU nodes only for generating models". Do the same for decompression, tokenization, and feature extraction:
   ```bash
   # on Biowulf (login node) — the user runs this
@@ -176,7 +176,7 @@ Multi-node: NIH documents two patterns, both in the `gpu` partition with `--node
 ## TensorBoard
 
 - The training script must write TensorBoard summaries; point its log dir at `/data` so the logs outlive the job.
-- TensorBoard needs no GPU. NIH runs it in the GPU session after training; a small CPU session started with `--tunnel` also works and frees the GPU [inference].
+- TensorBoard needs no GPU. NIH runs it in the GPU session after training; a small CPU session started with `--tunnel` also works and frees the GPU [inference]. It has no login, so other users on the login node can reach it while the tunnel is up (TUNNELING.md).
   ```bash
   # on the compute node (in a session started with --tunnel)
   module load python/3.12           # NIH's page used python/3.10
@@ -215,7 +215,7 @@ ollama_stop
 
 ## Stale advice on the official pages
 
-- `--gres=gpu:k80:N` (most deep_learning.html sections and most multinode_DL.html examples) → K80s were removed 24 Apr 2026; staff say such jobs "should run unmodified on P100 GPUs" (`gpu:p100:N`). For new work choose by VRAM. This file's examples are modernized.
+- `--gres=gpu:k80:N` (most deep_learning.html sections and most multinode_DL.html examples) → K80s were removed 24 Apr–1 May 2026; staff say such jobs "should run unmodified on P100 GPUs" (`gpu:p100:N`). For new work choose by VRAM. This file's examples are modernized.
 - `module load python/3.7` (PyTorch, Keras-R) and `python/2.7` (Caffe2) → retired June 2023; use `python/3.12`.
 - The TF and Keras batch scripts load only `cuDNN/8.9.2/CUDA-12 CUDA/12.1` → add `python/3.12`, or the job runs whatever `python` is first on PATH.
 - The Lightning example's `pip install --user pytorch-lightning` on `python/3.8` → ignored or refused on python/3.11+ (`PYTHONNOUSERSITE=1`); use a conda env.

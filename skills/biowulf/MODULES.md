@@ -28,7 +28,8 @@ module list
 module unload NAME; module purge   # purge unloads everything
 ```
 
-- Copy exact names from `spider`. They are case-sensitive and irregular: `R`, `GATK`, `CUDA`; extra variant levels (`fftw/3.3.4/gnu`, `openmpi/1.8.1/gnu-eth`); hash or date versions (`HLA-PRG-LA/f0833ed`, `trinity/r20140717`); aliases (`julia` = `julialang`).
+- Copy exact names from `spider`. They are case-sensitive and irregular: `R`, `GATK`, `CUDA`; extra variant levels (`fftw/3.3.4/gnu`, `openmpi/1.8.1/gnu-eth`); hash, date, or release-tag versions (`svsolver/cf1e3b3`, `simvascular/may-2023`, `percolator/rel-3-06-05`); aliases (`julia` = `julialang`).
+- On the login node the module tree is partial (`whereami` there: "Many modules are not available here"): search and load from a session.
 - `(D)` in `module avail` output marks the default. Defaults move as new versions are installed, so pin `NAME/VERSION` in anything that must reproduce.
 - Loading a second version of a loaded module swaps it ("reloaded with a version change"); `module switch NAME NAME/VERSION` does the same explicitly.
 - Modules that pull in dependencies announce them (`[+] Loading python 3.10 ...`); `module -q load` silences this in large batch runs.
@@ -61,9 +62,9 @@ module -q load NAME/VERSION NAME2/VERSION
 
 | Symptom | Cause and fix |
 |---|---|
-| `command not found` for an application | Its module isn't loaded: `module spider WORD`, then load the exact name. |
+| `command not found` for an application | Its module isn't loaded: `module spider WORD`, then load the exact name. If the version the user needs isn't installed, don't swap in another: see [Choosing how to install software](#choosing-how-to-install-software). |
 | `module load` reports an unknown module | Wrong case, spelling, or version, or the version was retired: `module spider WORD`. |
-| `module avail` shows almost no scientific apps | Possibly Helix, which has none: rerun SKILL.md's where-am-I check. |
+| `module avail` shows almost no scientific apps | Possibly Helix (none) or the login node (partial): rerun SKILL.md's where-am-I check. |
 | `module: command not found` in a tcsh script | `source /etc/profile.d/modules.csh` first. |
 | `module: command not found` in bash | A syntax error in `~/.bashrc` can remove the `module` function (NIH FAQ): show the user, who reverts the file or asks staff. In a non-interactive shell that never received the function, find the bash counterpart of `modules.csh` in `/etc/profile.d/` and source it (by analogy; undocumented). |
 | Module loads, but the wrong tool version runs | PATH clash: see [Load order and PATH clashes](#load-order-and-path-clashes). |
@@ -85,12 +86,13 @@ prepend_path("MANPATH", basedir .. "/share/man")
 ```
 
 ```bash
-module use --prepend ~/modulefiles      # personal modules win name clashes; --append lets system ones win
+module use --prepend ~/modulefiles      # lists personal modules first; order only breaks ties (below)
 module load NAME/VERSION && which PROGRAM
 ```
 
+- Name clashes: Lmod picks a marked default `(D)` first, then the highest version across all module directories; the directory order set by `--prepend`/`--append` only breaks ties. Give a personal module a `NAME/VERSION` the system lacks, load it by that full name, and confirm with `module list` and `which`.
 - Run `module use` in each session or job script. The workshop slides suggest adding it to `~/.bashrc`; don't (ground rules in SKILL.md).
-- `module load use.own` (a system module) also exposes `~/modulefiles`, listed above the system tree. `module purge` may drop it along with everything else; load it again after a purge.
+- `module load use.own` (a system module) also adds a personal directory to the search path; NIH's pages disagree on which (`~/modulefiles` or `~/privatemodules`), so check with `module display use.own`. `module purge` may drop it along with everything else; load it again after a purge.
 - A modulefile may load the modules it requires (Tcl `module load X`, Lua `load("X")`), and Lmod reverses those loads on `module unload`. It sets search paths (`PATH`, `MANPATH`, `LD_LIBRARY_PATH`, `PERL5LIB`, `PYTHONPATH`) for its own application only, never for the modules it loads.
 - Templates: read one with `module display NAME`, or copy from `/usr/local/lmod/modulefiles`. Files ending `.lua` are Lua; files without an extension that start with `#%Module` are Tcl. Tcl/Lua/shell equivalents: [modules_advanced](https://hpc.nih.gov/apps/modules_advanced.html).
 - Group-shared modules ([modules#shared](https://hpc.nih.gov/apps/modules.html#shared)); members without access to the group directory can't see them:
@@ -98,7 +100,7 @@ module load NAME/VERSION && which PROGRAM
 ```bash
 mkdir -p /data/GROUP/modulefiles        # once; the group's modulefiles go here
 mkdir -p ~/modulefiles && ln -s /data/GROUP/modulefiles ~/modulefiles/shared   # each member
-module load use.own                     # they appear as shared/NAME/VERSION
+module use --prepend ~/modulefiles      # they appear as shared/NAME/VERSION (or use.own, if it adds ~/modulefiles)
 ```
 
 ## Choosing how to install software
@@ -118,8 +120,8 @@ Try, in order:
 - modules.html examples (gromacs 4.5, `java/1.7.0 is loaded`, `python/2.7.8`, R 3.x, openmpi 1.8.1) date from about 2014–2018 → current modules print `[+] Loading ...`; check versions with `module -t avail NAME`.
 - modules.html suggests `alias ml="module -d avail"` → it shadows Lmod's `ml` shorthand that other NIH pages use (`ml mamba_install`); don't add it.
 - modules.html (titled "Biowulf & Helix") says `.bashrc` environment setups "will continue to work" → Helix has no scientific apps, and the startup-files page forbids pre-loading modules.
-- Name-clash priority: #personal says the system module wins, #shared says the personal one does → it depends on `--append` versus `--prepend` or `use.own`; confirm with `module list` and `which`.
-- modules_advanced.html puts its nested module in `/home/user/privatemodules/` yet loads it through `use.own` → put modulefiles in `~/modulefiles`.
+- Name-clash priority: #personal says the system module wins, #shared says the personal one does → both simplify: Lmod prefers a marked default, then the highest version; directory order only breaks ties (Personal and shared modulefiles).
+- modules_advanced.html puts its nested module in `/home/user/privatemodules/` and loads it through `use.own`, while modules.html#shared shows `use.own` exposing `~/modulefiles` → check `module display use.own`, or skip it and use `module use --prepend ~/modulefiles`.
 - The #shared example mixes `/data/DBCImaging` with `/data/DCBImaging` and loads `3.2.4` but lists `3.6.1` → typos; use one group path.
 
 ## Going further

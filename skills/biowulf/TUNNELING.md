@@ -17,7 +17,7 @@ Table of contents
 - **Two legs** ([tunneling](https://hpc.nih.gov/docs/tunneling/)): (1) the user's computer → the login node, opened by the user with `ssh -L N:localhost:N`; (2) the login node → the compute node, created by `sinteractive -T`/`--tunnel`. N is the same port at every hop.
 - `--tunnel` puts the port in `$PORT1`. Repeat the short flag for more: `-TT` gives `$PORT1` and `$PORT2`, and the Spyder recipe uses `-TTTTT`. Run one server per port. The session's banner prints the user's local command, with one `-L` per port: `ssh  -L 33327:localhost:33327 biowulf.nih.gov`.
 - **Bind the server to localhost** on `$PORTn`, as every NIH example does. Never use `0.0.0.0` or the node's hostname (advice: that opens the server to the whole cluster network).
-- **Keep authentication on** (advice): leg 2 ends on the shared login node, where other users could reach the port, so the server's token or password is its only lock. Never start a server with an empty token, and give the tokenized URL to the user only.
+- **Keep authentication on** (advice): leg 2 ends on the shared login node, where other users could reach the port, so the server's token or password is its only lock. Never start a server with an empty token, and give the tokenized URL to the user only. Some servers have no login at all (TensorBoard, a plain Shiny app): anyone on the login node who finds the port can open them while the tunnel is up, so serve only what the user may expose, say so, and stop the server when they're done.
 
 ## Who does what
 
@@ -65,7 +65,7 @@ Tell me when you're finished so I can stop the server.
 ## The user's side, per OS
 
 - **macOS, Linux, WSL, Windows PowerShell**: the `ssh -L` line in a new terminal, left open, then `http://localhost:N/...` in a local browser. Several ports go in one command, one `-L N:localhost:N` each. Windows 10 includes OpenSSH, "although it may be disabled"; then use PuTTY, or WSL's Linux ssh ([tunneling#windows](https://hpc.nih.gov/docs/tunneling/#windows)).
-- **Username**: the lines printed by the banner and `reconnect_tunnels` may omit it, and ssh then sends the local username. Add `NIHUSER@` when the two differ. On Windows the local name carries a domain prefix, so in PowerShell use `$env:username@biowulf.nih.gov` or type the NIH username ([ssh#windows](https://hpc.nih.gov/docs/ssh.html#windows)).
+- **Username**: the lines printed by the banner and `reconnect_tunnels` may omit it, and ssh then sends the local username. Add `NIHUSER@` when the two differ, or once and for all put `Host biowulf.nih.gov` and `User NIHUSER` in the local `~/.ssh/config` (generic ssh), which also fixes the `tun` alias below. On Windows the local name carries a domain prefix, so in PowerShell use `$env:username@biowulf.nih.gov` or type the NIH username ([ssh#windows](https://hpc.nih.gov/docs/ssh.html#windows)).
 - **PuTTY**:
   1. Double-click "Default Settings" and set Host Name to `biowulf.nih.gov`.
   2. Under SSH → Tunnels, set Source port `N` and Destination `localhost:N`, then click **Add** (once per port).
@@ -77,7 +77,7 @@ Tell me when you're finished so I can stop the server.
 
 | Situation | Do this |
 |---|---|
-| No tunnel exists: the session was started without `--tunnel`, or you're in an OnDemand app's terminal | NIH documents no way to add a tunnel to a running job. If the app is on OnDemand, the user can launch it there (it takes an interactive-job slot: JOBS.md). Otherwise the user starts a `--tunnel` session and restarts you in it. |
+| No tunnel exists: the session was started without `--tunnel` (an empty `$PORT1` in the shell `sinteractive` opened means this), or you're in an OnDemand app's terminal | NIH documents no way to add a tunnel to a running job. If the app is on OnDemand, the user can launch it there (it takes an interactive-job slot: JOBS.md). Otherwise the user starts a `--tunnel` session and restarts you in it. |
 | The session has a tunnel, but your shell lacks `$PORT1` (e.g. VS Code Remote-SSH to its node) | The tunnel lasts as long as the job. Ask the user for the port from the banner or from `reconnect_tunnels`, then `export PORT1=<port>` and continue as above. |
 
 Never improvise a leg: no `ssh -R` or `ssh -L` from the node to the login node (ground rule 7), and no random port, since only `$PORTn` ports are forwarded.
@@ -93,7 +93,7 @@ Never improvise a leg: no `ssh -R` or `ssh -L` from the node to the login node (
 ssh  -L 45000:localhost:45000 biowulf.nih.gov
 ```
 
-- On macOS or Linux, the user can make this one step with a local alias (add `NIHUSER@` if usernames differ). `tun` opens every tunnel and leaves a login-node shell open. It runs `reconnect_tunnels` on the login node, so it is never yours to run:
+- On macOS or Linux, the user can make this one step with a local alias. If usernames differ, it needs the `~/.ssh/config` entry above: `NIHUSER@` in the alias fixes only its own ssh, not the command it runs. `tun` opens every tunnel and leaves a login-node shell open. It runs `reconnect_tunnels` on the login node, so it is never yours to run:
 
 ```bash
 alias tun='$(ssh biowulf.nih.gov /usr/local/slurm/bin/reconnect_tunnels)'

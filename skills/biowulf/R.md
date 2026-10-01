@@ -17,7 +17,7 @@ Table of contents
 
 ## Versions
 
-- One module per minor release, holding its newest patch (`R/4.5` → 4.5.x). Default (Sept 2026): `R/4.5.2`, since Mar 18 2026; the default changed 7 times between Jan 2024 and Mar 2026. List with `module -r avail '^R$'`.
+- Minor-release modules (`R/4.5`, holding the newest 4.5.x patch) and patch-level ones (`R/4.5.2`). Default (Sept 2026): R 4.5.2, since Mar 18 2026; the default changed 7 times between Jan 2024 and Mar 2026. List with `module -r avail '^R$'`.
 - Pin the minor version in every script (`module load R/4.5`): private libraries are per minor version, so a minor-version bump of the default silently switches to an empty library.
 - R is built against MKL. Many packages are preinstalled (tidyverse loads with no install): try `library(pkg)` before installing.
 - R sessions are not allowed on the login node or Helix, for the user as well: use an interactive session or a batch job.
@@ -88,16 +88,16 @@ Rscript /data/$USER/R/R1 > /data/$USER/R/R1.out
 Rscript /data/$USER/R/R2 > /data/$USER/R/R2.out
 ```
 
-Give the user: `swarm -f rjobs.swarm -g 4 --gres=lscratch:1 --time=1:00:00 --module R/4.5`, adding `-t N` when each line runs parallel code (options: SWARM.md).
+Give the user: `swarm -g 4 --gres=lscratch:1 --time=1:00:00 --module R/4.5 rjobs.swarm`, adding `-t N` when each line runs parallel code (options: SWARM.md).
 
 - Replicates with different seeds: pass the seed on each line (`Rscript sim.R 24963`), the page's alternative to Rswarm. Don't derive it from `SLURM_ARRAY_TASK_ID`: lines bundled (`-b`) or packed (`-p`) into one subjob share it.
 - `Rswarm` (staff utility) writes one R file per replicate from a template, plus a swarmfile. Template placeholders: `DUMX` (sims per file), `DUMY1`/`DUMY2` (output files), `DUMZ` (seed, read from a seed file).
 
 ```bash
-# on the compute node; it asks "Is this correct (y or n)?" before writing
-Rswarm --rfile=rfile.R --sfile=seedfile.txt --path=. --reps=2 --sims=50 --start=0 --ext1=.rds
+# on the compute node; it asks "Is this correct (y or n)?" before writing, which your shell can't answer:
+echo y | Rswarm --rfile=rfile.R --sfile=seedfile.txt --path=. --reps=2 --sims=50 --start=0 --ext1=.rds   # untested; check rfile.sw appeared
 # the user submits the generated swarmfile, on the login node:
-swarm -f rfile.sw --time=10 --partition=quick --module R/4.5
+swarm --time=10 --partition=quick --module R/4.5 rfile.sw
 ```
 
 ## Parallel R
@@ -115,7 +115,7 @@ Get the CPU count from `parallelly::availableCores()` (R ≥ 4.0.3) or `future::
 - BiocParallel isn't Slurm-aware: its default backend uses `parallel::detectCores() - 2` workers, and the page shows 54 in a 2-CPU session. Check with `BiocParallel::registered()`.
 - Memory grows with each worker: size `--mem` for all of them.
 - Each worker's random-number state needs deliberate handling: see `?mcparallel` and the parallel package docs.
-- Aim for 70–80% parallel efficiency and benchmark before scaling. On the page, `mclapply` on 12 CPUs ran only 2.8× faster (23% efficiency), and that workload needed ≤ 6 CPUs to stay above 70%; a foreach benchmark justified 32 CPUs only for problem sizes `i > 300`.
+- Aim for 70–80% parallel efficiency and benchmark before scaling. On the page, `mclapply` on 12 CPUs ran only 2.8× faster (23% efficiency); a separate `mclapply` benchmark stayed above 70% only up to 6 CPUs; a foreach benchmark justified 32 CPUs only for problem sizes `i > 300`.
 
 ## Implicit multithreading
 

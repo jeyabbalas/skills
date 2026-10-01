@@ -25,7 +25,7 @@ Table of contents
 | `nodetype` | A node's features; does it have feature X | yes | `nodetype cn2039` |
 | `batchlim` | Per-user limits per partition; default and maximum walltime | yes | `batchlim` |
 | `sjobs` | The user's jobs, with pending reasons | yes | `sjobs` |
-| `squeue`, `sacct` | Slurm's view: estimated start, time used, today's failures | yes, one-off calls | `sacct --state f` |
+| `squeue`, `sacct` | Slurm's view: estimated start, time used, today's failures | yes, one-off calls | `sacct -S midnight -E now --state F` |
 | `jobload` | Live threads, load, memory of running jobs | yes, but broken since Aug 2026 | `jobload -j JOBID` |
 | `jobhist` | A finished job's CPUs, memory, runtime, submit command | yes | `jobhist JOBID` |
 | `jobdata` | Everything about one job: script, log paths, time series | yes (slow) | `jobdata --show-scripts JOBID` |
@@ -37,7 +37,7 @@ Table of contents
 | `wazzup` | "Show your running processes" (nothing more documented) | yes | `wazzup` |
 | `checkquota`, `dust`, `getfacl_path`, `setfacl_path -d`, `obj2 ls`/`df`/`put`/`get` | Quotas, what fills them, who can reach a path, ACL dry run, object-store listing and copies | yes (copies: when the user asked for them) | STORAGE.md |
 | `setfacl_path` without `-d`, `obj2 rm` | Change ACLs; permanently delete object data | only with the user's go-ahead | STORAGE.md |
-| `sbatch`, `sinteractive`, `spersist`, `svis`, `salloc`, `swarm`, `newwall`, `scontrol update\|hold\|release`, `scancel` | Start, submit, change, or cancel jobs | **user** (the `swarm --devel` dry run is yours: SWARM.md) | JOBS.md |
+| `sbatch`, `sinteractive`, `spersist`, `salloc`, `swarm`, `newwall`, `scontrol update\|hold\|release`, `scancel` | Start, submit, change, or cancel jobs | **user** (the `swarm --devel` dry run is yours: SWARM.md) | JOBS.md |
 | `mamba_install` | Installs conda under `/data`; edits dotfiles | only with the user's go-ahead | CONDA.md |
 | `reconnect_tunnels` | The local `ssh -L` line for open tunnels | **user** | TUNNELING.md |
 | `clearspace`, `split_fasta`, `histogram.pl` | Rename a file with a timestamp suffix; split a FASTA; histogram prep | only when asked (options undocumented) | — |
@@ -61,10 +61,10 @@ whereami -f short   # sinteractive: prints "sinteractive"
 
 ```bash
 freen                                    # one line per node type in each partition
-freen | grep -E 'Partition|----|gpu'     # GPU partitions only
+freen | grep -E 'Partition|----|gpu'     # rows with GPU nodes, in any partition
 ```
 
-- A snapshot of what is free now, not a start-time forecast (for that, `squeue` below). `FreeNds` (`19 / 397`) counts completely free nodes; `FreeCPUs` also counts free CPUs scattered over partly used nodes (Slurm allocates by core = 2 CPUs).
+- A snapshot of what is free now, not a start-time forecast (for that, `squeue` below). `FreeNds` (`19 / 397`) counts completely free nodes; `FreeCPUs` also counts free CPUs scattered over partly used nodes (Slurm allocates by core = 2 CPUs); `FreeGPUs` counts free GPUs, where a partition has them.
 - `Cores` is physical cores, a guide to the most threads an app should run; `CPUs` is the hyperthreaded count; `GPUs` is per node.
 - `Mem` is allocatable memory per node; `Disk` is local disk, the most `--gres=lscratch:N` can get there.
 - `Features` are the `--constraint` values (HARDWARE.md). On a GPU row, `CPUs` ÷ `GPUs` is the per-GPU CPU cap (the rule: JOBS.md).
@@ -86,7 +86,7 @@ The limits change: quote a live run, never the docs' example. Also at https://hp
 ```bash
 squeue --me -o '%18i %10j %10P %20S %20e'   # expected START_TIME/END_TIME ("may not always be calculable")
 squeue -O jobid,timelimit,timeused -u $USER # walltime limit vs time used
-sacct --state f                             # jobs that failed since midnight
+sacct -S midnight -E now --state F,OOM,TO,NF   # today's failures; with --state, sacct needs both -S and -E
 ```
 
 ## jobload
@@ -131,7 +131,7 @@ dashboard_cli jobs --jobid JOBID --allfields --vertical                         
 dashboard_cli jobs --since -7d --ended --fields jobid,partition,state,exit_code | grep -v COMPLETED   # this week's failures
 ```
 
-To wait for a job to finish (e.g. before post-processing its output), use the docs' loop. It reads the dashboard database, never `squeue`, and the data is cached for about a minute, so don't shorten the sleep:
+To act after a job ends, prefer a dependent job the user submits (`sbatch --dependency=afterok:JOBID post.sh`; JOBS.md): it needs neither your session nor you. To wait yourself (e.g. before post-processing in the session), use the docs' loop, in the background so it outlasts your tool calls' time limits. It reads the dashboard database, never `squeue`, and the data is cached for about a minute, so don't shorten the sleep; for a swarm or array, use `--jobid JOBID_`:
 
 ```bash
 while dashboard_cli jobs --is-active --jobid 32535313
@@ -142,12 +142,12 @@ done
 echo job has finished
 ```
 
-Exit codes 2–4 also end the loop; confirm with `dashboard_cli jobs --jobid ID --fields jobid,state,exit_code`.
+Exit codes 2–4 also end the loop, and so does a job that failed: confirm with `dashboard_cli jobs --jobid ID --fields jobid,state,exit_code` before using its output.
 
 ## GPUs, licenses, pasted text
 
 - `nvidia-smi` and `nvtop` (in the apps list; `module -r spider '^nvtop$'`) show GPU use on the node you are on. The docs tell users to "login to the compute node where your job is running"; you stay on your own node, so for the user's other GPU jobs read `gpus,gpu_cur,gpu_avg,gpu_util` from `dashboard_cli` or the `gpus` column of `jobdata --show-time-series`. Deep-learning checks: DEEP-LEARNING.md.
-- `licenses` shows current license availability (also on https://hpc.nih.gov/systems/status). Requesting licenses in a job: JOBS.md.
+- `licenses` shows current license availability (also at https://hpc.nih.gov/systems/status/license_status.html, NIH-only). Requesting licenses in a job: JOBS.md.
 - `highlightUnicode FILE` prints `N:line` for lines containing Unicode (e.g. an em space, U+2003); `highlightTabs FILE` shows each tab as `➤`. Run them when a swarmfile, sample sheet, or parser chokes on pasted text.
 
 ## Recipe: is my running job healthy?
@@ -209,7 +209,7 @@ dashboard_cli jobs --since -5d --bad-swarm    # subjobs too short: bundle them (
 
 - https://hpc.nih.gov/docs/biowulf_tools.html — every utility with sample output (anchors `#freen`, `#batchlim`, `#sjobs`, `#jobload`, `#jobhist`, `#jobdata`, `#dashboard_cli`, `#whereami`).
 - https://hpc.nih.gov/docs/userguide.html#monitor — monitoring overview and the 21-min video "Job Monitoring tools on Biowulf" (https://youtu.be/fLMJ8-t5bm4).
-- https://hpc.nih.gov/systems/status/ — service status, license availability, and batch limits (NIH-only); https://hpc.nih.gov/systems/status/partitions.html — partition usage.
+- https://hpc.nih.gov/systems/status/ — service status and batch limits (NIH-only); https://hpc.nih.gov/systems/status/partitions.html — partition usage.
 - https://hpc.nih.gov/policies/multinode.html#benchmark — benchmarking and parallel efficiency; https://hpc.nih.gov/docs/ExpUserGuide.html#donts — over-allocation and scheduler load.
 - https://hpc.nih.gov/docs/FAQ.html#killed and https://hpc.nih.gov/docs/FAQ.html#swarm_select — reading the dashboard and `jobhist` after a failure.
 - https://hpc.nih.gov/nih/about/announcements.php?1208 — the `jobload` outage.

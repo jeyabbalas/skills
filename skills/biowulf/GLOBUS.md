@@ -42,11 +42,11 @@ Only the user:
 - Creating, changing, or deleting shares and their permissions, even though the CLI could (`globus collection create guest`, `globus endpoint permission ...`); the NCI DME interface.
 - Any transfer involving controlled-access data (e.g. dbGaP) or PII/PHI (ground rule 4 in SKILL.md).
 
-Yours, on the compute node, after the user's login: `globus whoami`, `endpoint search`, `ls`, `task show|list|wait`; transfers and timers the user asked for; transfer lines in batch scripts the user submits; pre-flight checks (the source exists and is readable; the destination has room, via `checkquota` when it is Biowulf); drafting the collaborator message. Get the user's explicit go-ahead before anything that deletes or stops: `--delete-destination-extra`, `globus rm`, `globus delete`, `globus task cancel`, `globus timer delete`. Off the cluster, give the user the commands instead.
+Yours, on the compute node, after the user's login: `globus whoami`, `endpoint search`, `ls`, `task show|list|wait`; transfers and timers the user asked for; transfer lines in batch scripts the user submits; pre-flight checks (the source exists and is readable; the destination has room, via `checkquota` when it is Biowulf); drafting the collaborator message. Get the user's explicit go-ahead before anything that deletes or stops: `--delete` (`--delete-destination-extra` in newer CLIs), `globus rm`, `globus delete`, `globus task cancel`, `globus timer delete`. Off the cluster, give the user the commands instead.
 
 ## Command line
 
-`globus` is globus-cli 3.30.1 (Sept 2026; [apps list](https://hpc.nih.gov/apps/)); the flags here follow the current CLI reference, so if one is rejected, check `globus COMMAND --help`. NIH's sample runs it on Helix but says it "could also be run on any of the Biowulf compute nodes" ([transfer.php#cli](https://hpc.nih.gov/docs/globus/transfer.php#cli)); you run it only there. Data moves between the collections, not through your node, so a small session is enough. NIH never shows a `module load`; if `command -v globus` finds nothing, try `module spider globus`.
+`globus` is globus-cli 3.30.1 (Sept 2026; [apps list](https://hpc.nih.gov/apps/)), and the flags here are checked against that version; the online CLI reference describes newer releases, so if a flag is rejected, check `globus COMMAND --help`. NIH's sample runs it on Helix but says it "could also be run on any of the Biowulf compute nodes" ([transfer.php#cli](https://hpc.nih.gov/docs/globus/transfer.php#cli)); you run it only there. Data moves between the collections, not through your node, so a small session is enough. NIH never shows a `module load`; if `command -v globus` finds nothing, try `module spider globus`.
 
 Login is the user's. Don't run `globus login` yourself: it waits for a code only the user can get. Give them:
 
@@ -72,12 +72,12 @@ globus task wait "$TASK_ID" --timeout 1800 --polling-interval 60   # 0 = succeed
 - Exit status 4 from any command (`ConsentRequired`, or no login) means the user must act. Stop and hand them the output; they redo `globus login` (or the consent step the message names) in the browser, then you retry.
 - Restart a failed or partial transfer with `--sync-level checksum`: the CLI reference warns that other levels can corrupt data.
 
-Options are the same on the web's transfer options panel, and the long flags except `--dry-run` also work on `globus timer create transfer`. Bold = NIH recommends ([transfer.php#options](https://hpc.nih.gov/docs/globus/transfer.php#options), [CLI reference](https://docs.globus.org/cli/reference/transfer/)):
+Options are the same on the web's transfer options panel, and the long flags except `--dry-run`, `--include`, and `--exclude` also work on `globus timer create transfer` in 3.30.1. Bold = NIH recommends ([transfer.php#options](https://hpc.nih.gov/docs/globus/transfer.php#options), [CLI reference](https://docs.globus.org/cli/reference/transfer/)):
 
 | Web option | CLI flag | Notes |
 |---|---|---|
 | sync - only transfer new or changed files | `-s, --sync-level exists\|size\|mtime\|checksum` | `checksum` to resume after a failure |
-| delete files on destination that do not exist on source | `--delete-destination-extra` | recursive only; deletes files, so the user's explicit go-ahead |
+| delete files on destination that do not exist on source | `--delete` (renamed `--delete-destination-extra` in 3.32+) | recursive only; deletes files, so the user's explicit go-ahead |
 | preserve source file modification times | `--preserve-timestamp` | |
 | verify file integrity after transfer | on by default; `--no-verify-checksum` | verifying adds ~25% to transfer time (NIH tests) |
 | encrypt transfer | `--encrypt-data` | adds ~13% (both: ~40%); some endpoints refuse it |
@@ -93,18 +93,18 @@ Compute nodes can't scp to the user's computer; NIH's recommended way to send re
 ```bash
 #!/bin/bash
 # #SBATCH resource lines here (JOBS.md)
-set -e
 # ... the job's work, with results written to /data/$USER/mydir/ ...
 DEST_UUID=...   # destination collection: globus endpoint search, or the user's GCP UUID
 task_id="$(globus transfer --recursive --skip-source-errors --fail-on-quota-errors \
     --label "biowulf job $SLURM_JOB_ID" --jmespath 'task_id' --format unix \
-    "e2620047-6d04-11e5-ba46-22000b92c6ec:/data/$USER/mydir/" "$DEST_UUID:/path/on/dest/")"
+    "e2620047-6d04-11e5-ba46-22000b92c6ec:/data/$USER/mydir/" "$DEST_UUID:/path/on/dest/")" \
+  || { echo "Globus submit failed" >&2; exit 1; }
 echo "Globus task: $task_id"   # lands in slurm-JOBID.out; later: globus task show "$task_id"
 ```
 
-- The transfer runs after the job ends and reads the source then: send from `/data`, never `/lscratch` (deleted with the job, and on no collection). A GCP destination must be running at that time.
+- `globus transfer` only submits the task; Globus copies asynchronously, mostly after the job has ended, reading the source as it goes: send from `/data`, never `/lscratch` (deleted with the job, and on no collection). A GCP destination must be running then. For a job that sends the same directory every run, add `--sync-level checksum` so unchanged files aren't sent again.
 - Don't `globus task wait` inside the job; waiting burns the allocation. The user gets an email, and `globus task show` works any time.
-- If submission fails (exit 4: login or consent missing), `set -e` fails the job; the results stay in `/data`.
+- If submission fails (exit 4: login or consent missing), the `|| exit 1` fails the job; the results stay in `/data`.
 
 ## Scheduled and recurring transfers
 
@@ -145,7 +145,7 @@ Any HPC user can share a directory from their `/data` or `/home` area with anyon
 - Share directories, never single files, and never top-level `/home` or `/data`: make a subdirectory, preferably under `/data/$USER`, holding only what is to be shared. Share it with named people only, never 'all users'.
 - Access (read, or read/write) covers the whole subtree, and **write also allows deletion**. Read-only is the default; add write only for uploads.
 - There is no write-only drop box: one share per collaborator if they shouldn't see each other's data.
-- Keep controlled-access data out of shares: NIH forbids making it available to unauthorized users via Globus ([policies#CAD](https://hpc.nih.gov/policies/index.html#CAD)). Shares are for collaborators during a project, not for meeting the NIH data-sharing policy (STORAGE.md).
+- Controlled-access data goes into a share only if every person it reaches is authorized under its data-use terms, and that decision is the user's: NIH forbids making it available to unauthorized users via Globus ([policies#CAD](https://hpc.nih.gov/policies/index.html#CAD)). Shares are for collaborators during a project, not for meeting the NIH data-sharing policy (STORAGE.md).
 - Delete the share when the project is done, so files later put in that directory aren't shared unnoticed.
 
 The user's steps: File Manager → select the subdirectory → *Share* (right pane) → *Add a Guest Collection* → leave Path, add a Display Name → *Create Share* → *Add Permissions - Share With* → find the person by email, Globus username, or name → keep *Send Email* and add a message; tick *write* only if needed → *Add Permission*. Revoke a person with the trash can beside them. To review or delete shares: https://app.globus.org/endpoints → 'Administered by You' → right arrow → 'Permissions' tab, or delete ([sharing.php#delete_share](https://hpc.nih.gov/docs/globus/sharing.php#delete_share)).
@@ -173,7 +173,7 @@ S3 and GCS uploads can incur egress charges: the connector may download a file b
 | Message or symptom | Fix |
 |---|---|
 | GCP install: browser says 'Login successful', client says `Browser login did not complete. Error: ConnectionError on request` | The user gets off the VPN (from wired NIH or 'NIH Staff' Wi-Fi, switches to 'NIH Guest') and reinstalls |
-| `500 Sharing state dir has invalid permissions` when creating a share | `/home/$USER` is at quota: move files to `/data` or delete some (STORAGE.md), then retry |
+| `Sharing state dir has invalid permissions` when creating a share | `/home/$USER` is at quota: move files to `/data` or delete some (STORAGE.md), then retry |
 | `530 Login incorrect. : Sharing not enabled for user ...` or "Your credentials do not provide sufficient access to this endpoint", creating or opening a share | `chmod 0700 /home/$USER/.globus /home/$USER/.globus/sharing && chmod 0400 /home/$USER/.globus/sharing/*` |
 | `No effective ACL rules on the endpoint ...` | The share went to an email not linked to the user's Globus ID: [link it](https://docs.globus.org/guides/tutorials/manage-identities/link-to-existing/), or ask the owner to re-share to their usual address |
 | 'Transfer terminated because it hit the deadline' | A fault (expired credentials, permissions) went unfixed for 3 days; fix it and resubmit with `--sync-level checksum` |
@@ -182,7 +182,7 @@ S3 and GCS uploads can incur egress charges: the connector may download a file b
 
 ## Stale advice on the official pages
 
-- transfer.php#cli says to "activate" endpoints at www.globus.org/app/endpoints (`ClientError.ActivationRequired`, "10 day limit"). That is the legacy model: the current CLI has no activate command and reports consent errors (exit 4) instead, which are the user's step.
+- transfer.php#cli says to "activate" endpoints at www.globus.org/app/endpoints (`ClientError.ActivationRequired`, "10 day limit"). That is the legacy model: Biowulf's 3.30.1 still carries a hidden, deprecated `globus endpoint activate` (newer CLIs drop it); don't use it. Consent errors (exit 4) are the user's step.
 - transfer.html#after_batch puts the line-continuation backslash after the destination instead of the source, so the command runs without a destination. Use the script above.
 - globus_cron.php uses the deprecated `globus-timer` (translation under Scheduled and recurring transfers), and transfer.php's "Documentation about the Globus CLI" link (globus.github.io/globus-cli) is dead; use the Globus CLI reference in Going further.
 - cloud.php says to search 'NIH HPC S3' (the collection is `NIH HPC Internet2 - AWS S3`). Its GCS and Google Drive sections say "S3" and "Google Cloud Storage bucket" where they mean GCS and the Drive account.

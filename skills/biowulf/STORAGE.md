@@ -39,8 +39,8 @@ A full /home means "a lot of things can go wrong". Find the culprit with `dust $
 | data files | move them to /data/$USER |
 | a conda install or envs | they belong under /data: CONDA.md |
 | `~/.cache/pip` | `rm -rf ~/.cache/pip` |
-| the rest of `~/.cache` (e.g. Hugging Face models), `~/.conda` | move to /data and symlink back (below) |
-| `~/.singularity/cache` | point the cache at /data: CONTAINERS.md |
+| the rest of `~/.cache` (e.g. Hugging Face models), `~/.conda` (package cache, envs made by a module's conda) | move to /data and symlink back (below); the symlink keeps envs' hard-coded paths valid, which is why a conda install itself gets reinstalled instead |
+| `~/.singularity/cache` | point the cache at /data, then delete the old one: CONTAINERS.md (Troubleshooting) |
 | `~/.vep` | pass `--cache --dir_cache $VEP_CACHEDIR` to every VEP command |
 | `~/R/...` (a pre-Jun-2023 R library) or `~/.cache/R/renv` | reinstall under /data, or move renv's cache: R.md |
 
@@ -92,7 +92,7 @@ From your session, reading `.snapshot` on a compute node is undocumented: try it
 ## Permissions and umask
 
 - NIH prohibits world access to users' directories. Keep /home and /data at most `g+rwx`, and share through a Unix group or ACLs.
-- umask, per NIH's table: `027` is recommended for most users, `077` is private, and `007` suits group sharing where members edit each other's files. `022` and `002` make new files world-readable (warning); `000` is "DANGER". Check it with `umask` and set it per session or job script with `umask 007`. Persisting it means a line in `~/.bashrc`, which needs the user's OK.
+- umask, per NIH's table: `027` is recommended for most users, `077` is private, and `007` suits group sharing where members edit each other's files. `022` and `002` make new files world-readable (warning); `000` is "DANGER". Check it with `umask` and set it per session or job script (`umask 027`; `umask 007` only for a group-edited shared directory). Persisting it means a line in `~/.bashrc`, which needs the user's OK.
 - Directory modes (NIH's verdicts): `0700`/`0750` safe; `0770` lets group members delete any file inside, whatever its own mode; `2770` (setgid: new items inherit the group) is the standard for shared directories; `3770` adds the sticky bit so only owners delete (new subdirectories don't inherit it); `0701`/`0703` is "security through obscurity"; `0755` danger; `0777` "INSANE!". Files: `0600`/`0640` safe, `0660` lets the group edit, `0666` danger.
 
 ## ACLs
@@ -113,6 +113,12 @@ setfacl -x u:friend FILE          # remove one entry (--remove-all strips every 
   ```bash
   setfacl -m u:friend:rw- /data/$USER/sub1/sub2/file.txt
   setfacl -m u:friend:--x /data/$USER/sub1/sub2/ /data/$USER/sub1/ /data/$USER/
+  ```
+- **A whole directory, read-only, for one user** (generic `setfacl`): the existing contents, a default ACL for files added later, and traverse-only parents. `setfacl_path` (below) opens the path's directories, not what's inside them.
+  ```bash
+  setfacl -R -m u:friend:rX /data/$USER/proj/results      # what's there now (X: directories only)
+  setfacl -R -m d:u:friend:rX /data/$USER/proj/results    # what gets added later
+  setfacl -m u:friend:--x /data/$USER/proj /data/$USER    # the way in, without listing
   ```
 - `getfacl_path -p PATH` shows owner, mode, and ACLs for every component of a path. `setfacl_path -p PATH -a '-m u:friend:rX' -d` dry-runs one ACL on every component, skipping root-owned items and symlinks; drop `-d` to apply. Parents get the full entry (listable with `rX`), not just `--x`.
 - `mv` and `cp -p` carry the source's ACLs (or lack of them); the target's default ACLs are not applied. Re-apply after moving files into a shared tree.
@@ -137,10 +143,10 @@ setfacl -x u:friend FILE          # remove one entry (--remove-all strips every 
 | new folders aren't group-writable | `umask 007` (persisting it in `~/.bashrc` needs the user's OK), then `chmod g+w` on existing ones |
 | new folder has the wrong group | `chmod g+s PARENT; chgrp GROUP NEWDIR` |
 
-The groups page's bulk repair can only change files the user owns (`--quiet` hides the errors for the rest). Get the user's go-ahead, and run long repairs under tmux. On trees with ACLs, use `setfacl`, not `chmod g…`:
+The groups page's bulk repair can only change files the user owns (`--quiet` hides the errors for the rest). Get the user's go-ahead, and run long repairs under tmux. On trees with ACLs, use `setfacl`, not `chmod g…`. Fill in GROUP literally: the page's `$shared_data_group_name`, left unset, would turn the path into `/data/`.
 ```bash
-chmod -Rc --quiet g+rwX /data/$shared_data_group_name
-chown -Rc --quiet :$shared_data_group_name /data/$shared_data_group_name
+chmod -Rc --quiet g+rwX /data/GROUP
+chown -Rc --quiet :GROUP /data/GROUP
 ```
 
 ## Choosing a sharing method
@@ -154,6 +160,8 @@ chown -Rc --quiet :$shared_data_group_name /data/$shared_data_group_name
 | no HPC account | NIH Box (can share outside NIH) or OneDrive (NIH only) | TRANSFER.md |
 | anyone given the URL | datashare link | below |
 | none of these fit | staff@hpc.nih.gov | the user |
+
+Controlled-access data (e.g. dbGaP), and anything derived from it, goes only to recipients its data-use terms authorize, by a route those terms allow, and never by datashare link or `/scratch`; that call is the user's ([Data policy](#data-policy)).
 
 The /scratch hand-off is for non-private files only: everyone on the systems can read them. Never open a personal `/scratch/$USER` this way, since anyone could then read and delete its files.
 ```bash
@@ -216,6 +224,7 @@ Globus can't reach the object store yet ("planned"; as of Sept 2026, per object.
 - backups.html gives both "2 nightly and 1 weekly" and "two daily and two weekly" for /data. It describes names as `daily_<timestamp>` while its example is `weekly._2020-06-14T00_00_00.045003UTC`, and it calls `Nightly.2016-05-06_0010` a 6 am snapshot. Always `ls` and pick by timestamp. Its Windows mapped-drive recovery section is empty.
 - /scratch purge: trust the storage page (10 days after last access; early deletion above 80% full) over the Experienced User Guide ("90%", "purged every two weeks").
 - Example paths `/gpfs/gsfs*`, `/gs3`, `/gs11`, and `/spin1` (acls.html, `getfacl_path`, `setfacl_path`) and `/gs6` (groups.html) predate VAST; real output shows `/vf/...`.
+- groups.html's bulk repair writes the group as a shell variable, `/data/$shared_data_group_name`, which an unset variable turns into `/data/` → the literal form above.
 - apps/rclone.html configures the retired object store (`os1naccess2`/`os3access1`, vaults, v2 signatures, `--no-check-certificate`). Use object.html's settings above.
 - sharing_data.html points Globus links at the old `storage/globus.html` (current: https://hpc.nih.gov/docs/globus/), and its "Acronis" quick link leads nowhere.
 - The storage page's `checkquota` sample labels buckets "ObjectStore Vaults".

@@ -21,7 +21,7 @@ Every transfer runs either in your session on a compute node (through the proxy)
 |---|---|---|
 | public files, repositories, datasets over http/https/ftp | `wget`, `curl`, `lftp`, `git clone https://…` | you, in the session |
 | public SRA data | SRA-toolkit | you, in the session |
-| dbGaP (controlled-access) data | SRA-toolkit with the user's dbGaP key | the user (their credentials and data-use terms) |
+| dbGaP (controlled-access) data | SRA-toolkit with the user's dbGaP key | the user, on Helix only (their credentials and data-use terms) |
 | S3 or Google Cloud buckets | `aws`, `gsutil` | you, in the session (try); else the user on Helix |
 | 1–2 files to or from the user's computer | `scp` via helix.nih.gov | the user, on their computer |
 | a few files; a moderate directory tree | `sftp`; `rsync` via helix.nih.gov | the user, on their computer |
@@ -126,19 +126,20 @@ NIH runs the transfers on Helix. rclone also runs in Biowulf jobs and talks http
 
 ```bash
 module load rclone
-rclone copy --progress results.bam box:bam_files                  # copy never deletes
+rclone copy --progress results.bam box:bam_files                  # copy never deletes, but replaces changed same-name files (--ignore-existing skips them)
 tar -cz mydir | rclone -P rcat box:mydir_$(date +%F).tar.gz        # many small files: stream one tarball
 ```
 
-- `rclone sync` makes the destination match the source, deleting whatever the source lacks, and `rclone delete` removes files. Both need the user's go-ahead.
-- Many small files: `--checkers 128 --transfers 128` helps somewhat; a tarball helps more.
+- `rclone sync` makes the destination match the source, deleting whatever the source lacks, and `rclone delete` removes files. Both need the user's go-ahead; a request to "keep it in sync" isn't one, so use `copy` until they agree to deletions.
+- Many small files: `--checkers 128 --transfers 128` helps somewhat (NIH's figure, run on Helix; in a session keep them near the allocation's CPUs); a tarball helps more.
+- Recurring syncs: NIH documents no user cron, and Globus timers (GLOBUS.md) can't reach Box. The user reruns the copy, or submits a batch job for each round.
 - **Files over the size limit:** the user adds a `chunker` remote wrapping `box:` (e.g. `chunk_size` 10G). Uploads through it arrive as `NAME.rclone_chunk.NNN` plus a small placeholder; reassemble outside rclone with `cat biggerfile.rclone_chunk.* > biggerfile`.
 - Folders others share with the user's Box appear in `rclone lsd box:` like their own.
 - NIH's sample rates from Helix: Box 24–35 MB/s, OneDrive about 9.5 MB/s.
 
 ## NCBI downloads
 
-- **SRA and dbGaP data:** use [SRA-toolkit](https://hpc.nih.gov/apps/sratoolkit.html), not Aspera. SRA-toolkit, NCBI-ngs, ngs-bam, ncbi-vdb, Entrez Direct, and hisat are configured to fetch from NCBI automatically, so they work in the session for public SRA data. dbGaP data is controlled-access: its downloads use the user's key and are the user's (table above; STORAGE.md).
+- **SRA and dbGaP data:** use [SRA-toolkit](https://hpc.nih.gov/apps/sratoolkit.html), not Aspera. SRA-toolkit, NCBI-ngs, ngs-bam, ncbi-vdb, Entrez Direct, and hisat are configured to fetch from NCBI automatically, so they work in the session for public SRA data. dbGaP data is controlled-access: its downloads use the user's key and are the user's (table above; STORAGE.md). Since SRA-toolkit 3.0.0 they don't work through the compute-node proxy, so they run on Helix only, one at a time (no swarms of downloads there), with temp space on `/scratch` (Helix has no lscratch).
 - **NCBI FTP** (anonymous): the page uses the `ftp` client on Helix or Biowulf. In the session, `wget`/`lftp` with `ftp://ftp.ncbi.nlm.nih.gov/...` should work, since the proxy carries ftp. Some data exists only on FTP.
 - **Aspera** (`ascp`) is up to ~5× faster than FTP but runs only on Helix: it loads the login node heavily and fails on compute nodes. It needs no module. Since Aspera 4.2, NCBI downloads need `ASPERA_SCP_PASS` set (the page puts it in `~/.bashrc`):
 
@@ -184,7 +185,7 @@ scp -r submission_dir geoftp@sftp-private.ncbi.nlm.nih.gov:uploads/your_geo_work
 
 - transfer.html suggests "blowfish or arcfour" ciphers for speed. Modern OpenSSH builds may not offer them; don't recommend it.
 - Its first Aspera example saves to `/scratch/$USER`, which is purged and invisible to compute nodes. Save to /data.
-- Its OpenNeuro fallback `NODE_OPTIONS=--no-experimental-openneuro upload PATH_TO_BIDS_FOLDER` is garbled (there's no `openneuro` command in it). Run `openneuro upload …` under the 4.12.1 module and check its help.
+- Its OpenNeuro fallback `NODE_OPTIONS=--no-experimental-openneuro upload PATH_TO_BIDS_FOLDER` is garbled (there's no `openneuro` command in it); it probably meant `NODE_OPTIONS=--no-experimental-fetch openneuro upload PATH_TO_BIDS_FOLDER` (unconfirmed). Run `openneuro upload …` under the 4.12.1 module and check its help.
 - Its end-of-batch-job Globus example misplaces a `\`; GLOBUS.md has a working version.
 - box_onedrive.html's comparison dates from 15 Sep 2022. Its Box "Globus connector coming…" is still pending on the Globus pages, so use rclone for Box.
 

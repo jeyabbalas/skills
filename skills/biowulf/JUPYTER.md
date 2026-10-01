@@ -51,7 +51,7 @@ module load jupyter && jupyter kernelspec list                                # 
 ```
 
 - Run the install with the env's own python (full path above, or `python` in the activated env before loading `jupyter`). It writes to `~/.local/share/jupyter`. `--name` is the internal id; `--display-name` is what the UI shows.
-- Advice: a kernelspec stores the env's absolute interpreter path, so re-run the install after moving or recreating the env. Remove a kernel with `jupyter kernelspec remove myenv`.
+- Advice: a kernelspec stores the env's absolute interpreter path, so re-run the install after moving or recreating the env. Remove a kernel, with the user's OK, by `jupyter kernelspec remove -f myenv` (without `-f` it waits for a y/N answer).
 - For other languages, install that language's Jupyter kernel package the same way, or ask staff.
 - Is a package missing from a module kernel? Add it to your own env and use that env's kernel. Advice: `pip install` from a module kernel lands in `~/.local` (why that breaks: PYTHON.md).
 

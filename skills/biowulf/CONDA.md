@@ -23,11 +23,14 @@ Table of contents
 Look for an existing install and for init code in dotfiles first:
 
 ```bash
+# on the compute node (inside the session)
 ls -d /data/$USER/*conda* /data/$USER/*forge* ~/*conda* ~/*forge* ~/.conda/envs ~/bin/myconda 2>/dev/null
 grep -n 'conda initialize' ~/.bashrc ~/.bash_profile ~/.zshrc ~/.cshrc ~/.tcshrc 2>/dev/null
 ```
 
-If `/data/$USER/conda` exists, use it rather than reinstalling (add `--init-only` if the init file is missing); an install under `~` is what fills /home ([Fix a broken setup](#fix-a-broken-setup)). Otherwise get the user's go-ahead before running `mamba_install`: it installs several GB under /data and, by default, also strips `conda init` code from all their shell dotfiles (`--no-cleanup` skips that part).
+- `/data/$USER/conda` exists: use it rather than reinstalling (add `--init-only` if the init file is missing).
+- Only an install under `~` (e.g. `~/miniconda3`): don't create envs with it or offer to, even though it works, since that is what fills /home. Propose a fresh install under /data and leave the old one alone until the user decides ([Fix a broken setup](#fix-a-broken-setup)).
+- Either way, get the user's go-ahead before running `mamba_install`: it installs several GB under /data and, by default, also strips `conda init` code from all their shell dotfiles (`--no-cleanup` skips that part). Say so when asking: stripping is NIH's intent, but it changes their login shell and stops any old install from auto-activating.
 
 ```bash
 # on the compute node, after the user's go-ahead
@@ -76,17 +79,19 @@ Swarm lines: call the env's binary by full path (`/data/$USER/conda/envs/proj/bi
 ## Create and manage environments
 
 ```bash
-mamba create -n proj python=3.12 numpy scipy bioconda::pysam   # pin versions; CHANNEL::pkg picks the channel
+mamba create -y -n proj python=3.12 numpy scipy bioconda::pysam   # pin versions; CHANNEL::pkg picks the channel
 conda activate proj
 conda config --env --add channels bioconda       # per-env channels; the last one added goes on top,
 conda config --env --add channels conda-forge    #   so conda-forge is searched first
 conda config --env --set channel_priority strict
 conda config --env --add pinned_packages 'blas=*=mkl'   # e.g. pin the BLAS flavor; quote specs with *
 conda config --show-sources                      # every .condarc in effect
-mamba install -q bedtools hisat2
+mamba install -y -q bedtools hisat2
 conda info --envs
 ```
 
+- Pass `-y` to `create` and `install`: your shell can't answer their confirmation prompt.
+- `conda config --env` writes to the active env's `.condarc`, and with no env active to `~/.condarc`, which should hold no channels. If your tool calls don't share a shell, chain the activation and every `conda config --env` line into one call, or name the file: `conda config --file /data/$USER/conda/envs/proj/.condarc --add channels bioconda`. Confirm with `conda config --show-sources`.
 - Configure with `conda config`; mamba had no `config` command when NIH wrote its page.
 - `pip install` inside an activated env is allowed, but pip "can sometimes cause problems when pip overwrites existing conda-installed packages": install conda packages first and pip packages last (more in PYTHON.md).
 - GPU builds use build-string specs such as `mamba install 'tensorflow=*=cuda*'` (framework setup: DEEP-LEARNING.md).
@@ -97,7 +102,7 @@ conda info --envs
 **conda init code in dotfiles** (Graphical Session or TurboVNC authentication fails, a black screen, login trouble):
 
 1. Show the user what's there: `grep -n -A15 '>>> conda initialize' ~/.bashrc ~/.bash_profile ~/.zshrc ~/.cshrc 2>/dev/null`, plus any other `conda activate`, `source .../conda.sh`, or `module load` lines.
-2. With their go-ahead, back up each affected file (`cp -p ~/.bashrc ~/.bashrc.bak`) and remove the blocks with `module load mamba_install && mamba_install --cleanup-only` (all shell dotfiles; documented for an install at `/data/$USER/conda`), or `conda init --reverse` from the sourced install, or by deleting from `# >>> conda initialize >>>` to `# <<< conda initialize <<<`.
+2. With their go-ahead, back up each affected file (`cp -p ~/.bashrc ~/.bashrc.bak`) and remove the blocks with `module load mamba_install && mamba_install --cleanup-only` (all shell dotfiles; documented for an install at `/data/$USER/conda`), or `conda init --reverse --all` from the sourced install (bare `--reverse` cleans bash only), or by deleting from `# >>> conda initialize >>>` to `# <<< conda initialize <<<`.
 3. Remove lines outside those blocks by hand, also with the user's OK; changes apply to new shells, so the user logs in again to confirm. For the TurboVNC symptom alone, removing the `dbus` package from the auto-activated env also works.
 
 **HTTP 403 from repo.anaconda.com** (`RuntimeError: Multi-download failed. Reason: Transfer finalized, status: 403 [https://repo.anaconda.com/pkgs/...]`): add this to the install's own `.condarc`, `/data/$USER/conda/.condarc` (`$CONDA_ROOT/.condarc`, not `~/.condarc`), and make sure `~/.condarc` sets no channels or defaults (edit it only with the user's OK). NIH's alternative is the user's own Anaconda Professional license.

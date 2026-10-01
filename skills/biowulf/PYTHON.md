@@ -65,7 +65,7 @@ Symptoms and traps:
 
 ## Multiprocessing template
 
-The page's template with its missing `import sys` added (its "set up 50 tasks" comment also contradicted the 100 tasks it creates). Workers ignore SIGINT, so Ctrl-C (or `scancel`, per the page) stops the script cleanly.
+The page's template with its missing `import sys` added (its "set up 50 tasks" comment also contradicted the 100 tasks it creates). Workers ignore SIGINT, so Ctrl-C stops the script cleanly; the page adds `scancel`, but that sends SIGTERM, which the handler doesn't catch (the job still ends).
 
 ```python
 #!/usr/bin/env python
@@ -113,7 +113,7 @@ Its README sizes workers with `--cpus-per-task` and `--gpus-per-task` and sends 
 
 ## Headless plotting
 
-Without a display, matplotlib fails with `Could not connect to any X display`. Switch to a non-interactive backend, narrowest scope first:
+With a GUI backend configured and no display, matplotlib fails with `Could not connect to any X display` (left alone, it falls back to Agg). Switch to a non-interactive backend, narrowest scope first:
 
 - In code, before importing pyplot: `import matplotlib; matplotlib.use("agg")`.
 - In the job script or your shell: `export MPLBACKEND=agg`. The page also suggests `~/.bashrc`; that edit is the user's call.
@@ -133,7 +133,7 @@ python /data/$USER/proj/run.py           # sizes pools and n_jobs from SLURM_CPU
 
 Give the user: `sbatch --cpus-per-task=8 --mem=16g --gres=lscratch:10 --time=4:00:00 job.sh`.
 
-- Swarm: load Python in each subjob with `--module`, e.g. `swarm -f run.swarm -g 8 -t 4 --time=2:00:00 --module python/3.12`, which the user runs (options: SWARM.md).
+- Swarm: load Python in each subjob with `--module`, e.g. `swarm -g 8 -t 4 --time=2:00:00 --module python/3.12 run.swarm`, which the user runs (options: SWARM.md).
 - Each Python start scans many paths on the shared filesystem, so thousands of short Python processes strain it, worst in large swarms whose lines each run several short scripts. Make each process do more work (loop over a batch of inputs per line); bundling lines (SWARM.md) also cuts how many start at once.
 - An own conda env in batch or swarm: CONDA.md.
 
@@ -153,7 +153,7 @@ Give the user: `sbatch --cpus-per-task=8 --mem=16g --gres=lscratch:10 --time=4:0
 ## Stale advice on the official pages
 
 - python.html intro: `/usr/local/bin/python` links to Python 2.7 → per the Jun 2023 changelog it is Python 3.9, and 2.7 is provided in no form.
-- `python.html#packages` (the package table the intro links) doesn't exist → `python -m pip list`. Its conda advice ("mambaforge", `#envs`) is stale too: CONDA.md.
+- `python.html#packages` (the package table the intro links) doesn't exist → `python -m pip list`. Its conda advice ("mambaforge", and a dead `docs/diy_installation#conda` link) is stale too: CONDA.md.
 - The rpy2 example loads `python/3.7`, retired in Jun 2023 → a current module.
 - The multiprocessing template calls `sys.exit` without `import sys` → fixed above.
 - The commented-out mpi4py how-to offers `srun --mpi=pmi2`, contradicting the changelog → `mpiexec`.

@@ -52,12 +52,13 @@ For one command without a script, the user can run `sbatch --cpus-per-task=4 --m
 ## Checklist before handing over
 
 - `--mem` has a unit (`--mem=16g`). A bare number is MB, and the job "will likely" fail.
+- `#SBATCH` lines are read by Slurm, not the shell: `$USER` or `$HOME` there stays literal. In `--output`/`--error` use Slurm's `%u` (user), `%j` (job ID), `%x` (job name), and point them at a directory that already exists (generic Slurm).
 - Threaded programs get `--cpus-per-task` and read `$SLURM_CPUS_PER_TASK`; without the flag the variable is unset, in batch and interactive jobs alike.
 - `--time` and `--mem` come from a measured run plus a small buffer (15–25% on time). Bigger requests wait longer, since smaller jobs are scheduled first.
 - One `--gres` flag carries every GRES (`--gres=lscratch:50,gpu:a100:1`); repeated `--gres` flags keep only the last.
 - `TMPDIR` is exported to lscratch, and results are copied to `/data` before the script ends.
-- `set -e` or `|| fail` checks, so failures end `FAILED` and `afterok` dependents don't run on bad input.
-- Partition rules hold: GPUs → `--partition=gpu`, `gpuh200`, or (H200s, under 4 h) `quick`; `largemem` → `--mem` of at least 350g; `multinode` → multi-node MPI only; at most two partitions.
+- `set -e` or `|| fail` checks, so failures end `FAILED` and `afterok` dependents don't run on bad input; add `-o pipefail` when a step is a pipeline (Exit codes below).
+- Partition rules hold: GPUs → `--partition=gpu`, `gpuh200`, or (H200s, up to 4 h) `quick`; `largemem` → `--mem` of at least 350g; `multinode` → multi-node MPI only; at most two partitions.
 - GPU jobs stay within the CPUs-per-GPU cap.
 - No node or GPU types copied from old examples (`x2695`, `x2630`, `k80` are retired; `x2650` is absent from the hardware page).
 - `bash -n job.sh` passes, and the core command ran on a small input inside your session (GPU code from a CPU session: a short GPU test job the user submits).
@@ -101,20 +102,21 @@ As of Sept 2026; `batchlim` shows current limits and `freen` the nodes behind ea
 | Partition | For | Rules |
 |---|---|---|
 | `norm` | the default; CPU jobs | single node only |
-| `quick` | jobs under 4 h | higher priority; dedicated quick nodes plus idle buy-in nodes |
-| `largemem` | memory that won't fit on `norm` | `--mem` of at least 350g; nodes up to 3 TB. A 350–747g job also fits `norm`'s largest nodes (HARDWARE.md), so `--partition=norm,largemem` widens its pool |
+| `quick` | short jobs: `--time` up to 4:00:00 (NIH: "< 4 hours") | higher priority; dedicated quick nodes plus idle buy-in nodes |
+| `largemem` | memory that won't fit on `norm` | `--mem` of at least 350g; nodes up to 3 TB. A job of 350g or more that also fits a `norm` node (747g on `e9454`; about 1.5 TB if the new `e9645` nodes are in `norm`, as the hardware page's source suggests: HARDWARE.md) can use `--partition=norm,largemem` to widen its pool. swarm has its own threshold (SWARM.md) |
 | `multinode` | MPI jobs across nodes | no single-node jobs (Multinode MPI jobs) |
 | `unlimited` | runs over 10 days that can't be split, or a first run of unknown length | small, low per-user CPU limit, older nodes; still set `--time`; maintenance can end jobs |
 | `gpu` | GPU software (P100, V100, V100x, A100, L40) | request GPUs with `--gres` (GPUs) |
 | `gpuh200` | H200 batch jobs | strict limits (GPUs) |
 | `interactive` | `sinteractive` sessions | not in the user guide's table; `batchlim` lists it |
-| `visual` | GPU-accelerated remote graphics via `svis` | whole-node allocation (ACCESS.md) |
 | `ccr*`, `forgo`, `persist`, … | buy-in nodes | NCI CCR; some NHLBI and NINDS groups; NIMH |
+
+The `visual` partition and `svis` were retired in January 2026 ([announcement](https://hpc.nih.gov/nih/about/announcements.php?1172)); remote graphics go through HPC OnDemand (ACCESS.md).
 
 - Give at most two partitions, e.g. `--partition=quick,norm`: the job runs on the first where it can be scheduled, and it must satisfy both, so here `--time` must fit `quick`.
 - Priority falls as the user's CPU usage over the last few months grows; `quick` and `interactive` rank above the other partitions.
 - Without `--time` a job gets its partition's default (`batchlim`; the documented sample shows 2–8 h for the general partitions). A job that reaches its walltime is killed.
-- Walltime maximum is 10 days (`--time=10-00:00:00`) except on `unlimited`; `quick` under 4 h, `gpuh200` 24 h, interactive 36 h (Sept 2026). Formats in the docs: `--time=8:00:00`, `--time=1-12:00:00`, `--time=168:00:00`.
+- Walltime maximum is 10 days (`--time=10-00:00:00`) on the general partitions; `quick` 4 h, `gpuh200` 24 h, interactive 36 h, and `unlimited` and the buy-in partitions set their own (Sept 2026; `batchlim`). Formats in the docs: `--time=8:00:00`, `--time=1-12:00:00`, `--time=168:00:00`.
 - Asking for 10 days when a job needs 2 only delays its start. Check limit and time used once, not in a loop: `squeue -O jobid,timelimit,timeused -u $USER`. The user can change a walltime with `newwall` (Changing or cancelling a job).
 
 ## Interactive sessions
@@ -128,7 +130,7 @@ sinteractive --cpus-per-task=8 --mem=32g --gres=gpu:a100:1,lscratch:50   # the d
 ```
 
 - **At most two interactive jobs per user**, each up to 36 h, however obtained: every OnDemand app counts (Jupyter, RStudio, VS Code, Shiny) except the Graphical Session, and a third fails to submit. Your own session usually holds one of the two (a Graphical Session terminal doesn't).
-- `-T`/`--tunnel` opens ports for a browser app: TUNNELING.md. GPU-accelerated visualization (`svis`): ACCESS.md.
+- `-T`/`--tunnel` opens ports for a browser app: TUNNELING.md. Remote graphics: ACCESS.md.
 - An interactive shell from `salloc` or `srun` is unsupported; use `sinteractive`.
 - Time left in your session: `squeue -j $SLURM_JOB_ID -O jobid,timelimit,timeused`. Before it runs out, ask the user to extend it with `newwall` (36 h cap); lscratch does not outlive the session.
 - NIMH users needing more than 36 h can start `spersist` themselves on the `persist` partition: default 2 CPUs and 4 GB, no walltime limit, ends when the login node reboots ([nimh.html#persist](https://hpc.nih.gov/docs/nimh.html#persist)).
@@ -150,14 +152,14 @@ Batch GPU jobs name the partition (`gpu`; H200s `gpuh200`) and request GPUs as `
 # script template; nvidia-smi at the top records which GPU the job got
 ```
 
-Request forms for the user's `sbatch` (flags) and `sinteractive` (Sept 2026):
+Request forms (Sept 2026). The `--partition` lines are `sbatch` flags; `sinteractive` takes the same `--gres` and `--constraint` but no `--partition`, as in the docs' examples and the last line:
 
 ```bash
 --partition=gpu --gres=gpu:v100x:2                             # typed: documented
 --partition=gpu --gres=gpu:1 --constraint="gpuv100x|gpua100"   # any listed type: documented pattern (app pages)
---partition=gpu --gres=gpu:1 --constraint=gpul40               # an L40; the type string gpu:l40:1 is unverified — check freen
+--partition=gpu --gres=gpu:1 --constraint=gpul40               # an L40; type string gpu:l40 or gpu:l40s (early announcements said L40S) unverified — check freen
 --partition=gpuh200 --gres=gpu:2                               # H200 batch; gpu:h200:2 is unverified
---partition=quick --gres=gpu:2 --constraint=gpuh200 --time=3:00:00   # H200 nodes in quick
+--partition=quick --gres=gpu:2 --constraint=gpuh200 --time=3:00:00   # H200 nodes in quick; syntax unverified
 sinteractive --gres=gpu:1,lscratch:50 --constraint=gpuh200     # the one interactive H200; syntax unverified
 ```
 
@@ -174,10 +176,12 @@ H200 rules ([30 Sep 2026 announcement](https://hpc.nih.gov/nih/about/announcemen
 
 ## Exit codes and job states
 
-A job's final state is its script's exit status, i.e. that of the last command. A failed step followed by `echo "DONE"` ends `COMPLETED`, even after a step was killed for exceeding memory. Make failures fail:
+A job's final state is its script's exit status, i.e. that of the last command. A failed step followed by `echo "DONE"` ends `COMPLETED`. A command killed for exceeding memory also lets the script run on; the user guide says the job can then end `COMPLETED`, but current Slurm marks a kill in the batch script `OUT_OF_MEMORY` (an OOM inside a separate `srun` step can still end `COMPLETED`), so check MemUsed either way. Make failures fail:
 
 ```bash
 set -e                               # stop at the first failing command (a grep with no match counts)
+set -o pipefail                      # a pipeline fails if any stage does, not just the last (generic bash);
+                                     #   a producer cut off by `| head` then fails too
 fail() { echo "FAIL: $*" >&2; exit 1; }
 module load mytool || fail "module load failed"      # or check only the steps that matter
 ```
@@ -197,11 +201,11 @@ States (meanings only; what to do: TROUBLESHOOTING.md): `PD` pending · `R` runn
 | `Licenses` | waiting for a software license |
 | `ReqNodeNotAvail` | a node the job needs is unavailable (down, drained, or reserved) |
 
-All codes: [Slurm job reason codes](https://slurm.schedmd.com/job_reason_codes.html). Finished jobs: `sacct` (today's), `sacct --state f --starttime 2026-09-01` (failures since a date).
+All codes: [Slurm job reason codes](https://slurm.schedmd.com/job_reason_codes.html). Finished jobs: `sacct` (today's), `sacct --state F,OOM,TO,NF -S 2026-09-01 -E now` (failures since a date). With `--state`, give both `-S` and `-E`: otherwise the window collapses to a single instant and nothing is listed.
 
 ## Dependencies
 
-Biowulf's `sbatch` is a wrapper that prints only the job ID (stock Slurm prints `Submitted batch job N`), or `sbatch failed` with exit status 1; `swarm` also prints the ID. So `jid=$(sbatch ...)` captures it.
+Biowulf's `sbatch` is a wrapper that prints only the job ID (stock Slurm prints `Submitted batch job N`), or, per job_dependencies.html's sketch of it, `sbatch failed` with exit status 1; `swarm --silent` also prints only the ID. So `jid=$(sbatch ...)` captures it.
 
 | Type | The dependent job may start once the listed jobs have… |
 |---|---|
@@ -218,11 +222,11 @@ A job that depends on a swarm or array starts when all its subjobs have finished
 # pipeline.sh — the user runs it on the Biowulf login node: bash pipeline.sh
 set -e
 jid1=$(sbatch --cpus-per-task=8 --mem=32g --time=6:00:00 align.sh)
-jid2=$(swarm -f per_sample.swarm -g 8 -t 4 --time=2:00:00 --dependency=afterok:$jid1)
+jid2=$(swarm --silent -f per_sample.swarm -g 8 -t 4 --time=2:00:00 --dependency=afterok:$jid1)
 sbatch --dependency=afterany:$jid2 --mem=16g --time=1:00:00 merge.sh   # merge.sh checks every sample's output exists
 ```
 
-- A job script can chain its successor with `sbatch --dependency=afterany:$SLURM_JOB_ID next.sh`. That is a submission: fine inside a script the user submits, never something you run in your session.
+- A job script can chain its successor with `sbatch --dependency=afterany:$SLURM_JOB_ID next.sh`. That is a submission: fine as a line in a script the user submits, never a command you run yourself, not even from inside a batch job.
 - `sjobs` shows each job's dependency (UTILITIES.md); the user changes one with `scontrol update` (next section).
 
 ## Changing or cancelling a job
@@ -233,7 +237,7 @@ All of these are the user's. Hand over the exact line with the real job ID.
 # on Biowulf (login node) — the user runs:
 newwall --jobid 12345 --time 8:00:00                  # raise or lower walltime, pending or running (too low → TIMEOUT kill)
 scontrol update JobId=12345 dependency=afterany:12300
-scontrol update JobID=12345 partition=ccr QOS=ccr     # send a queued job to another partition
+scontrol update JobID=12345 partition=ccr QOS=ccr     # user guide's example: a queued job to NCI CCR's buy-in partition (CCR members); other targets undocumented
 scancel 12345
 scancel --name=JobName
 scancel --user=$USER --state=PENDING                  # all of the user's pending jobs
@@ -262,8 +266,9 @@ srun --mpi=pmix_v3 myapp_mpi input.cfg    # or: mpirun -np $SLURM_NTASKS myapp_m
 ```
 
 - Node types available in `multinode`: HARDWARE.md. With `--exclusive`, make `--ntasks` a multiple of the node's CPUs (or of its cores, with `--ntasks-per-core=1`) so no capacity sits idle.
+- Pure-MPI codes: `export OMP_NUM_THREADS=1` in the script; without `--cpus-per-task`, `$SLURM_CPUS_PER_TASK` is unset, and the usual `:-2` fallback would give each rank two threads.
 - Add `--mem-per-cpu=Ng` only if a process needs more than the default 2 GB per CPU; size it with `jobhist` on the benchmark runs (UTILITIES.md).
-- **Benchmark first:** short representative runs on 1, 2, 4, … nodes. Parallel efficiency = work done on N ÷ (N × work done on 1), computed per node if you like. Run at the largest size whose efficiency is above 0.7 (the policy's worked example lands on 128 cores). Staff will ask for proof that a job requesting more than 512 CPUs can use them, and wasted CPU lowers the user's future priority.
+- **Benchmark first:** short representative runs on 1, 2, 4, … nodes (the 1-node run goes to `norm` with the same `--constraint`, since `multinode` refuses single-node jobs). Parallel efficiency = work done on N ÷ (N × work done on 1), computed per node if you like. Run at the largest size whose efficiency is above 0.7 (the policy's worked example lands on 128 cores). Staff will ask for proof that a job requesting more than 512 CPUs can use them, and wasted CPU lowers the user's future priority.
 - `--qos=turbo` gives higher limits and slightly higher priority to jobs of 8 h or less. "This is only valid on the multinode partition!", and it doesn't excuse skipping the benchmark.
 - I/O: estimate total bytes read and written ÷ runtime; about 144 MB/s is near the top of what storage sustains for one user. Put independent per-task temp files on lscratch, and scale up from a few nodes.
 
@@ -276,18 +281,19 @@ srun --mpi=pmix_v3 myapp_mpi input.cfg    # or: mpirun -np $SLURM_NTASKS myapp_m
 
 ## Licenses, email, and citation
 
-- Licensed software includes MATLAB, IDL, and Mathematica. Batch jobs using licensed software other than MATLAB must pass `--license` (e.g. `--license=idl:6`, the 6 licenses one IDL instance needs), so the job waits for a license instead of starting, failing to get one, and exiting. Availability: `licenses`, or the [System Status](https://hpc.nih.gov/systems/status) page. MATLAB checks out licenses automatically ([Matlab.html#compiledbatch](https://hpc.nih.gov/apps/Matlab.html#compiledbatch) for batch jobs).
+- Licensed software includes MATLAB, IDL, and Mathematica. Batch jobs using licensed software other than MATLAB must pass `--license` (e.g. `--license=idl:6`, the 6 licenses one IDL instance needs), so the job waits for a license instead of starting, failing to get one, and exiting. Availability: `licenses`, or the [license status table](https://hpc.nih.gov/systems/status/license_status.html) (NIH-only; the System Status page dropped it in April 2026). MATLAB checks out licenses automatically ([Matlab.html#compiledbatch](https://hpc.nih.gov/apps/Matlab.html#compiledbatch) for batch jobs).
 - `--mail-type=` takes a comma list of `BEGIN`, `END`, `FAIL`, `REQUEUE`, `ALL` (the first four), `TIME_LIMIT_50`, `TIME_LIMIT_80`, `TIME_LIMIT_90`, `TIME_LIMIT`. Mail goes to `$USER@biowulf.nih.gov`, forwarded to the user's NIH mailbox. Leave `--mail-user` out; if the user wants it, it must be their literal nih.gov address, tested on one job before any swarm or array, since every bounce lands on the staff mail server.
 - Citation for publications that made significant use of Biowulf: "This work utilized the computational resources of the NIH HPC Biowulf cluster (https://hpc.nih.gov)." ([userguide#ack](https://hpc.nih.gov/docs/userguide.html#ack))
 
 ## Stale advice on the official pages
 
-- Examples still use `x2650` (user guide, multinode policy; absent from the current hardware page) and types retired in April 2026 (`x2695` in the multinode policy, `k80` on the deep-learning pages) → current types from HARDWARE.md or `freen`.
+- Examples still use `x2650` (user guide, multinode policy; absent from the current hardware page) and types retired in April–May 2026 (`x2695` in the multinode policy, `k80` on the deep-learning pages) → current types from HARDWARE.md or `freen`.
 - The user guide says GPU jobs must "specifically request the type"; the Experienced User Guide calls the type optional, and current app pages use untyped `gpu:1` with `--constraint` → both forms are in use.
 - sinteractive default memory: the 2020 cheat sheet says 4 GB → 1.5 GB. Ignore the cheat sheet's `--partition=ibfdr` too (`ibfdr` is a node feature).
 - The user guide sends readers to "the default walltime in the table above", which no longer exists → `batchlim`. The Experienced User Guide's "up to 10 days by default" → 10 days is the maximum, not the default.
 - The user guide's MPI example omits `--partition=multinode` (required: `norm` is single-node) and loads `meep/1.2/mpi/gige` but runs `meme` → use the template above.
-- The user guide says MATLAB licenses are interactive-only (since 2016) → Matlab.html documents `sbatch` and swarm jobs with automatic license checkout. Its unquoted `matlab -batch hyp(3,4)` is a bash syntax error → `matlab -batch "hyp(3,4)"`.
+- The user guide says MATLAB licenses are interactive-only (since 2016) → Matlab.html documents `sbatch` and swarm jobs with automatic license checkout. Matlab.html's unquoted `matlab -batch hyp(3,4)` is a bash syntax error → `matlab -batch "hyp(3,4)"`.
+- The user guide's `sacct --state f` ("failed since midnight") lists nothing: with `--state`, sacct's window defaults to the current instant → `sacct --state F,OOM,TO,NF -S midnight -E now`. Its #licenses section still points to the System Status page, which dropped the license table in April 2026.
 - job_dependencies.html's Python example is Python 2 (`commands` module, `print` statements) → port to Python 3 with `subprocess`.
 
 ## Going further
