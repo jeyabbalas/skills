@@ -10,10 +10,15 @@ parse is not reported as an error by the skills.sh installer -- the skill is
 just dropped from the repo's listing, so `skills add ... --skill <name>` says
 the skill does not exist. An unquoted ": " inside a description is enough.
 
+It also runs scripts/release.py's checks -- every changed skill bumped, no
+version reused, changelogs in step, the bundle version derived -- which need
+the repo's full history and tags.
+
 Usage:  uv run scripts/validate_skills.py
         (fallback: pip install pyyaml && python3 scripts/validate_skills.py)
 
 Exits 0 when every check passes, 1 otherwise, printing one line per failure.
+On success it also says what the next push will release.
 """
 
 from __future__ import annotations
@@ -24,6 +29,8 @@ import sys
 from pathlib import Path
 
 import yaml
+
+import release  # scripts/release.py owns versions, changelogs, and release tags
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -76,6 +83,13 @@ def check_skill(d: Path) -> None:
         fail(f"skills/{name}/SKILL.md", f"name is {fm.get('name')!r}, must equal the directory name {name!r}")
     if not str(fm.get("description", "")).strip():
         fail(f"skills/{name}/SKILL.md", "description is missing or empty")
+    # The Agent Skills spec makes metadata a map of strings; release.py
+    # reports on metadata.version itself, so it is skipped here.
+    meta = fm.get("metadata", {})
+    if not isinstance(meta, dict) or any(
+        not isinstance(v, str) for k, v in meta.items() if k != "version"
+    ):
+        fail(f"skills/{name}/SKILL.md", "metadata must map keys to double-quoted strings (Agent Skills spec)")
 
     # House rule: quote the free-text scalars, so an edit that introduces a
     # colon cannot turn into the silent-drop bug above.
@@ -130,6 +144,20 @@ def check_manifests(names: list[str]) -> None:
     for n in names:
         if f"](./skills/{n}/SKILL.md)" not in readme:
             fail("README.md", f"no skills-table row linking ./skills/{n}/SKILL.md")
+        if f"](./changelogs/{n}.md)" not in readme:
+            fail("README.md", f"{n}'s skills-table row does not link ./changelogs/{n}.md")
+
+
+def check_releases() -> str:
+    """Versions, changelogs, and tags; returns what the next push will release."""
+    try:
+        report = release.check(ROOT)
+    except release.ReleaseError as e:
+        fail("release", str(e))
+        return ""
+    for where, msg in report.problems:
+        fail(where, msg)
+    return report.summary
 
 
 def main() -> int:
@@ -141,6 +169,7 @@ def main() -> int:
     for d in dirs:
         check_skill(d)
     check_manifests([d.name for d in dirs])
+    summary = check_releases()
 
     if failures:
         print(f"{len(failures)} problem(s) found:\n")
@@ -148,6 +177,8 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print(f"OK: {len(dirs)} skill(s) valid -- {', '.join(d.name for d in dirs)}")
+    if summary:
+        print(summary)
     return 0
 
 

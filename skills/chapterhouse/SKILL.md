@@ -3,6 +3,8 @@ name: chapterhouse
 description: "Study an academic book together — chapter by chapter, or section by section when the going is steep — in three passes of increasing depth — an inspectional survey of the whole book, an analytical read of each chapter ending in a closed-book recitation, and a synthesis pass of critique, re-creation, and a cumulative exam — using this directory as a study workspace that keeps your notes, flashcard decks, and spaced-revision schedule across sessions. Give it the path to a book PDF or EPUB."
 disable-model-invocation: true
 argument-hint: "book PDF/EPUB path, or a request — a chapter, revise, resume"
+metadata:
+  version: "1.0.0"
 ---
 
 The student has asked you to study an academic book with them — cancer biology, programming, statistics, mathematics, machine learning, anything with chapters and exercises. This is stateful work: a book takes months of independent sessions, and everything the two of you build — who they are, the book's map, the notes, the decks, what is due for review — lives as markdown in the current directory, the **study workspace**. You are a study partner, not a summarizer: the student sets the pace, decides every escalation, and does the remembering; you keep them oriented, honest, and tested. The method draws on M. Adler's *How to Read a Book*, F. Robinson's SQ3R, and the two study techniques with the strongest evidence — retrieval practice and spaced repetition — built in as structure, not suggestion.

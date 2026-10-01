@@ -8,27 +8,27 @@ Agent skills I use for my own work, shared so you (or your agent) can install th
 
 | Skill | What it does | Invocation |
 |---|---|---|
-| [`handoff`](./skills/handoff/SKILL.md) | Compact the current conversation into a portable handoff document, so a fresh agent — in another harness, another directory, or another person's hands — can pick the work up without you re-explaining it. | User-invoked |
+| [`handoff`](./skills/handoff/SKILL.md) · [changelog](./changelogs/handoff.md) | Compact the current conversation into a portable handoff document, so a fresh agent — in another harness, another directory, or another person's hands — can pick the work up without you re-explaining it. | User-invoked |
 
 ### Tutor
 
 | Skill | What it does | Invocation |
 |---|---|---|
-| [`three-pass`](./skills/three-pass/SKILL.md) | Read an academic paper together in three passes of increasing depth — a bird's-eye profile, an interactive close reading, and a line-by-line derivation or reproduction — building a reading workspace that remembers you and your papers across sessions. | User-invoked |
-| [`chapterhouse`](./skills/chapterhouse/SKILL.md) | Study a whole academic book together — chapter by chapter, or section by section when the going is steep — in three passes of increasing depth — an inspectional survey that maps and plans the read, an analytical read where every chapter ends in a closed-book recitation, and a synthesis pass of critique, re-creation, and a cumulative exam — building a study workspace of Cornell notes, flashcard decks, and a spaced-revision schedule that remembers you, your books, and what's due across sessions. | User-invoked |
+| [`three-pass`](./skills/three-pass/SKILL.md) · [changelog](./changelogs/three-pass.md) | Read an academic paper together in three passes of increasing depth — a bird's-eye profile, an interactive close reading, and a line-by-line derivation or reproduction — building a reading workspace that remembers you and your papers across sessions. | User-invoked |
+| [`chapterhouse`](./skills/chapterhouse/SKILL.md) · [changelog](./changelogs/chapterhouse.md) | Study a whole academic book together — chapter by chapter, or section by section when the going is steep — in three passes of increasing depth — an inspectional survey that maps and plans the read, an analytical read where every chapter ends in a closed-book recitation, and a synthesis pass of critique, re-creation, and a cumulative exam — building a study workspace of Cornell notes, flashcard decks, and a spaced-revision schedule that remembers you, your books, and what's due across sessions. | User-invoked |
 
 ### Data Management
 
 | Skill | What it does | Invocation |
 |---|---|---|
-| [`schemify`](./skills/schemify/SKILL.md) | Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: interviews for what the files don't say, toy-data unit tests for every rule (skip patterns and sentinel codes included), a hunt for the skip logic dictionaries never state — proposed for your confirmation, never invented — browsable web pages for feedback, and progress that persists across sessions. | User-invoked |
+| [`schemify`](./skills/schemify/SKILL.md) · [changelog](./changelogs/schemify.md) | Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: interviews for what the files don't say, toy-data unit tests for every rule (skip patterns and sentinel codes included), a hunt for the skip logic dictionaries never state — proposed for your confirmation, never invented — browsable web pages for feedback, and progress that persists across sessions. | User-invoked |
 
 ### Research Computing
 
 | Skill | What it does | Invocation |
 |---|---|---|
-| [`biowulf`](./skills/biowulf/SKILL.md) | Work on NIH's Biowulf HPC cluster the way NIH HPC's policies expect: your agent checks where it is running before it touches anything, writes and right-sizes sbatch scripts and swarmfiles for you to submit, and knows Biowulf's partitions, GPUs, storage, modules, conda, containers, Jupyter tunnels, Globus, and workflow managers — with links to the official docs, and the stale advice on them flagged. | Model-invoked |
-| [`frce`](./skills/frce/SKILL.md) | Work on NCI's FRCE cluster at NCI-Frederick with your agent kept off the shared login hosts: it checks where it is running, writes and right-sizes sbatch scripts and job arrays for you to submit, and knows FRCE's partitions, GPUs, storage, Environment Modules, conda, containers, OnDemand and VS Code sessions, Ollama endpoints, Globus, and how Biowulf habits translate — with links to the official docs, and the errors in them fixed. | Model-invoked |
+| [`biowulf`](./skills/biowulf/SKILL.md) · [changelog](./changelogs/biowulf.md) | Work on NIH's Biowulf HPC cluster the way NIH HPC's policies expect: your agent checks where it is running before it touches anything, writes and right-sizes sbatch scripts and swarmfiles for you to submit, and knows Biowulf's partitions, GPUs, storage, modules, conda, containers, Jupyter tunnels, Globus, and workflow managers — with links to the official docs, and the stale advice on them flagged. | Model-invoked |
+| [`frce`](./skills/frce/SKILL.md) · [changelog](./changelogs/frce.md) | Work on NCI's FRCE cluster at NCI-Frederick with your agent kept off the shared login hosts: it checks where it is running, writes and right-sizes sbatch scripts and job arrays for you to submit, and knows FRCE's partitions, GPUs, storage, Environment Modules, conda, containers, OnDemand and VS Code sessions, Ollama endpoints, Globus, and how Biowulf habits translate — with links to the official docs, and the errors in them fixed. | Model-invoked |
 
 ## Install
 
@@ -41,7 +41,7 @@ Two routes, two philosophies. The **Claude Code plugin** installs the whole set 
 /plugin install jeyabbalas-skills@jeyabbalas
 ```
 
-Update later with `/plugin marketplace update jeyabbalas`.
+To update, run `claude plugin update jeyabbalas-skills@jeyabbalas` in your shell, then start a new session. `/plugin marketplace update` alone may not refresh the plugin. For updates to arrive on their own, run `/plugin`, open **Marketplaces**, select `jeyabbalas`, and choose **Enable auto-update**.
 
 ### Any agent (Claude Code, Codex, Cursor, …) — via skills.sh
 
@@ -49,13 +49,44 @@ Update later with `/plugin marketplace update jeyabbalas`.
 npx skills@latest add jeyabbalas/skills --skill <skill-name>
 ```
 
-Replace `<skill-name>` with a name from the tables above, such as `biowulf`. To install several at once, list them after the one `--skill`, separated by spaces: `--skill three-pass chapterhouse`. To see every skill the repo offers, run `npx skills@latest add jeyabbalas/skills --list`. This copies the skills into your project as files you own. Pull updates with `npx skills@latest update`.
+Replace `<skill-name>` with a name from the tables above, such as `biowulf`. To install several at once, list them after the one `--skill`, separated by spaces: `--skill three-pass chapterhouse`. To see every skill the repo offers, run `npx skills@latest add jeyabbalas/skills --list`. This copies the skills into your project as files you own. Pull updates with `npx skills@latest update`. A skill added at a version tag stays at that version through updates; see [Pin a version](#pin-a-version).
 
 ### Or just tell your agent
 
 Replace `<skill-names>` with the names you want, separated by spaces, then paste this to any coding agent and it will install them itself:
 
-> Install these agent skills from the GitHub repo `jeyabbalas/skills`: `<skill-names>`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill` followed by those names, separated by spaces, and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`, which installs every skill in the repo. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy each named skill's whole folder under `skills/`, subfolders included, into your skills directory (Claude Code: `~/.claude/skills/`). Finish by verifying the skills are listed as available and telling me the exact phrase to invoke each one (a model-invoked skill such as `biowulf` also loads on its own when the work calls for it).
+> Install these agent skills from the GitHub repo `jeyabbalas/skills`: `<skill-names>`. Preferred route: run `npx skills@latest add jeyabbalas/skills --skill` followed by those names, separated by spaces, and accept the defaults for the agent you are running in. If you are Claude Code and prefer the managed plugin, instead run `/plugin marketplace add jeyabbalas/skills` then `/plugin install jeyabbalas-skills@jeyabbalas`, which installs every skill in the repo. If both routes fail, clone `https://github.com/jeyabbalas/skills` to a temporary directory and copy each named skill's whole folder under `skills/`, subfolders included, into your skills directory (Claude Code: `~/.claude/skills/`). If I named a version tag, such as `biowulf--v1.0.0`, install that version instead. In either command, append `#` and the tag to `jeyabbalas/skills`, as in `jeyabbalas/skills#biowulf--v1.0.0`, or clone with `--branch` and the tag. Finish by verifying the skills are listed as available and telling me the exact phrase to invoke each one (a model-invoked skill such as `biowulf` also loads on its own when the work calls for it).
+
+### Pin a version
+
+Every skill has its own version, and the plugin has one for the whole bundle (see [Versions](#versions)). Each release is tagged and listed, with its changes, on the [releases page](https://github.com/jeyabbalas/skills/releases):
+
+- A skill's tag is `<skill>--v<version>`, such as `biowulf--v1.0.0`.
+- The plugin's tag is `jeyabbalas-skills--v<version>`.
+
+To install an earlier version, add `#` and its tag to the repo.
+
+**Claude Code plugin.** Point the marketplace at a plugin tag:
+
+```
+/plugin marketplace add jeyabbalas/skills#jeyabbalas-skills--v1.0.0
+```
+
+Then run `claude plugin update jeyabbalas-skills@jeyabbalas` in your shell and start a new session. To return to the latest release, run both again without `#…`. Don't remove the marketplace to switch, because removing it uninstalls the plugin.
+
+**skills.sh.** Add the skill at its tag:
+
+```bash
+npx skills@latest add 'jeyabbalas/skills#biowulf--v1.0.0' --skill biowulf
+```
+
+`npx skills@latest update` leaves it at that version. To move, run `add` again with another tag, or without `#…` to follow the latest. Use `#`, not `@`: skills.sh reads `jeyabbalas/skills@name` as a skill name.
+
+**By hand.** Clone the tag, then copy the skill's folder from `skills/` into your skills directory:
+
+```bash
+git clone --depth 1 --branch biowulf--v1.0.0 https://github.com/jeyabbalas/skills
+```
 
 ## Using `handoff`
 
@@ -137,6 +168,29 @@ Where your agent runs matters. FRCE has no AI-agent policy, but its login node k
 - **On a login host** (`batch`, `batch2`, `nx`), it stops and tells you how to restart it inside a session.
 
 The guide was compiled from the [FRCE documentation](https://ncifrederick.cancer.gov/staff/FRCE) in September 2026 and checked against the live cluster — partitions, limits, GPUs, modules, storage — on 30 September 2026. Those pages are thin in places and wrong in others — three GPU types listed where five are in service, a home quota given as both 48 and 256 GB, example scripts that don't run — so each topic file ends with the fixes for its topic. Its SKILL.md holds the where-am-I check, the ground rules, a storage map, and a router; nineteen topic files — access, porting from Biowulf, jobs, arrays, monitoring, hardware, workflows, interactive sessions, OnDemand, modules, Python and R, containers, development, applications, deep learning, LLM inference, storage, transfer, troubleshooting — load only when the task needs them. When a live command such as `sinfo`, `scontrol show partition`, `freen`, or `module avail` disagrees with the skill, the agent trusts the live source.
+
+## Versions
+
+Every skill carries its own version, MAJOR.MINOR.PATCH, as `version:` under `metadata:` at the top of its `SKILL.md`. Its changes are listed newest first in [`changelogs/`](./changelogs/), and each skill's changelog is linked from the tables above. Every change I push to a skill is a release, and the level says what it means for you:
+
+- **Major**: you have to act, or something stops working the way it did. Examples are a change to a workspace or package format, to a script's commands or output, or to how you invoke the skill, or a capability the skill drops. The entry has a **Breaking:** line that says how to migrate.
+- **Minor**: something new, such as a capability, a topic, or an option. What you have keeps working.
+- **Patch**: fixes to stale facts, unclear wording, or bugs.
+
+`three-pass`, `chapterhouse`, and `schemify` copy their stylesheets and scripts into your workspace. When those files change, the entry says so, and the skill itself tells you to run `refresh-assets`.
+
+The plugin's version moves with the largest change among its skills:
+
+- A major change in any skill makes a major release.
+- Otherwise a minor change makes a minor release, and a new skill counts as minor.
+- Otherwise the release is a patch.
+- Removing or renaming a skill makes a major release.
+
+Each [release](https://github.com/jeyabbalas/skills/releases) lists every skill's version.
+
+**Follow updates.** On GitHub, choose **Watch → Custom → Releases**, or subscribe to the [releases feed](https://github.com/jeyabbalas/skills/releases.atom). To follow one skill, subscribe to its changelog's history feed, such as `https://github.com/jeyabbalas/skills/commits/main/changelogs/biowulf.md.atom`.
+
+**Which version do I have?** Look for `version:` under `metadata:` at the top of the installed `SKILL.md`. For the plugin, `claude plugin list` shows its version, and the release with that number lists each skill's.
 
 ## Credits
 

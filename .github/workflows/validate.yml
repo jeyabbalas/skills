@@ -6,20 +6,37 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read            # only the release job writes
+
 jobs:
   skills:
     name: Skill manifests
     runs-on: ubuntu-latest
     steps:
+      # Full history and every tag: the release checks compare each skill
+      # with its tagged version and with the commit this push or PR builds on.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v5
 
       # Frontmatter, cross-manifest, and layout invariants. A SKILL.md whose
       # YAML does not parse is dropped silently by installers, so this is the
       # only thing standing between a stray ':' and an unavailable skill.
+      # It also runs the release checks: versions published at the previous
+      # tip (push) or the PR's base are spent, so a skill changed since must
+      # carry a new one.
       - name: Validate skills
+        env:
+          RELEASE_BASE: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
         run: uv run scripts/validate_skills.py
+
+      # release.py tags and publishes from CI, so throwaway-repo tests pin
+      # its rules before it gets the chance.
+      - name: Test the release script
+        run: uv run tests/test_release.py
 
       # schemify's validator is executed, never read, so its behaviour is
       # pinned by tests; the example package is the integration fixture and
@@ -34,6 +51,8 @@ jobs:
 
       # Second opinion from the Claude Code CLI on the plugin/marketplace
       # manifests, which validate_skills.py only cross-checks against disk.
+      # It never opens a SKILL.md (pointed at skills/, it finds no components
+      # and passes broken YAML), so frontmatter stays validate_skills.py's job.
       - name: Validate plugin manifest
         run: |
           npm install -g @anthropic-ai/claude-code
@@ -70,3 +89,32 @@ jobs:
             fi
           done
           exit $status
+
+  # Every push to main that changes a skill is a release. Tags pushed with
+  # GITHUB_TOKEN start no workflow runs, so the release is cut here, once
+  # validation passes. Runs one at a time; a run that a newer release already
+  # covers exits quietly, and a README-only push releases nothing.
+  release:
+    name: Release
+    needs: skills
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Tag and publish
+        env:
+          RELEASE_BASE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+          GIT_COMMITTER_NAME: "github-actions[bot]"
+          GIT_COMMITTER_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
+        run: uv run scripts/release.py publish

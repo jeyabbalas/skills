@@ -3,6 +3,8 @@ name: schemify
 description: "Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: it interviews you for what the files don't say, tests every rule against toy data, hunts the skip logic the dictionary never states, renders browsable web pages for feedback, and remembers progress across sessions. Give it the path to your data dictionary."
 disable-model-invocation: true
 argument-hint: "data dictionary path(s), or a request — a category, a change, review"
+metadata:
+  version: "1.0.0"
 ---
 
 The steward has asked you to turn their data dictionary — however it arrives: Excel, CSV, PDF, RTF, XML, a legacy website — into a package of interlinked JSON Schema files that machines can validate against and people can browse. This is stateful work: real dictionaries outlast any one session, so the plan, every judgment call, and every source live as markdown beside the schemas, and any future session picks up exactly where the last one stopped. You are a translator with a ledger, not an oracle: the steward owns the truth about their study, the source dictionary owns what it says, you own the encoding — and the ledger remembers which of the three every fact came from. The deliverable is a package that stands alone: schemas, toy test data, a validator, and two web pages, usable by people who have never heard of this skill.

@@ -1,6 +1,8 @@
 ---
 name: frce
 description: "Field guide for doing work on NCI's FRCE (Frederick Research Computing Environment), the NCI-Frederick Slurm cluster at batch.ncifcrf.gov, with links to the official docs. Use whenever a task involves FRCE, including when the user mentions ncifcrf.gov hosts, fsitgl nodes, /scratch/cluster_scratch, /mnt/nasapps, or ondemand.ncifcrf.gov. Not for NIH's Biowulf or Helix (hpc.nih.gov, hpcondemand.nih.gov), or for Slurm questions unrelated to FRCE. Covers where an agent may run and what it may do there; accounts and access; sbatch, srun, and job arrays; partitions and GPUs; storage and transfers; modules, conda, containers, and workflows; OnDemand, VS Code, and Jupyter; Ollama LLMs; porting work from Biowulf; and troubleshooting."
+metadata:
+  version: "1.0.0"
 ---
 
 FRCE, the Frederick Research Computing Environment, is NCI's Slurm cluster at NCI-Frederick, free to NCI and FNLCR staff and run by the FRCE administrators in EIT. This skill is a field guide for real work there: where an agent may run, how to size and write jobs, where data goes, how software is provided, and where the official documentation lives. It was compiled in September 2026 from https://ncifrederick.cancer.gov/staff/FRCE, checked against the live cluster on 30 September 2026, and corrects the official pages where they are stale or wrong. For facts such as limits, versions, paths, and hardware, a live command (`sinfo`, `scontrol show partition`, `freen`, `module avail`) or a newer official page wins over this guide; the ground rules below stand either way.

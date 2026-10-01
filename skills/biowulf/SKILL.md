@@ -1,6 +1,8 @@
 ---
 name: biowulf
 description: "Field guide for working on NIH's Biowulf HPC cluster and Helix (hpc.nih.gov). Use whenever a task involves Biowulf or NIH HPC, including when the user mentions swarm, sinteractive, lscratch, sjobs, cnNNNN nodes, hpcondemand.nih.gov, or /data paths on the cluster; not for other Slurm clusters, NCI's FRCE included. Covers NIH HPC's AI-agent policy (no agents on the login node or Helix; the user submits jobs) and a where-am-I check; accounts, SSH, HPC OnDemand, and VS Code; sbatch jobs, interactive sessions, partitions, walltimes, GPUs, multinode MPI, dependencies, and swarm; monitoring and right-sizing jobs (jobhist, dashboard_cli, freen, batchlim); node and GPU hardware; storage, quotas, snapshots, ACLs, and sharing; data transfer (cloud, Box, SRA) and Globus; modules, conda, Python, and R; Jupyter, RStudio, and SSH tunnels; deep learning and Ollama; Singularity/Apptainer containers; compilers, CUDA, and building software; Snakemake and Nextflow; and troubleshooting pending, failed, or killed jobs."
+metadata:
+  version: "1.0.0"
 ---
 
 Biowulf is the NIH intramural research program's Slurm cluster, run by the NIH HPC group together with Helix, its data-transfer host. This skill is a field guide for real work there: what NIH HPC allows an agent to do, how to size and write jobs, where data goes, how software is provided, and where the official documentation lives. It was compiled from hpc.nih.gov in September 2026. Where it disagrees with a live page, `--help` output, or a live command such as `batchlim`, `freen`, or `module spider`, the live source wins.
