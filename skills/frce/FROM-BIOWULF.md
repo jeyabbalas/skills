@@ -40,7 +40,7 @@ As of Sept 2026; each row points to the file that owns the details.
 | HPC OnDemand, hpcondemand.nih.gov | Open OnDemand, ondemand.ncifcrf.gov | ONDEMAND.md |
 | VS Code: ProxyCommand into the `sinteractive` node | `frce-cpu` or `frce-gpu`, or ProxyJump into a job the user sized | INTERACTIVE.md (VS Code on a compute node) |
 | NoMachine: retired | NoMachine at nx.ncifcrf.gov | INTERACTIVE.md (NoMachine) |
-| `svis` and the `visual` partition | a GPU desktop in OnDemand, or VNC from a GPU session | ONDEMAND.md; INTERACTIVE.md (VNC desktops) |
+| `svis` and the `visual` partition: retired January 2026; NIH points remote graphics to HPC OnDemand, whose Graphical Session has no GPU | a GPU desktop in OnDemand, or VNC from a GPU session | ONDEMAND.md; INTERACTIVE.md (VNC desktops) |
 | NIH HPC's AI-agent policy | none; this skill applies NIH's by analogy | SKILL.md |
 | staff@hpc.nih.gov | the FRCE administrators, by email or ServiceNow | ACCESS.md (Support and requests) |
 
