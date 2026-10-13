@@ -86,10 +86,12 @@ UNCHECKABLE = (
 )
 
 # Domains whose host names resolve only inside the NIH network (NCI-Frederick's
-# FRCE cluster services: OnDemand, AppDB, the live status pages). Elsewhere --
-# CI included -- a DNS failure there means "off the network", not "gone"; on
-# the network these pages are checked like any other.
-NIH_NETWORK_ONLY = ("ncifcrf.gov",)
+# FRCE cluster services: OnDemand, AppDB, the live status pages; NIH's software
+# mirror, with the Xming site license and installers). Elsewhere -- CI
+# included -- a DNS failure there means "off the network", not "gone"; on the
+# network these pages are checked like any other. List a host, not nih.gov:
+# most nih.gov names are public, and a DNS failure there is a real problem.
+NIH_NETWORK_ONLY = ("ncifcrf.gov", "mirror.nih.gov")
 
 WORKERS = 8
 RETRIES = 2

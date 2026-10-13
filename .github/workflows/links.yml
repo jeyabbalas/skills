@@ -29,9 +29,9 @@ jobs:
       # raise the alarm; a link that is really broken fails both passes and
       # lands in the run's summary. Runners are off the NIH network, so pages
       # restricted to it (hpc.nih.gov/nih/..., /systems/status) answer 403,
-      # and NCI-Frederick's *.ncifcrf.gov hosts don't resolve at all; both
-      # are listed as unverified rather than failed. A run from the NIH
-      # network or VPN covers them.
+      # and NCI-Frederick's *.ncifcrf.gov hosts and NIH's software mirror
+      # (mirror.nih.gov) don't resolve at all; both are listed as unverified
+      # rather than failed. A run from the NIH network or VPN covers them.
       - name: Check every URL and anchor in the skills
         run: |
           uv run scripts/check_links.py > report.txt && { cat report.txt; exit 0; }
