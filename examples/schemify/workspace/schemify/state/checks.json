@@ -1,0 +1,1100 @@
+{
+  "ok": true,
+  "headline": "6 schema files valid · 10 rules · toy data: 15 valid rows pass, 46/46 seeded errors caught · provenance: 15/15 properties traced",
+  "package": "examples/schemify/workspace/schemify/package",
+  "counts": {
+    "error": 0,
+    "warning": 0,
+    "info": 0
+  },
+  "check": {
+    "ok": true,
+    "package": "examples/schemify/workspace/schemify/package",
+    "files": 6,
+    "tables": [
+      {
+        "table": "baseline",
+        "mother": "baseline/baseline.schema.json",
+        "categories": [
+          "baseline/categories/about_you.json",
+          "baseline/categories/smoking.json",
+          "baseline/categories/womens_health.json",
+          "baseline/categories/health.json"
+        ],
+        "properties": 15,
+        "rules": 10
+      }
+    ],
+    "counts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "findings": [],
+    "truncated": false
+  },
+  "rules": {
+    "count": 10,
+    "by_kind": {
+      "skip": 5,
+      "applicability": 5,
+      "routing": 0
+    },
+    "by_table": {
+      "baseline": 10
+    },
+    "items": [
+      {
+        "table": "baseline",
+        "id": "R001",
+        "kind": "skip",
+        "domain": null,
+        "index": 4,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/4",
+        "comment": "Skip pattern R001: people who have not smoked 100 cigarettes (smk_ever = 2), or who refused or did not know (-7, -9), skip the smoking questions that follow, so smk_status, cigs_day and smk_age_start are -6. Questionnaire ¶8: 'IF NO, GO TO SECTION C.'; the data steward says refusals and don't-know answers at B1 were routed like No (D017) and confirms the -6 coding (D018); dictionary Codes row 2: -6 is 'Question not asked of this participant (skip pattern)'.",
+        "reading": "people who have not smoked 100 cigarettes (smk_ever = 2), or who refused or did not know (-7, -9), skip the smoking questions that follow, so smk_status, cigs_day and smk_age_start are -6. Questionnaire ¶8: 'IF NO, GO TO SECTION C.'; the data steward says refusals and don't-know answers at B1 were routed like No (D017) and confirms the -6 coding (D018); dictionary Codes row 2: -6 is 'Question not asked of this participant (skip pattern)'.",
+        "provenance": {
+          "default": [
+            "S02:¶8",
+            "D017"
+          ],
+          "value:-6": "D018"
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "smk_ever",
+                  "test": "in",
+                  "values": [
+                    2,
+                    -7,
+                    -9
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "smk_status",
+              "effect": "eq",
+              "value": -6
+            },
+            {
+              "variable": "cigs_day",
+              "effect": "eq",
+              "value": -6
+            },
+            {
+              "variable": "smk_age_start",
+              "effect": "eq",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R001",
+        "kind": "applicability",
+        "domain": null,
+        "index": 5,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/5",
+        "comment": "Applicability R001: people who have smoked 100 cigarettes (smk_ever = 1) were asked whether they smoke now and when they started, so smk_status and smk_age_start are never -6. Questionnaire ¶8 to ¶11: only 'No' at B1 skips B2 to B4 (refusals and don't-know answers count as No: D017); the data steward confirms the rule matches the delivered data (D018).",
+        "reading": "people who have smoked 100 cigarettes (smk_ever = 1) were asked whether they smoke now and when they started, so smk_status and smk_age_start are never -6. Questionnaire ¶8 to ¶11: only 'No' at B1 skips B2 to B4 (refusals and don't-know answers count as No: D017); the data steward confirms the rule matches the delivered data (D018).",
+        "provenance": {
+          "default": [
+            "S02:¶8",
+            "D018"
+          ]
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "smk_ever",
+                  "test": "eq",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "smk_status",
+              "effect": "ne",
+              "value": -6
+            },
+            {
+              "variable": "smk_age_start",
+              "effect": "ne",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R002",
+        "kind": "skip",
+        "domain": null,
+        "index": 6,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/6",
+        "comment": "Skip pattern R002: former smokers (smk_status = 2), and people who did not know (-9) whether they smoke now, were not asked how many cigarettes they smoke, so cigs_day is -6. Questionnaire ¶10: 'IF SMOKES NOW:'; dictionary Variables row 11: 'Current smokers only'; a don't-know answer is treated like No (D017 for the first question, confirmed for this one in D029); the data steward confirms the -6 coding (D018).",
+        "reading": "former smokers (smk_status = 2), and people who did not know (-9) whether they smoke now, were not asked how many cigarettes they smoke, so cigs_day is -6. Questionnaire ¶10: 'IF SMOKES NOW:'; dictionary Variables row 11: 'Current smokers only'; a don't-know answer is treated like No (D017 for the first question, confirmed for this one in D029); the data steward confirms the -6 coding (D018).",
+        "provenance": {
+          "default": [
+            "S02:¶10",
+            "D017",
+            "D029"
+          ],
+          "value:-6": "D018"
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "smk_status",
+                  "test": "in",
+                  "values": [
+                    2,
+                    -9
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "cigs_day",
+              "effect": "eq",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R002",
+        "kind": "applicability",
+        "domain": null,
+        "index": 7,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/7",
+        "comment": "Applicability R002: current smokers (smk_status = 1) were asked how many cigarettes they smoke, so cigs_day is never -6. The data steward confirms the rule matches the delivered data (D018).",
+        "reading": "current smokers (smk_status = 1) were asked how many cigarettes they smoke, so cigs_day is never -6. The data steward confirms the rule matches the delivered data (D018).",
+        "provenance": {
+          "default": [
+            "S02:¶10",
+            "D018"
+          ]
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "smk_status",
+                  "test": "eq",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "cigs_day",
+              "effect": "ne",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R003",
+        "kind": "skip",
+        "domain": null,
+        "index": 8,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/8",
+        "comment": "Skip pattern R003: men (sex = 1), and people whose sex was refused (-7), skip the women's-health section, so menarche_age, parity, age_first_birth and breastfed_ever are -6. Questionnaire ¶13: 'ASK SECTION C OF WOMEN ONLY (A2 = 2). MEN: GO TO SECTION D.'; dictionary Variables rows 13 and 14: 'Women only'; the data steward says a refused sex is skipped like men (D021) and confirms the -6 coding (D022).",
+        "reading": "men (sex = 1), and people whose sex was refused (-7), skip the women's-health section, so menarche_age, parity, age_first_birth and breastfed_ever are -6. Questionnaire ¶13: 'ASK SECTION C OF WOMEN ONLY (A2 = 2). MEN: GO TO SECTION D.'; dictionary Variables rows 13 and 14: 'Women only'; the data steward says a refused sex is skipped like men (D021) and confirms the -6 coding (D022).",
+        "provenance": {
+          "default": [
+            "S02:¶13",
+            "D021"
+          ],
+          "value:-6": "D022"
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "sex",
+                  "test": "in",
+                  "values": [
+                    1,
+                    -7
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "menarche_age",
+              "effect": "eq",
+              "value": -6
+            },
+            {
+              "variable": "parity",
+              "effect": "eq",
+              "value": -6
+            },
+            {
+              "variable": "age_first_birth",
+              "effect": "eq",
+              "value": -6
+            },
+            {
+              "variable": "breastfed_ever",
+              "effect": "eq",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R003",
+        "kind": "applicability",
+        "domain": null,
+        "index": 9,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/9",
+        "comment": "Applicability R003: women (sex = 2) were asked the age at first period and the number of live births, so menarche_age and parity are never -6. The data steward confirms the rule matches the delivered data (D022).",
+        "reading": "women (sex = 2) were asked the age at first period and the number of live births, so menarche_age and parity are never -6. The data steward confirms the rule matches the delivered data (D022).",
+        "provenance": {
+          "default": [
+            "S02:¶13",
+            "D022"
+          ]
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "sex",
+                  "test": "eq",
+                  "value": 2
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "menarche_age",
+              "effect": "ne",
+              "value": -6
+            },
+            {
+              "variable": "parity",
+              "effect": "ne",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R004",
+        "kind": "skip",
+        "domain": null,
+        "index": 10,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/10",
+        "comment": "Skip pattern R004: people who were not told they have diabetes (diabetes_dx = 2), or who did not know (-9), were not asked the age at diagnosis, so diabetes_age is -6. Questionnaire ¶21: 'IF YES:'; dictionary Variables row 19: 'Asked only if diabetes_dx = 1'; the data steward says a don't-know answer means the age was not asked (D024) and confirms the -6 coding (D025).",
+        "reading": "people who were not told they have diabetes (diabetes_dx = 2), or who did not know (-9), were not asked the age at diagnosis, so diabetes_age is -6. Questionnaire ¶21: 'IF YES:'; dictionary Variables row 19: 'Asked only if diabetes_dx = 1'; the data steward says a don't-know answer means the age was not asked (D024) and confirms the -6 coding (D025).",
+        "provenance": {
+          "default": [
+            "S02:¶21",
+            "D024"
+          ],
+          "value:-6": "D025"
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "diabetes_dx",
+                  "test": "in",
+                  "values": [
+                    2,
+                    -9
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "diabetes_age",
+              "effect": "eq",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R004",
+        "kind": "applicability",
+        "domain": null,
+        "index": 11,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/11",
+        "comment": "Applicability R004: people who were told they have diabetes (diabetes_dx = 1) were asked the age at diagnosis, so diabetes_age is never -6. The data steward confirms the rule matches the delivered data (D025).",
+        "reading": "people who were told they have diabetes (diabetes_dx = 1) were asked the age at diagnosis, so diabetes_age is never -6. The data steward confirms the rule matches the delivered data (D025).",
+        "provenance": {
+          "default": [
+            "S02:¶21",
+            "D025"
+          ]
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "diabetes_dx",
+                  "test": "eq",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "diabetes_age",
+              "effect": "ne",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R005",
+        "kind": "skip",
+        "domain": null,
+        "index": 12,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/12",
+        "comment": "Skip pattern R005: women with no live births (parity = 0) have no first birth and no children to breastfeed, so age_first_birth and breastfed_ever are -6. The documents do not state this routing; the data steward vouches for it (D020).",
+        "reading": "women with no live births (parity = 0) have no first birth and no children to breastfeed, so age_first_birth and breastfed_ever are -6. The documents do not state this routing; the data steward vouches for it (D020).",
+        "provenance": {
+          "default": "D020"
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "parity",
+                  "test": "eq",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "age_first_birth",
+              "effect": "eq",
+              "value": -6
+            },
+            {
+              "variable": "breastfed_ever",
+              "effect": "eq",
+              "value": -6
+            }
+          ]
+        }
+      },
+      {
+        "table": "baseline",
+        "id": "R005",
+        "kind": "applicability",
+        "domain": null,
+        "index": 13,
+        "file": "baseline/baseline.schema.json",
+        "pointer": "/items/allOf/13",
+        "comment": "Applicability R005: women with at least one live birth (parity 1 to 15) were asked the age at first birth and about breastfeeding, so age_first_birth and breastfed_ever are never -6 (they may still be refused or don't know). The documents do not state this routing; the data steward vouches for it (D020).",
+        "reading": "women with at least one live birth (parity 1 to 15) were asked the age at first birth and about breastfeeding, so age_first_birth and breastfed_ever are never -6 (they may still be refused or don't know). The documents do not state this routing; the data steward vouches for it (D020).",
+        "provenance": {
+          "default": "D020"
+        },
+        "when": {
+          "any": [
+            {
+              "all": [
+                {
+                  "variable": "parity",
+                  "test": "range",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 15,
+                  "excludes": []
+                }
+              ]
+            }
+          ]
+        },
+        "then": {
+          "mode": "all",
+          "effects": [
+            {
+              "variable": "age_first_birth",
+              "effect": "ne",
+              "value": -6
+            },
+            {
+              "variable": "breastfed_ever",
+              "effect": "ne",
+              "value": -6
+            }
+          ]
+        }
+      }
+    ],
+    "variables": {
+      "baseline": {
+        "participant_id": {
+          "topic": "about_you",
+          "file": "baseline/categories/about_you.json",
+          "pointer": "/properties/participant_id"
+        },
+        "site": {
+          "topic": "about_you",
+          "file": "baseline/categories/about_you.json",
+          "pointer": "/properties/site"
+        },
+        "age": {
+          "topic": "about_you",
+          "file": "baseline/categories/about_you.json",
+          "pointer": "/properties/age"
+        },
+        "sex": {
+          "topic": "about_you",
+          "file": "baseline/categories/about_you.json",
+          "pointer": "/properties/sex"
+        },
+        "smk_ever": {
+          "topic": "smoking",
+          "file": "baseline/categories/smoking.json",
+          "pointer": "/properties/smk_ever"
+        },
+        "smk_status": {
+          "topic": "smoking",
+          "file": "baseline/categories/smoking.json",
+          "pointer": "/properties/smk_status"
+        },
+        "cigs_day": {
+          "topic": "smoking",
+          "file": "baseline/categories/smoking.json",
+          "pointer": "/properties/cigs_day"
+        },
+        "smk_age_start": {
+          "topic": "smoking",
+          "file": "baseline/categories/smoking.json",
+          "pointer": "/properties/smk_age_start"
+        },
+        "menarche_age": {
+          "topic": "womens_health",
+          "file": "baseline/categories/womens_health.json",
+          "pointer": "/properties/menarche_age"
+        },
+        "parity": {
+          "topic": "womens_health",
+          "file": "baseline/categories/womens_health.json",
+          "pointer": "/properties/parity"
+        },
+        "age_first_birth": {
+          "topic": "womens_health",
+          "file": "baseline/categories/womens_health.json",
+          "pointer": "/properties/age_first_birth"
+        },
+        "breastfed_ever": {
+          "topic": "womens_health",
+          "file": "baseline/categories/womens_health.json",
+          "pointer": "/properties/breastfed_ever"
+        },
+        "bmi": {
+          "topic": "health",
+          "file": "baseline/categories/health.json",
+          "pointer": "/properties/bmi"
+        },
+        "diabetes_dx": {
+          "topic": "health",
+          "file": "baseline/categories/health.json",
+          "pointer": "/properties/diabetes_dx"
+        },
+        "diabetes_age": {
+          "topic": "health",
+          "file": "baseline/categories/health.json",
+          "pointer": "/properties/diabetes_age"
+        }
+      }
+    }
+  },
+  "fixtures": {
+    "ok": true,
+    "tables": {
+      "baseline": {
+        "valid": {
+          "rows": 15,
+          "status": "pass",
+          "findings": []
+        },
+        "invalid": {
+          "rows": 46,
+          "cases": 46,
+          "caught": 46,
+          "verdicts": [
+            {
+              "case": 0,
+              "row": 0,
+              "column": "participant_id",
+              "kind": "pattern-break",
+              "status": "caught"
+            },
+            {
+              "case": 1,
+              "row": 1,
+              "column": "participant_id",
+              "kind": "pattern-break",
+              "status": "caught"
+            },
+            {
+              "case": 2,
+              "row": 2,
+              "column": "site",
+              "kind": "wrong-type",
+              "status": "caught"
+            },
+            {
+              "case": 3,
+              "row": 3,
+              "column": "site",
+              "kind": "unknown-level",
+              "status": "caught"
+            },
+            {
+              "case": 4,
+              "row": 4,
+              "column": "age",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 5,
+              "row": 5,
+              "column": "age",
+              "kind": "wrong-type",
+              "status": "caught"
+            },
+            {
+              "case": 6,
+              "row": 6,
+              "column": "sex",
+              "kind": "unknown-level",
+              "status": "caught"
+            },
+            {
+              "case": 7,
+              "row": 7,
+              "column": "age",
+              "kind": "invented-sentinel",
+              "status": "caught"
+            },
+            {
+              "case": 8,
+              "row": 8,
+              "column": "age",
+              "kind": "missing-key",
+              "status": "caught"
+            },
+            {
+              "case": 9,
+              "row": 9,
+              "column": "shoe_size",
+              "kind": "undeclared-column",
+              "status": "caught"
+            },
+            {
+              "case": 10,
+              "row": 10,
+              "column": "smk_ever",
+              "kind": "unknown-level",
+              "status": "caught"
+            },
+            {
+              "case": 11,
+              "row": 11,
+              "column": "smk_status",
+              "kind": "wrong-type",
+              "status": "caught"
+            },
+            {
+              "case": 12,
+              "row": 12,
+              "column": "smk_status",
+              "kind": "unknown-level",
+              "status": "caught"
+            },
+            {
+              "case": 13,
+              "row": 13,
+              "column": "cigs_day",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 14,
+              "row": 14,
+              "column": "cigs_day",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 15,
+              "row": 15,
+              "column": "cigs_day",
+              "kind": "invented-sentinel",
+              "status": "caught"
+            },
+            {
+              "case": 16,
+              "row": 16,
+              "column": "smk_age_start",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 17,
+              "row": 17,
+              "column": "cigs_day",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R001"
+              ]
+            },
+            {
+              "case": 18,
+              "row": 18,
+              "column": "smk_age_start",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R001"
+              ]
+            },
+            {
+              "case": 19,
+              "row": 19,
+              "column": "smk_status",
+              "kind": "applicability-break",
+              "status": "caught",
+              "rules": [
+                "R001"
+              ]
+            },
+            {
+              "case": 20,
+              "row": 20,
+              "column": "smk_age_start",
+              "kind": "applicability-break",
+              "status": "caught",
+              "rules": [
+                "R001"
+              ]
+            },
+            {
+              "case": 21,
+              "row": 21,
+              "column": "cigs_day",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R002"
+              ]
+            },
+            {
+              "case": 22,
+              "row": 22,
+              "column": "cigs_day",
+              "kind": "applicability-break",
+              "status": "caught",
+              "rules": [
+                "R002"
+              ]
+            },
+            {
+              "case": 23,
+              "row": 23,
+              "column": "cigs_day",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R001"
+              ]
+            },
+            {
+              "case": 24,
+              "row": 24,
+              "column": "smk_age_start",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R001"
+              ]
+            },
+            {
+              "case": 25,
+              "row": 25,
+              "column": "cigs_day",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R002"
+              ]
+            },
+            {
+              "case": 26,
+              "row": 26,
+              "column": "menarche_age",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 27,
+              "row": 27,
+              "column": "parity",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 28,
+              "row": 28,
+              "column": "age_first_birth",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 29,
+              "row": 29,
+              "column": "breastfed_ever",
+              "kind": "unknown-level",
+              "status": "caught"
+            },
+            {
+              "case": 30,
+              "row": 30,
+              "column": "menarche_age",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R003"
+              ]
+            },
+            {
+              "case": 31,
+              "row": 31,
+              "column": "breastfed_ever",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R003"
+              ]
+            },
+            {
+              "case": 32,
+              "row": 32,
+              "column": "parity",
+              "kind": "applicability-break",
+              "status": "caught",
+              "rules": [
+                "R003"
+              ]
+            },
+            {
+              "case": 33,
+              "row": 33,
+              "column": "menarche_age",
+              "kind": "applicability-break",
+              "status": "caught",
+              "rules": [
+                "R003"
+              ]
+            },
+            {
+              "case": 34,
+              "row": 34,
+              "column": "bmi",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 35,
+              "row": 35,
+              "column": "bmi",
+              "kind": "invented-sentinel",
+              "status": "caught"
+            },
+            {
+              "case": 36,
+              "row": 36,
+              "column": "diabetes_dx",
+              "kind": "unknown-level",
+              "status": "caught"
+            },
+            {
+              "case": 37,
+              "row": 37,
+              "column": "diabetes_age",
+              "kind": "range-break",
+              "status": "caught"
+            },
+            {
+              "case": 38,
+              "row": 38,
+              "column": "diabetes_age",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R004"
+              ]
+            },
+            {
+              "case": 39,
+              "row": 39,
+              "column": "diabetes_age",
+              "kind": "applicability-break",
+              "status": "caught",
+              "rules": [
+                "R004"
+              ]
+            },
+            {
+              "case": 40,
+              "row": 40,
+              "column": "age_first_birth",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R005"
+              ]
+            },
+            {
+              "case": 41,
+              "row": 41,
+              "column": "breastfed_ever",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R005"
+              ]
+            },
+            {
+              "case": 42,
+              "row": 42,
+              "column": "age_first_birth",
+              "kind": "applicability-break",
+              "status": "caught",
+              "rules": [
+                "R005"
+              ]
+            },
+            {
+              "case": 43,
+              "row": 43,
+              "column": "breastfed_ever",
+              "kind": "applicability-break",
+              "status": "caught",
+              "rules": [
+                "R005"
+              ]
+            },
+            {
+              "case": 44,
+              "row": 44,
+              "column": "menarche_age",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R003"
+              ]
+            },
+            {
+              "case": 45,
+              "row": 45,
+              "column": "diabetes_age",
+              "kind": "skip-break",
+              "status": "caught",
+              "rules": [
+                "R004"
+              ]
+            }
+          ],
+          "unledgered": []
+        },
+        "coverage": {
+          "properties": {
+            "covered": 14,
+            "total": 14
+          },
+          "rules": {
+            "fired": [
+              "R001:skip",
+              "R001:applicability",
+              "R002:skip",
+              "R002:applicability",
+              "R003:skip",
+              "R003:applicability",
+              "R004:skip",
+              "R004:applicability",
+              "R005:skip",
+              "R005:applicability"
+            ],
+            "unfired": [],
+            "caught": [
+              "R001:skip",
+              "R001:applicability",
+              "R002:skip",
+              "R002:applicability",
+              "R003:skip",
+              "R003:applicability",
+              "R004:skip",
+              "R004:applicability",
+              "R005:skip",
+              "R005:applicability"
+            ],
+            "uncaught": []
+          }
+        }
+      }
+    },
+    "counts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "findings": [],
+    "truncated": false
+  },
+  "provenance": {
+    "properties": 15,
+    "traced": 15,
+    "rules": 10,
+    "by_origin": {
+      "document": 44,
+      "web": 0,
+      "person": 26,
+      "agent": 0,
+      "unknown": 0
+    },
+    "needs_review": []
+  },
+  "topics": {
+    "baseline/about_you": {
+      "file": "baseline/categories/about_you.json",
+      "properties": 4,
+      "rules_targeting": 0,
+      "errors": 0,
+      "warnings": 0,
+      "provenance_ok": true,
+      "coverage": {
+        "covered": 3,
+        "total": 3
+      }
+    },
+    "baseline/smoking": {
+      "file": "baseline/categories/smoking.json",
+      "properties": 4,
+      "rules_targeting": 4,
+      "errors": 0,
+      "warnings": 0,
+      "provenance_ok": true,
+      "coverage": {
+        "covered": 4,
+        "total": 4
+      }
+    },
+    "baseline/womens_health": {
+      "file": "baseline/categories/womens_health.json",
+      "properties": 4,
+      "rules_targeting": 4,
+      "errors": 0,
+      "warnings": 0,
+      "provenance_ok": true,
+      "coverage": {
+        "covered": 4,
+        "total": 4
+      }
+    },
+    "baseline/health": {
+      "file": "baseline/categories/health.json",
+      "properties": 3,
+      "rules_targeting": 2,
+      "errors": 0,
+      "warnings": 0,
+      "provenance_ok": true,
+      "coverage": {
+        "covered": 3,
+        "total": 3
+      }
+    }
+  },
+  "ran": true,
+  "at": "2026-10-13T13:11:01Z",
+  "setId": "c547430f04d597a9"
+}

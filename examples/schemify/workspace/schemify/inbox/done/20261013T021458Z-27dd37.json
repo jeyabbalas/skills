@@ -1,0 +1,153 @@
+{
+  "schemifyInbox": 1,
+  "workspace": "ashgrove-29ac",
+  "study": "Ashgrove",
+  "from": "author",
+  "submittedAt": "2026-10-13T02:14:58.561Z",
+  "items": [
+    {
+      "kind": "answer",
+      "decision": "D001",
+      "choice": "data"
+    },
+    {
+      "kind": "answer",
+      "decision": "D002",
+      "choice": "ach"
+    },
+    {
+      "kind": "answer",
+      "decision": "D003",
+      "choice": "steward"
+    },
+    {
+      "kind": "answer",
+      "decision": "D004",
+      "choices": [
+        "collection",
+        "cleaning",
+        "releases"
+      ]
+    },
+    {
+      "kind": "answer",
+      "decision": "D005",
+      "choices": [
+        "none"
+      ],
+      "note": "Nothing else is written down, but I ran the 2024 cleaning myself and remember the recodes - ask me."
+    },
+    {
+      "kind": "answer",
+      "decision": "D006",
+      "text": "Nobody else - I am the data manager (Jordan Lee).",
+      "choice": "other"
+    },
+    {
+      "kind": "answer",
+      "decision": "D007",
+      "choice": "yes"
+    },
+    {
+      "kind": "answer",
+      "decision": "D008",
+      "choice": "8"
+    },
+    {
+      "kind": "answer",
+      "decision": "D009",
+      "choice": "a"
+    },
+    {
+      "kind": "answer",
+      "decision": "D010",
+      "choice": "a",
+      "note": "Right: -1 only ever appears for BMI, when the nurse could not measure (no clinic visit)."
+    },
+    {
+      "kind": "answer",
+      "decision": "D011",
+      "choice": "a"
+    },
+    {
+      "kind": "answer",
+      "decision": "D012",
+      "choice": "a"
+    },
+    {
+      "kind": "answer",
+      "decision": "D013",
+      "choice": "a"
+    }
+  ],
+  "id": "20261013T021458Z-27dd37",
+  "receivedAt": "2026-10-13T02:14:58Z",
+  "takenAt": "2026-10-13T02:15:15Z",
+  "recorded": [
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D001"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D002"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D003"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D004"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D005"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D006"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D007"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D008"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D009"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D010"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D011"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D012"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D013"
+    }
+  ]
+}

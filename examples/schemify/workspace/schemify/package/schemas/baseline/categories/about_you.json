@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/ashgrove/baseline/categories/about_you.json",
+  "title": "About you",
+  "description": "Participant identifier and recruitment site, then age and sex from questionnaire Section A, About you.",
+  "type": "object",
+  "x-variable-group": "about_you",
+  "properties": {
+    "participant_id": {
+      "title": "Participant ID",
+      "description": "Assigned at enrollment",
+      "$comment": "Source coding: ACH followed by 4 digits. Since the 2024 release the IDs carry a hyphen after the prefix: the letters ACH, a hyphen, then 4 digits (D032); the dictionary text was never updated.",
+      "x-provenance": {
+        "default": "S01:Variables row 5"
+      },
+      "$ref": "../../common/defs.json#/$defs/participant_id"
+    },
+    "site": {
+      "title": "Recruitment site",
+      "$comment": "Source coding: 01=Northgate; 02=Riverside; 03=Hillcrest. Notes: Leading zero kept.",
+      "x-provenance": {
+        "default": "S01:Variables row 6"
+      },
+      "oneOf": [
+        {
+          "const": "01",
+          "title": "Northgate"
+        },
+        {
+          "const": "02",
+          "title": "Riverside"
+        },
+        {
+          "const": "03",
+          "title": "Hillcrest"
+        }
+      ]
+    },
+    "age": {
+      "title": "Age at interview (years)",
+      "description": "Ages above 85 were top-coded to 85 in the 2024 release, so 85 means 85 or older.",
+      "$comment": "Source coding: integer 18-85; -9 Don't know. Questionnaire A1: 'How old are you?'",
+      "x-provenance": {
+        "default": "S01:Variables row 7",
+        "description": "D027"
+      },
+      "x-unit": "years",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 18,
+          "maximum": 85
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "sex": {
+      "title": "Sex",
+      "description": "Recorded by interviewer",
+      "$comment": "Source coding: 1=Male; 2=Female; -7 Refused. Questionnaire A2: 'INTERVIEWER: RECORD SEX.'",
+      "x-provenance": {
+        "default": "S01:Variables row 8"
+      },
+      "oneOf": [
+        {
+          "const": 1,
+          "title": "Male"
+        },
+        {
+          "const": 2,
+          "title": "Female"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/refused"
+        }
+      ]
+    }
+  },
+  "required": [
+    "participant_id",
+    "site",
+    "age",
+    "sex"
+  ]
+}

@@ -21,7 +21,7 @@ Agent skills I use for my own work, shared so you (or your agent) can install th
 
 | Skill | What it does | Invocation |
 |---|---|---|
-| [`schemify`](./skills/schemify/SKILL.md) · [changelog](./changelogs/schemify.md) | Turn a bespoke data dictionary — Excel, CSV, PDF, whatever the study ships — into a validated package of interlinked JSON Schema files, working with you as the data steward: interviews for what the files don't say, toy-data unit tests for every rule (skip patterns and sentinel codes included), a hunt for the skip logic dictionaries never state — proposed for your confirmation, never invented — browsable web pages for feedback, and progress that persists across sessions. | User-invoked |
+| [`schemify`](./skills/schemify/SKILL.md) · [changelog](./changelogs/schemify.md) | Turn a study's scattered metadata — data dictionaries in any format, questionnaires, protocols, papers, websites, and what your data steward remembers — into a validated package of JSON Schema files for a tabular dataset, with no JSON Schema knowledge needed: it researches and reads your sources, interviews you, asks batched questions with recommended answers, traces every code, bound, and skip pattern to where it came from, tests each rule on toy data, and gives you a project website to follow progress, answer questions, review the data dictionary, and check your real data privately in QuaC. A review mode hands the hard questions to your data steward. | User-invoked |
 
 ### Research Computing
 
@@ -132,18 +132,24 @@ A complete example workspace — Allen Downey's *Think Stats* surveyed, two chap
 
 ## Using `schemify`
 
-Invoke it in the repository where the JSON Schema package should live, pointing at your data dictionary — however bespoke its format:
+Invoke it in the folder where the work should live, pointing at whatever metadata you have, however scattered:
 
 ```
-/schemify path/to/data_dictionary.xlsx
-/schemify metadata/                      (a directory of dictionary files)
-/schemify                                (resume — it proposes the next step from its notes)
-/schemify review the sentinel decisions
+/schemify path/to/data_dictionary.xlsx path/to/questionnaire.pdf
+/schemify metadata/                      (a folder of documents)
+/schemify                                (resume: it picks up from its notes and says what comes next)
+/schemify review                         (the data steward reviews someone's first pass)
 ```
 
-The first run inventories the dictionary, interviews you about the study — what is one row? which codes mean missing or not-applicable? — proposes topic categories for you to approve, then converts category by category — hunting the skip logic your dictionary never states and proposing each rule for your confirmation rather than inventing it — validating each against toy PASS/FAIL data (survey skip patterns and sentinel codes included) and re-rendering two web pages for your review: `dictionary.html`, a searchable, printable data dictionary that opens by double-click — keyword search built in, semantic search a switch away — and `playground.html`, a live validator you can drop your own JSON or CSV into, entirely in your browser. Large dictionaries deliberately run over several sittings: progress, every judgment call, and every source live as markdown beside the schemas, so any later `/schemify` picks up exactly where the last session stopped, and the closing review walks each decision with you before the working files are cleaned away. The finished package stands alone — schemas, toy data, a bundled validator, and the pages — usable by collaborators and CI without this skill installed.
+The first session sets up a `schemify/` workspace and opens a project website. While it reads your documents (in parallel, with subagents, where your agent supports them) and searches the web for more about the study (using anything it finds only after you approve the source), it interviews you on the website: your role, what you know first-hand, what other documentation exists. Then it plans the tables and topics with you and builds the schemas one topic at a time. Questions arrive in batches on the website, each showing what the sources say and a recommended answer; say you're not sure and it uses its recommendation, flagged for your data steward. Contradictions between sources always come to you, and skip logic your documents don't state is inferred only if you say yes.
 
-A complete example package — a small synthetic sleep-diary study, source dictionary included — lives in [`examples/schemify/`](./examples/schemify/), with a README of copy-able prompts.
+Every title, code, special code, bound, and rule carries its provenance: your document, a web page you approved, an answer from you or your steward, or the agent's own guess, flagged for review. You can see it for every variable in the website's data dictionary, and it ships in the package. Each topic is tested on made-up toy data before you see it; the website shows those rows in an interactive table with every validation error pinned to its cell and explained in plain words. To measure how well the schemas fit your real data, the website walks you through [QuaC](https://jeyabbalas.github.io/quac/), which runs in your browser: the agent never sees the data, only a summary of what failed (counts, no values). For public data, or when your agent runs on a model you control, you can instead let the agent run QuaC on a file you name: it re-checks after each round of changes, fixes its own slips, and asks you about the rest, still reading only that summary.
+
+Large dictionaries run over several sessions; the website shows the progress and how to continue. When the first pass is done, the agent packs the workspace for your data steward, whose review mode asks only the questions that need their knowledge.
+
+The deliverable, `schemify/package/`, stands on its own: the schemas, toy data, a README, the provenance, a data dictionary page, and a validator.
+
+A complete example workspace (a small synthetic study, its source documents included) lives in [`examples/schemify/`](./examples/schemify/), with a README of copy-able prompts.
 
 ## Using `biowulf`
 

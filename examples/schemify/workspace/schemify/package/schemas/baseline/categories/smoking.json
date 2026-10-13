@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/ashgrove/baseline/categories/smoking.json",
+  "title": "Smoking",
+  "description": "Lifetime and current cigarette smoking, from questionnaire Section B, Smoking.",
+  "type": "object",
+  "x-variable-group": "smoking",
+  "properties": {
+    "smk_ever": {
+      "title": "Smoked at least 100 cigarettes in lifetime",
+      "$comment": "Source coding: 1=Yes; 2=No; -7 Refused; -9 Don't know. Questionnaire B1: 'Have you smoked at least 100 cigarettes in your entire life?' The data steward says a refused or don't-know answer was routed like No (D017).",
+      "x-provenance": {
+        "default": "S01:Variables row 9"
+      },
+      "oneOf": [
+        {
+          "const": 1,
+          "title": "Yes"
+        },
+        {
+          "const": 2,
+          "title": "No"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/refused"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "smk_status": {
+      "title": "Current smoking status",
+      "$comment": "Source coding: 1=Current; 2=Former; -6 Not applicable; -9 Don't know. Questionnaire B2 offers 'Yes, I smoke now' [1] and 'No, I have quit' [2]. People whose smk_ever is 2, -7 or -9 hold -6 here (D017).",
+      "x-provenance": {
+        "default": "S01:Variables row 10",
+        "universe": "S02:¶8"
+      },
+      "x-universe": "People who have smoked at least 100 cigarettes in their life (smk_ever = 1)",
+      "oneOf": [
+        {
+          "const": 1,
+          "title": "Current"
+        },
+        {
+          "const": 2,
+          "title": "Former"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "cigs_day": {
+      "title": "Cigarettes per day (current smokers)",
+      "description": "Counts above 60 were capped at 60 in the 2024 cleaning, so 60 means 60 or more; a current smoker always has at least 1.",
+      "$comment": "Source coding: integer 0-99 in the dictionary, (1-60) in questionnaire B3; -6 Not applicable; -9 Don't know. Notes: Current smokers only. The data steward settled the range at 1-60 (D016): the 2024 cleaning capped counts at 60 and the dictionary range was never updated. People whose smk_ever is 2, -7 or -9, and people whose smk_status is 2 or -9, hold -6 here (D017, D029).",
+      "x-provenance": {
+        "default": "S01:Variables row 11",
+        "description": "D016",
+        "minimum": "D016",
+        "maximum": "D016",
+        "universe": [
+          "S01:Variables row 11",
+          "S02:¶10"
+        ]
+      },
+      "x-unit": "cigarettes per day",
+      "x-universe": "Current smokers only (smk_status = 1)",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "smk_age_start": {
+      "title": "Age started smoking (years)",
+      "description": "Questionnaire B4 asks: 'How old were you when you started smoking regularly?' Ages below 10 were recoded to -9 (don't know) in the 2024 cleaning.",
+      "$comment": "Source coding: integer 5-80 in the dictionary; -6 Not applicable; -9 Don't know. The data steward says real values run 10 to 80, because ages below 10 were recoded to -9 as implausible (D028). The dictionary label does not say 'regularly'; the questionnaire question does.",
+      "x-provenance": {
+        "default": "S01:Variables row 12",
+        "description": [
+          "S02:¶11",
+          "D028"
+        ],
+        "minimum": "D028",
+        "universe": "S02:¶8"
+      },
+      "x-unit": "years",
+      "x-universe": "People who have smoked at least 100 cigarettes in their life (smk_ever = 1)",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 80
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    }
+  },
+  "required": [
+    "smk_ever",
+    "smk_status",
+    "cigs_day",
+    "smk_age_start"
+  ]
+}

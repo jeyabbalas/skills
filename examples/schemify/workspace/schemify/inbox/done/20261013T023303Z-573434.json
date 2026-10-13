@@ -1,0 +1,78 @@
+{
+  "schemifyInbox": 1,
+  "workspace": "ashgrove-29ac",
+  "study": "Ashgrove Community Health Survey (ACH)",
+  "from": "author",
+  "submittedAt": "2026-10-13T02:33:03.721Z",
+  "items": [
+    {
+      "kind": "answer",
+      "decision": "D015",
+      "text": "Ages above 85 were top-coded to 85 in the 2024 release; nothing else changed.",
+      "choice": "other"
+    },
+    {
+      "kind": "answer",
+      "decision": "D016",
+      "choice": "b",
+      "note": "In the 2024 cleaning we capped cigarettes per day at 60 (anything higher was set to 60), and a current smoker always has at least 1. The dictionary range was never updated."
+    },
+    {
+      "kind": "answer",
+      "decision": "D017",
+      "choice": "a",
+      "note": "Refused or don't know at B1 was routed like No: those people skipped to section C, so the later smoking items hold -6."
+    },
+    {
+      "kind": "answer",
+      "decision": "D018",
+      "choice": "a"
+    },
+    {
+      "kind": "answer",
+      "decision": "D019",
+      "text": "smk_age_start: ages below 10 were recoded to -9 (don't know) as implausible, so real values run 10 to 80.",
+      "choice": "other"
+    },
+    {
+      "kind": "topic",
+      "topic": "about_you",
+      "verdict": "approve"
+    }
+  ],
+  "id": "20261013T023303Z-573434",
+  "receivedAt": "2026-10-13T02:33:03Z",
+  "takenAt": "2026-10-13T02:33:13Z",
+  "recorded": [
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D015"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D016"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D017"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D018"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D019"
+    },
+    {
+      "type": "topic",
+      "event": "approve",
+      "id": "about_you"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "schemifyInbox": 1,
+  "workspace": "ashgrove-29ac",
+  "study": "Ashgrove Community Health Survey (ACH)",
+  "from": "author",
+  "submittedAt": "2026-10-13T02:56:12.422Z",
+  "items": [
+    {
+      "kind": "answer",
+      "decision": "D031",
+      "choice": "accept",
+      "note": "Yes, this is the small extract we send to collaborators who only need demographics and smoking; the full release has all 15 variables."
+    },
+    {
+      "kind": "answer",
+      "decision": "D032",
+      "choice": "change",
+      "note": "Since the 2024 release the IDs carry a hyphen after the prefix: the letters ACH, then a hyphen, then four digits. The dictionary text was never updated."
+    },
+    {
+      "kind": "answer",
+      "decision": "D033",
+      "choice": "clean",
+      "note": "Data-entry errors from one site; they will be fixed in the next cleaning pass. The age rules in the dictionary are right."
+    },
+    {
+      "kind": "answer",
+      "decision": "D034",
+      "choice": "accept",
+      "note": "It is a quality-control marker our export tool adds. It is not study data and should not be in the dictionary."
+    }
+  ],
+  "id": "20261013T025612Z-8f14f3",
+  "receivedAt": "2026-10-13T02:56:12Z",
+  "takenAt": "2026-10-13T02:56:26Z",
+  "recorded": [
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D031"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D032"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D033"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D034"
+    }
+  ]
+}

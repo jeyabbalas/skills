@@ -1,0 +1,106 @@
+{
+  "schemifyInbox": 1,
+  "workspace": "ashgrove-29ac",
+  "study": "Ashgrove Community Health Survey (ACH)",
+  "from": "author",
+  "submittedAt": "2026-10-13T02:40:35.877Z",
+  "items": [
+    {
+      "kind": "answer",
+      "decision": "D020",
+      "choice": "known"
+    },
+    {
+      "kind": "answer",
+      "decision": "D021",
+      "choice": "a"
+    },
+    {
+      "kind": "answer",
+      "decision": "D022",
+      "choice": "a"
+    },
+    {
+      "kind": "answer",
+      "decision": "D023",
+      "text": "Nothing else changed in this section.",
+      "choice": "other"
+    },
+    {
+      "kind": "answer",
+      "decision": "D024",
+      "choice": "a"
+    },
+    {
+      "kind": "answer",
+      "decision": "D025",
+      "choice": "a"
+    },
+    {
+      "kind": "answer",
+      "decision": "D026",
+      "text": "BMI was rounded to one decimal place in the 2024 release; nothing else changed.",
+      "choice": "other"
+    },
+    {
+      "kind": "answer",
+      "decision": "D029",
+      "choice": "a"
+    },
+    {
+      "kind": "topic",
+      "topic": "smoking",
+      "verdict": "approve"
+    }
+  ],
+  "id": "20261013T024035Z-077a4a",
+  "receivedAt": "2026-10-13T02:40:35Z",
+  "takenAt": "2026-10-13T02:40:46Z",
+  "recorded": [
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D020"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D021"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D022"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D023"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D024"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D025"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D026"
+    },
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D029"
+    },
+    {
+      "type": "topic",
+      "event": "approve",
+      "id": "smoking"
+    }
+  ]
+}

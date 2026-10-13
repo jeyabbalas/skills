@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/ashgrove/baseline/baseline.schema.json",
+  "title": "ACH — Baseline",
+  "description": "Array of baseline records. One element is one participant.",
+  "$comment": "Not enforceable here: participant_id is unique across rows, one record per participant (S01:Variables row 2, D009).",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "title": "Baseline record",
+    "allOf": [
+      {
+        "$ref": "categories/about_you.json"
+      },
+      {
+        "$ref": "categories/smoking.json"
+      },
+      {
+        "$ref": "categories/womens_health.json"
+      },
+      {
+        "$ref": "categories/health.json"
+      },
+      {
+        "$comment": "Skip pattern R001: people who have not smoked 100 cigarettes (smk_ever = 2), or who refused or did not know (-7, -9), skip the smoking questions that follow, so smk_status, cigs_day and smk_age_start are -6. Questionnaire ¶8: 'IF NO, GO TO SECTION C.'; the data steward says refusals and don't-know answers at B1 were routed like No (D017) and confirms the -6 coding (D018); dictionary Codes row 2: -6 is 'Question not asked of this participant (skip pattern)'.",
+        "x-provenance": {
+          "default": [
+            "S02:¶8",
+            "D017"
+          ],
+          "value:-6": "D018"
+        },
+        "if": {
+          "required": [
+            "smk_ever"
+          ],
+          "properties": {
+            "smk_ever": {
+              "enum": [
+                2,
+                -7,
+                -9
+              ]
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "smk_status": {
+              "const": -6
+            },
+            "cigs_day": {
+              "const": -6
+            },
+            "smk_age_start": {
+              "const": -6
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Applicability R001: people who have smoked 100 cigarettes (smk_ever = 1) were asked whether they smoke now and when they started, so smk_status and smk_age_start are never -6. Questionnaire ¶8 to ¶11: only 'No' at B1 skips B2 to B4 (refusals and don't-know answers count as No: D017); the data steward confirms the rule matches the delivered data (D018).",
+        "x-provenance": {
+          "default": [
+            "S02:¶8",
+            "D018"
+          ]
+        },
+        "if": {
+          "required": [
+            "smk_ever"
+          ],
+          "properties": {
+            "smk_ever": {
+              "const": 1
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "smk_status": {
+              "not": {
+                "const": -6
+              }
+            },
+            "smk_age_start": {
+              "not": {
+                "const": -6
+              }
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Skip pattern R002: former smokers (smk_status = 2), and people who did not know (-9) whether they smoke now, were not asked how many cigarettes they smoke, so cigs_day is -6. Questionnaire ¶10: 'IF SMOKES NOW:'; dictionary Variables row 11: 'Current smokers only'; a don't-know answer is treated like No (D017 for the first question, confirmed for this one in D029); the data steward confirms the -6 coding (D018).",
+        "x-provenance": {
+          "default": [
+            "S02:¶10",
+            "D017",
+            "D029"
+          ],
+          "value:-6": "D018"
+        },
+        "if": {
+          "required": [
+            "smk_status"
+          ],
+          "properties": {
+            "smk_status": {
+              "enum": [
+                2,
+                -9
+              ]
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "cigs_day": {
+              "const": -6
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Applicability R002: current smokers (smk_status = 1) were asked how many cigarettes they smoke, so cigs_day is never -6. The data steward confirms the rule matches the delivered data (D018).",
+        "x-provenance": {
+          "default": [
+            "S02:¶10",
+            "D018"
+          ]
+        },
+        "if": {
+          "required": [
+            "smk_status"
+          ],
+          "properties": {
+            "smk_status": {
+              "const": 1
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "cigs_day": {
+              "not": {
+                "const": -6
+              }
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Skip pattern R003: men (sex = 1), and people whose sex was refused (-7), skip the women's-health section, so menarche_age, parity, age_first_birth and breastfed_ever are -6. Questionnaire ¶13: 'ASK SECTION C OF WOMEN ONLY (A2 = 2). MEN: GO TO SECTION D.'; dictionary Variables rows 13 and 14: 'Women only'; the data steward says a refused sex is skipped like men (D021) and confirms the -6 coding (D022).",
+        "x-provenance": {
+          "default": [
+            "S02:¶13",
+            "D021"
+          ],
+          "value:-6": "D022"
+        },
+        "if": {
+          "required": [
+            "sex"
+          ],
+          "properties": {
+            "sex": {
+              "enum": [
+                1,
+                -7
+              ]
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "menarche_age": {
+              "const": -6
+            },
+            "parity": {
+              "const": -6
+            },
+            "age_first_birth": {
+              "const": -6
+            },
+            "breastfed_ever": {
+              "const": -6
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Applicability R003: women (sex = 2) were asked the age at first period and the number of live births, so menarche_age and parity are never -6. The data steward confirms the rule matches the delivered data (D022).",
+        "x-provenance": {
+          "default": [
+            "S02:¶13",
+            "D022"
+          ]
+        },
+        "if": {
+          "required": [
+            "sex"
+          ],
+          "properties": {
+            "sex": {
+              "const": 2
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "menarche_age": {
+              "not": {
+                "const": -6
+              }
+            },
+            "parity": {
+              "not": {
+                "const": -6
+              }
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Skip pattern R004: people who were not told they have diabetes (diabetes_dx = 2), or who did not know (-9), were not asked the age at diagnosis, so diabetes_age is -6. Questionnaire ¶21: 'IF YES:'; dictionary Variables row 19: 'Asked only if diabetes_dx = 1'; the data steward says a don't-know answer means the age was not asked (D024) and confirms the -6 coding (D025).",
+        "x-provenance": {
+          "default": [
+            "S02:¶21",
+            "D024"
+          ],
+          "value:-6": "D025"
+        },
+        "if": {
+          "required": [
+            "diabetes_dx"
+          ],
+          "properties": {
+            "diabetes_dx": {
+              "enum": [
+                2,
+                -9
+              ]
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "diabetes_age": {
+              "const": -6
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Applicability R004: people who were told they have diabetes (diabetes_dx = 1) were asked the age at diagnosis, so diabetes_age is never -6. The data steward confirms the rule matches the delivered data (D025).",
+        "x-provenance": {
+          "default": [
+            "S02:¶21",
+            "D025"
+          ]
+        },
+        "if": {
+          "required": [
+            "diabetes_dx"
+          ],
+          "properties": {
+            "diabetes_dx": {
+              "const": 1
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "diabetes_age": {
+              "not": {
+                "const": -6
+              }
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Skip pattern R005: women with no live births (parity = 0) have no first birth and no children to breastfeed, so age_first_birth and breastfed_ever are -6. The documents do not state this routing; the data steward vouches for it (D020).",
+        "x-provenance": {
+          "default": "D020"
+        },
+        "if": {
+          "required": [
+            "parity"
+          ],
+          "properties": {
+            "parity": {
+              "const": 0
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "age_first_birth": {
+              "const": -6
+            },
+            "breastfed_ever": {
+              "const": -6
+            }
+          }
+        }
+      },
+      {
+        "$comment": "Applicability R005: women with at least one live birth (parity 1 to 15) were asked the age at first birth and about breastfeeding, so age_first_birth and breastfed_ever are never -6 (they may still be refused or don't know). The documents do not state this routing; the data steward vouches for it (D020).",
+        "x-provenance": {
+          "default": "D020"
+        },
+        "if": {
+          "required": [
+            "parity"
+          ],
+          "properties": {
+            "parity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 15
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "age_first_birth": {
+              "not": {
+                "const": -6
+              }
+            },
+            "breastfed_ever": {
+              "not": {
+                "const": -6
+              }
+            }
+          }
+        }
+      }
+    ],
+    "unevaluatedProperties": false
+  }
+}

@@ -1,5 +1,6 @@
 interface:
   display_name: "Schemify"
-  short_description: "Convert a data dictionary into JSON Schema"
+  short_description: "Turn a study's metadata into validated JSON Schema"
+  default_prompt: "Use $schemify to turn the data dictionary and questionnaires in this folder into JSON Schema."
 policy:
   allow_implicit_invocation: false

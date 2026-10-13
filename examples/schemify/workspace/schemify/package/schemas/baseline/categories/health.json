@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/ashgrove/baseline/categories/health.json",
+  "title": "Health",
+  "description": "Body mass index measured at the clinic and diabetes history, from questionnaire Section D, Health.",
+  "type": "object",
+  "x-variable-group": "health",
+  "properties": {
+    "bmi": {
+      "title": "Body mass index (kg/m2)",
+      "description": "Measured at clinic visit. Questionnaire D1: 'Body mass index recorded from measured height and weight.' Rounded to one decimal place in the 2024 release.",
+      "$comment": "Source coding: number 12.0-70.0; -1 Not measured. Questionnaire D1: '(Clinic) Body mass index recorded from measured height and weight.' The author confirms -1 appears only for BMI, when the nurse could not measure (D010), and that BMI was rounded to one decimal place in the 2024 release (D030); the rounding is not enforced.",
+      "x-provenance": {
+        "default": "S01:Variables row 17",
+        "description": [
+          "S01:Variables row 17",
+          "S02:¶19",
+          "D030"
+        ],
+        "sentinels": [
+          "S01:Variables row 17",
+          "D010"
+        ]
+      },
+      "x-unit": "kg/m2",
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 12.0,
+          "maximum": 70.0
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_measured"
+        }
+      ]
+    },
+    "diabetes_dx": {
+      "title": "Ever told you have diabetes",
+      "$comment": "Source coding: 1=Yes; 2=No; -9 Don't know. Questionnaire D2: 'Has a doctor ever told you that you have diabetes?'",
+      "x-provenance": {
+        "default": "S01:Variables row 18"
+      },
+      "oneOf": [
+        {
+          "const": 1,
+          "title": "Yes"
+        },
+        {
+          "const": 2,
+          "title": "No"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "diabetes_age": {
+      "title": "Age at diabetes diagnosis (years)",
+      "$comment": "Source coding: integer 10-85; -6 Not applicable; -9 Don't know. Notes: Asked only if diabetes_dx = 1. Questionnaire D3: 'IF YES: How old were you when you were told?' People whose diabetes_dx is don't know hold -6 here (D024).",
+      "x-provenance": {
+        "default": "S01:Variables row 19",
+        "universe": [
+          "S01:Variables row 19",
+          "S02:¶21"
+        ]
+      },
+      "x-unit": "years",
+      "x-universe": "People who were told by a doctor that they have diabetes (diabetes_dx = 1)",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 85
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    }
+  },
+  "required": [
+    "bmi",
+    "diabetes_dx",
+    "diabetes_age"
+  ]
+}

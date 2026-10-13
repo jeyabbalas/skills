@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/ashgrove/common/defs.json",
+  "title": "ACH — shared definitions",
+  "$defs": {
+    "not_applicable": {
+      "const": -6,
+      "title": "Not applicable",
+      "description": "Question not asked of this participant (skip pattern)",
+      "x-value-kind": "sentinel",
+      "x-provenance": {
+        "default": "S01:Codes row 2"
+      }
+    },
+    "refused": {
+      "const": -7,
+      "title": "Refused",
+      "x-value-kind": "sentinel",
+      "x-provenance": {
+        "default": "S01:Codes row 3"
+      }
+    },
+    "dont_know": {
+      "const": -9,
+      "title": "Don't know",
+      "x-value-kind": "sentinel",
+      "x-provenance": {
+        "default": "S01:Codes row 4"
+      }
+    },
+    "not_measured": {
+      "const": -1,
+      "title": "Not measured",
+      "description": "Clinic measurement not taken",
+      "x-value-kind": "sentinel",
+      "x-provenance": {
+        "default": "S01:Codes row 5"
+      }
+    },
+    "participant_id": {
+      "type": "string",
+      "pattern": "^ACH-[0-9]{4}$",
+      "title": "Participant ID",
+      "x-provenance": {
+        "default": "S01:Variables row 5",
+        "pattern": "D032"
+      }
+    }
+  }
+}

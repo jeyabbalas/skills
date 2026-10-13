@@ -1,0 +1,107 @@
+{
+  "schemify": 2,
+  "id": "ashgrove-29ac",
+  "study": "Ashgrove Community Health Survey (ACH)",
+  "slug": "ashgrove",
+  "description": "Baseline interview data from the Ashgrove Community Health Survey (ACH): the Ashgrove Regional Health Unit ran the baseline interviews in 2022 and 2023, and the study's documents label the data synthetic. This package describes the 2024 data release (release 2 of the baseline data dictionary): one record per participant, recruited at three sites (Northgate, Riverside and Hillcrest), with age and sex, smoking history, women's reproductive health, body mass index measured at a clinic visit, and diabetes history. It follows the data dictionary and the baseline interview questionnaire, corrected by the data steward where the 2024 cleaning changed the data; for example, participant IDs carry a hyphen after the prefix and cigarettes per day is capped at 60. A smaller extract is sent to collaborators who only need demographics and smoking; it omits the other variables, so checking an extract against these schemas reports them as missing. Exports may also carry a \"canary\" quality-control column, which is not study data.",
+  "mode": "build",
+  "invoke": "/schemify",
+  "harness": "claude-code",
+  "idBase": "https://schemas.example.org/ashgrove/",
+  "tables": [
+    {
+      "name": "baseline",
+      "title": "Baseline",
+      "grain": "One element is one participant.",
+      "mother": "baseline/baseline.schema.json"
+    }
+  ],
+  "topics": [
+    {
+      "id": "about_you",
+      "title": "About you",
+      "table": "baseline",
+      "file": "baseline/categories/about_you.json"
+    },
+    {
+      "id": "smoking",
+      "title": "Smoking",
+      "table": "baseline",
+      "file": "baseline/categories/smoking.json"
+    },
+    {
+      "id": "womens_health",
+      "title": "Women's health",
+      "table": "baseline",
+      "file": "baseline/categories/womens_health.json"
+    },
+    {
+      "id": "health",
+      "title": "Health",
+      "table": "baseline",
+      "file": "baseline/categories/health.json"
+    }
+  ],
+  "conventions": {
+    "missing": "in-band codes",
+    "sentinels": [
+      {
+        "code": -6,
+        "meaning": "Not applicable (skipped by design)",
+        "structural": true,
+        "decision": "D010"
+      },
+      {
+        "code": -7,
+        "meaning": "Refused",
+        "structural": false,
+        "decision": "D010"
+      },
+      {
+        "code": -9,
+        "meaning": "Don't know",
+        "structural": false,
+        "decision": "D010"
+      },
+      {
+        "code": -1,
+        "meaning": "Not measured",
+        "structural": false,
+        "decision": "D010"
+      }
+    ],
+    "decision": "D011"
+  },
+  "people": [
+    {
+      "role": "author",
+      "name": "Jordan Lee",
+      "profile": "steward",
+      "knows": [
+        "how the questionnaires were administered",
+        "how the data was cleaned and recoded (ran the 2024 cleaning)",
+        "differences between data releases"
+      ]
+    },
+    {
+      "role": "steward",
+      "name": "Jordan Lee",
+      "profile": "steward",
+      "knows": [
+        "how the questionnaires were administered",
+        "how the data was cleaned and recoded (ran the 2024 cleaning)",
+        "differences between data releases"
+      ]
+    }
+  ],
+  "preferences": {
+    "batchSize": 8,
+    "inferRules": "ask",
+    "realData": "yes"
+  },
+  "plan": {
+    "sessions": 1,
+    "note": "All four topics this session, in questionnaire order: About you, Smoking, Women's health, Health. Smoking and Women's health carry the skip logic."
+  },
+  "created": "2026-10-13"
+}

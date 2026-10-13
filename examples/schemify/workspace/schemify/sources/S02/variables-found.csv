@@ -1,0 +1,14 @@
+variable,label,type,codes,missing,locator
+age,A1 age in years,write-in blank (years),,not stated,¶4
+sex,A2 sex (recorded by interviewer),choice,1=Male; 2=Female,not stated,¶5
+smk_ever,B1 smoked at least 100 cigarettes in lifetime,choice,1=Yes; 2=No,not stated,¶7
+smk_status,B2 smokes cigarettes now or has quit,choice,"1=Yes, I smoke now; 2=No, I have quit",not stated,¶9
+cigs_day,B3 cigarettes per day if smokes now,write-in blank; printed range (1–60),,not stated,¶10
+smk_age_start,B4 age started smoking regularly,write-in blank (years),,not stated,¶11
+menarche_age,C1 age at first menstrual period,write-in blank (years),,not stated,¶14
+parity,C2 number of live births,write-in blank (no unit printed),,not stated,¶15
+age_first_birth,C3 age at first live birth,write-in blank (years),,not stated,¶16
+breastfed_ever,C4 ever breastfed any of your children,choice,1=Yes; 2=No,not stated,¶17
+bmi,D1 BMI from clinic-measured height and weight,not stated,,not stated,¶19
+diabetes_dx,D2 doctor ever said you have diabetes,choice,1=Yes; 2=No,not stated,¶20
+diabetes_age,D3 age when told of diabetes,write-in blank (years),,not stated,¶21

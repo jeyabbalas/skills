@@ -1,42 +1,48 @@
-# schemify example — the LARK sleep-diary study
+# schemify example — the Ashgrove Community Health Survey (synthetic)
 
-This is a complete schemify run, committed as it finished. The input was `workspace/source/dictionary.csv` — a deliberately typical bespoke data dictionary: eleven variables, codes and missing codes mixed into one "Coding / Values" column, a routing note in prose ("Asked only if nap_yesterday=1"), and one variable whose coding sheet is missing. The simulated steward was the study coordinator: they confirmed the grain and the sentinel policy, approved the two proposed categories, supplied the site list for a link key the dictionary never mentions, corrected the bedtime encoding, and chose to keep the working files at cleanup — so `PROGRESS.md`, `DECISIONS.md`, and `SOURCES.md` show exactly what schemify's state looks like at the end of a run (a steward who chooses "clean" would have those three folded into the README and deleted).
+A complete schemify workspace, committed as it stood at the end of a run. The study is fictional and so are its documents: `workspace/metadata/` holds what the author handed over — a data dictionary (`ashgrove_dictionary_r2.xlsx`, two sheets: variables and special codes) and the baseline questionnaire (`ashgrove_baseline_questionnaire.docx`). They were written to disagree and to stay silent in the ways real documentation does:
 
-The conversion exercises most of the skill's machinery: labeled `oneOf` codes, bounded `anyOf` measures with sentinel branches, string codes with leading zeros, anchored id/date/time patterns, a skip/applicability conditional pair in the mother file carrying its routing-register id, a routing register (`ROUTING.csv`) with one encoded rule and one deliberately not-enforceable one (R002, D015), a superseded decision (D008 → D009), a deferred variable held as an open item (D013), toy PASS/FAIL fixtures with a ground-truth ledger, and both rendered pages.
+- the dictionary says cigarettes per day run 0–99; the questionnaire's answer box says 1–60. The agent put the contradiction to the person, recommending the dictionary's range, and they chose 1–60;
+- the skip patterns come from the questionnaire's routing instructions ("IF NO, GO TO…", women-only sections), each rule cited to the paragraph that states it; the diabetes follow-up is stated in both documents;
+- nothing says women with no live births skip "age at first birth" and "ever breastfed". The agent asked before inferring the rule; the person knew it was done that way, so it is encoded on their word;
+- neither document says what refused or don't-know answers to a gate question do to the questions behind it. Each case became a question with a recommended answer.
 
-## Browse it
+## What happened in the run
 
-- `workspace/json_schema/dictionary.html` — double-click it; the searchable, printable data dictionary works straight from disk, offline. Flip **Semantic search** beside the title to also find related variables by meaning (“how long they slept” finds `sleep_minutes` though the words never appear): it fetches a small model once and runs entirely in your browser.
-- `workspace/json_schema/playground.html` — needs a local server: `cd workspace/json_schema && python3 -m http.server 8000`, then open `http://localhost:8000/playground.html`. Click **Toy FAIL data** and hover the tinted cells — each seeded violation is explained on the cell, skip-pattern rules in the study's own words. Drop any `.json`/`.csv` onto **Check your own file**; nothing you upload leaves your browser.
-- `workspace/json_schema/README.md` — the package's own front door: conventions, sentinel table, enforced routing rules, what is documented but not enforced, and the surviving open item.
-- Re-run the checks yourself: `uv run workspace/json_schema/tools/validate.py summary workspace/json_schema` (or `pip install -r workspace/json_schema/tools/requirements.txt` and use `python3`). Expect: 4 schema files valid, toy PASS clean, 9/9 seeded violations caught, coverage 11/12 with one deferred, 2 conditionals clean, routing 1/2 encoded with 0 unregistered and 1/1 fixtured.
+Seven sessions, each closed with a written handoff (`state/ledger.jsonl` → `session` events). The simulated person was the study's data manager, who is also its data steward. They answered 35 questions in 8 batches on the website and approved the four topics one by one. Along the way they volunteered what the 2024 cleaning changed — ages above 85 top-coded, implausible smoking-start ages recoded to don't-know, BMI rounded to one decimal — and each fact is a decision cited where it applies.
+
+They then checked a 40-row extract of their "real" data in QuaC, in the browser. That extract was synthetic, built to test the agent, and is not included here. The agent saw only QuaC's findings — counts and column names, no values (`alignment/A01.json`). It never opened the file, asking about it only by name. The 13 failed checks became four questions:
+
+- every ID failed the pattern the person had confirmed: they explained the 2024 release adds a hyphen, so the pattern changed and the earlier decision is superseded;
+- five ages were data-entry errors, a data issue, so the schema stayed;
+- the 10 missing variables (a partial extract) and an extra quality-control column were recorded as expected.
+
+## Look around
+
+- `workspace/schemify/index.html` — the project website. Double-click it: everything shows from disk. To see it as during a run, with live updates and one-click sending, serve it: `python3 workspace/schemify/tools/serve.py`, then open the address it prints. The Data check tab's tables load the data-table library from jsDelivr, so they need a network connection.
+- `workspace/schemify/package/` — the deliverable: `README.md` (start there), `PROVENANCE.md`, `schemas/`, `toy-data/`, `dictionary.html`, and `tools/validate.py`.
+- `workspace/schemify/state/ledger.jsonl` — every source, decision, rule, question batch, data check, and session, in order.
+
+Check it yourself: `uv run workspace/schemify/package/tools/validate.py summary workspace/schemify/package`. Expect 6 schema files valid, 10 rules, 15 valid toy rows passing, 46/46 seeded errors caught, and 15/15 properties traced.
 
 ## Restoring what git leaves out
 
-Nothing — everything here is committed, including the rendered pages and the copied `assets/` and `tools/`. If you refresh the assets from a newer skill version (`render.py refresh-assets workspace/json_schema`), rebuild the pages afterwards (`render.py dictionary …`, `render.py playground …`).
+The synthetic data extract, which the agent never saw, is not included. The text and tables the agent extracted from the two documents are left out too, because they regenerate: the digests cite them, in `workspace/schemify/sources/S01/extract/` and `S02/extract/`. To restore them, run these from `examples/schemify/workspace`:
+
+```
+uv run ../../../skills/schemify/scripts/extract.py schemify/sources/ashgrove_dictionary_r2.xlsx --out schemify/sources/S01/extract --id S01
+uv run ../../../skills/schemify/scripts/extract.py schemify/sources/ashgrove_baseline_questionnaire.docx --out schemify/sources/S02/extract --id S02
+```
+
+The run's machine-specific paths in `START-HERE.md` and the website's data were replaced with repository-relative ones. Rebuilding (`uv run skills/schemify/scripts/schemify.py --ws examples/schemify/workspace/schemify build`) writes your own.
 
 ## How to prompt the agent
 
-Starting a run like this one, in a fresh directory containing your dictionary:
-
 ```
-/schemify source/dictionary.csv
-```
-
-Mid-run, in later sessions:
-
-```
-/schemify                                   (resume from PROGRESS.md's next: pointer)
-/schemify convert the sleep category
-/schemify what does -666 mean in nap_minutes?
+/schemify metadata/ashgrove_dictionary_r2.xlsx metadata/ashgrove_baseline_questionnaire.docx
+/schemify                                   (resume: it says where things stand and continues)
+/schemify the steward says -7 never occurs for sex; drop it
+/schemify review                            (the data steward's review)
 ```
 
-Steering and finishing:
-
-```
-/schemify the bedtime values are always zero-padded 24-hour — tighten it
-/schemify review                            (walk every decision, finish the README)
-/schemify review the sentinel decisions     (a scoped review, any time)
-```
-
-One honest note: this example was produced by the skill's author exercising the skill's own playbooks and scripts end-to-end (the fixtures, pages, and validation output are real script output); the steward's side of the conversation is simulated, as the intro says.
+One honest note: the person's side of this run was simulated. A second AI agent, working for the skill's author, played the data manager and answered on the website as a person would. Every file here is real output of the skill's scripts and of the agent that ran them.

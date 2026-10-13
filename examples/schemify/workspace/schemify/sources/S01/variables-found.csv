@@ -1,0 +1,16 @@
+variable,label,type,codes,missing,locator
+participant_id,Participant ID,text,,,Variables row 5
+site,Recruitment site,text,01=Northgate; 02=Riverside; 03=Hillcrest,,Variables row 6
+age,Age at interview (years),integer,,-9,Variables row 7
+sex,Sex,integer,1=Male; 2=Female,-7,Variables row 8
+smk_ever,Smoked at least 100 cigarettes in lifetime,integer,1=Yes; 2=No,-7; -9,Variables row 9
+smk_status,Current smoking status,integer,1=Current; 2=Former,-6; -9,Variables row 10
+cigs_day,Cigarettes per day (current smokers),integer,,-6; -9,Variables row 11
+smk_age_start,Age started smoking (years),integer,,-6; -9,Variables row 12
+menarche_age,Age at first menstrual period (years),integer,,-6; -9,Variables row 13
+parity,Number of live births,integer,,-6; -9,Variables row 14
+age_first_birth,Age at first live birth (years),integer,,-6; -9,Variables row 15
+breastfed_ever,Ever breastfed,integer,1=Yes; 2=No,-6; -9,Variables row 16
+bmi,Body mass index (kg/m2),number,,-1,Variables row 17
+diabetes_dx,Ever told you have diabetes,integer,1=Yes; 2=No,-9,Variables row 18
+diabetes_age,Age at diabetes diagnosis (years),integer,,-6; -9,Variables row 19

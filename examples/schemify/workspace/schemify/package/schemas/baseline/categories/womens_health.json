@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/ashgrove/baseline/categories/womens_health.json",
+  "title": "Women's health",
+  "description": "Reproductive history, asked of women only: questionnaire Section C, Women's health.",
+  "type": "object",
+  "x-variable-group": "womens_health",
+  "properties": {
+    "menarche_age": {
+      "title": "Age at first menstrual period (years)",
+      "$comment": "Source coding: integer 8-20; -6 Not applicable; -9 Don't know. Notes: Women only. Questionnaire C1: 'How old were you when you had your first menstrual period?' People whose sex was refused hold -6 here, like men (D021).",
+      "x-provenance": {
+        "default": "S01:Variables row 13",
+        "universe": [
+          "S01:Variables row 13",
+          "S02:¶13"
+        ]
+      },
+      "x-unit": "years",
+      "x-universe": "Women only (sex = 2)",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 20
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "parity": {
+      "title": "Number of live births",
+      "$comment": "Source coding: integer 0-15; -6 Not applicable; -9 Don't know. Notes: Women only. Questionnaire C2: 'How many live births have you had?' People whose sex was refused hold -6 here, like men (D021).",
+      "x-provenance": {
+        "default": "S01:Variables row 14",
+        "universe": [
+          "S01:Variables row 14",
+          "S02:¶13"
+        ]
+      },
+      "x-universe": "Women only (sex = 2)",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "age_first_birth": {
+      "title": "Age at first live birth (years)",
+      "$comment": "Source coding: integer 14-50; -6 Not applicable; -9 Don't know. Questionnaire C3: 'How old were you at your first live birth?' The dictionary has no 'Women only' note on this row; the questionnaire asks all of Section C of women only (¶13). The data steward says women with no live births hold -6 here (D020), as do people whose sex was refused (D021).",
+      "x-provenance": {
+        "default": "S01:Variables row 15",
+        "universe": [
+          "S02:¶13",
+          "D020"
+        ]
+      },
+      "x-unit": "years",
+      "x-universe": "Women with at least one live birth (sex = 2 and parity 1 or more)",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 14,
+          "maximum": 50
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    },
+    "breastfed_ever": {
+      "title": "Ever breastfed",
+      "$comment": "Source coding: 1=Yes; 2=No; -6 Not applicable; -9 Don't know. Questionnaire C4: 'Did you ever breastfeed any of your children?' The dictionary has no 'Women only' note on this row; the questionnaire asks all of Section C of women only (¶13). The data steward says women with no live births hold -6 here (D020), as do people whose sex was refused (D021).",
+      "x-provenance": {
+        "default": "S01:Variables row 16",
+        "universe": [
+          "S02:¶13",
+          "D020"
+        ]
+      },
+      "x-universe": "Women with at least one live birth (sex = 2 and parity 1 or more)",
+      "oneOf": [
+        {
+          "const": 1,
+          "title": "Yes"
+        },
+        {
+          "const": 2,
+          "title": "No"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/not_applicable"
+        },
+        {
+          "$ref": "../../common/defs.json#/$defs/dont_know"
+        }
+      ]
+    }
+  },
+  "required": [
+    "menarche_age",
+    "parity",
+    "age_first_birth",
+    "breastfed_ever"
+  ]
+}

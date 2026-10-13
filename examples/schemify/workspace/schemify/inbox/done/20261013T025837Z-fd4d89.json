@@ -1,0 +1,25 @@
+{
+  "schemifyInbox": 1,
+  "workspace": "ashgrove-29ac",
+  "study": "Ashgrove Community Health Survey (ACH)",
+  "from": "author",
+  "submittedAt": "2026-10-13T02:58:37.747Z",
+  "items": [
+    {
+      "kind": "answer",
+      "decision": "D035",
+      "text": "The Ashgrove Regional Health Unit ran the baseline interviews in 2022 and 2023. Yes: release 2 of the dictionary describes the 2024 data release.",
+      "choice": "other"
+    }
+  ],
+  "id": "20261013T025837Z-fd4d89",
+  "receivedAt": "2026-10-13T02:58:37Z",
+  "takenAt": "2026-10-13T02:58:51Z",
+  "recorded": [
+    {
+      "type": "decision",
+      "event": "answer",
+      "id": "D035"
+    }
+  ]
+}

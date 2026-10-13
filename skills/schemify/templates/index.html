@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="schemify {{SKILL_VERSION}}">
+<title>{{TITLE}}</title>
+<link rel="icon" href="{{FAVICON}}">
+<link rel="stylesheet" href="site/schemify.css">
+<style>
+  /* failsafe: if site/schemify.css is missing, the page stays readable */
+  body { font-family: system-ui, sans-serif; margin: 0; }
+</style>
+</head>
+<body>
+<a class="sf-skip" href="#sf-main">Skip to content</a>
+<header class="sf-header">
+  <a class="sf-brand" href="#overview" aria-label="Overview">
+    {{LOGO}}
+    <span class="sf-brand-text"><span class="sf-brand-name">schemify</span><span class="sf-study">{{STUDY}}</span></span>
+  </a>
+  <div class="sf-header-status" id="sf-status"></div>
+</header>
+<nav class="sf-tabs" id="sf-tabs" role="tablist" aria-label="Sections"></nav>
+<main id="sf-main" tabindex="-1">
+  <section class="sf-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview"></section>
+  <section class="sf-panel" id="panel-questions" role="tabpanel" aria-labelledby="tab-questions" hidden></section>
+  <section class="sf-panel" id="panel-dictionary" role="tabpanel" aria-labelledby="tab-dictionary" hidden></section>
+  <section class="sf-panel" id="panel-skip-logic" role="tabpanel" aria-labelledby="tab-skip-logic" hidden></section>
+  <section class="sf-panel" id="panel-evidence" role="tabpanel" aria-labelledby="tab-evidence" hidden></section>
+  <section class="sf-panel" id="panel-data-check" role="tabpanel" aria-labelledby="tab-data-check" hidden></section>
+  <div class="sf-card" id="sf-boot-error" hidden>
+    <h2>This page could not load its data</h2>
+    <p>The file <code>site/data/state.js</code> is missing or damaged. Ask your agent to run its <code>build</code> step,
+      or reopen this page from the agent's local address.</p>
+  </div>
+  <noscript><div class="sf-card"><h2>JavaScript is off</h2><p>This page needs JavaScript to show the work.
+    The finished schemas, their README, and the data dictionary are in the <code>package/</code> folder.</p></div></noscript>
+</main>
+<footer class="sf-footer">
+  Made with <a href="https://github.com/jeyabbalas/skills">schemify</a> {{SKILL_VERSION}} ·
+  the data dictionary is drawn by <a href="https://www.npmjs.com/package/json-schema-data-dictionary">json-schema-data-dictionary</a> ·
+  the JSON Schema logo belongs to the <a href="https://json-schema.org">JSON Schema</a> project, which does not endorse this tool.
+  <span id="sf-generated"></span>
+</footer>
+<div class="sf-toast" id="sf-toast" role="status" aria-live="polite"></div>
+<script src="site/json-schema-data-dictionary.global.js"></script>
+<script src="site/data/state.js"></script>
+<script src="site/data/activity.js"></script>
+<script src="site/app.js"></script>
+</body>
+</html>

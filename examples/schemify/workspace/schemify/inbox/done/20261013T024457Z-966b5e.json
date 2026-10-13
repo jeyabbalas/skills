@@ -1,0 +1,346 @@
+{
+  "schemifyInbox": 1,
+  "workspace": "ashgrove-29ac",
+  "study": "Ashgrove Community Health Survey (ACH)",
+  "from": "author",
+  "submittedAt": "2026-10-13T02:44:57.765Z",
+  "items": [
+    {
+      "kind": "confirm",
+      "decision": "D014"
+    },
+    {
+      "kind": "topic",
+      "topic": "womens_health",
+      "verdict": "approve"
+    },
+    {
+      "kind": "topic",
+      "topic": "health",
+      "verdict": "approve"
+    },
+    {
+      "kind": "alignment",
+      "label": "2024 baseline release",
+      "note": "",
+      "findings": {
+        "findingsSchemaVersion": 1,
+        "containsData": false,
+        "generator": {
+          "name": "QuaC",
+          "version": "1.2.0",
+          "homepage": "https://jeyabbalas.github.io/quac/"
+        },
+        "generatedAt": "2026-10-13T02:43:55.782Z",
+        "dataset": {
+          "name": "2024 baseline release",
+          "format": "csv",
+          "sheet": null,
+          "records": 40,
+          "variables": 6
+        },
+        "inputs": {
+          "schema": {
+            "root": "baseline/baseline.schema.json",
+            "files": [
+              "baseline/baseline.schema.json",
+              "baseline/categories/about_you.json",
+              "baseline/categories/health.json",
+              "baseline/categories/smoking.json",
+              "baseline/categories/womens_health.json",
+              "common/defs.json"
+            ],
+            "baseUrl": null,
+            "setId": "288f6ac3b464b6a3",
+            "title": "ACH — Baseline",
+            "id": "https://schemas.example.org/ashgrove/baseline/baseline.schema.json"
+          },
+          "rules": [],
+          "correctionsApplied": true
+        },
+        "overview": {
+          "records": 40,
+          "recordsWithErrors": 40,
+          "recordsWithWarnings": 0,
+          "recordsExact": true,
+          "schemaChecksFailed": 13,
+          "rules": {
+            "total": 0,
+            "failed": 0,
+            "passed": 0,
+            "corrected": 0,
+            "errored": 0,
+            "notRun": 0
+          },
+          "valuesCorrected": 0,
+          "missingVariables": {
+            "required": 10,
+            "optional": 0
+          },
+          "columnsNotInSchema": 1
+        },
+        "schemaChecks": [
+          {
+            "level": "variable",
+            "variable": "site",
+            "variableTitle": "Recruitment site",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/about_you.json",
+              "pointer": "/properties/site"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:site:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "smk_status",
+            "variableTitle": "Current smoking status",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/smoking.json",
+              "pointer": "/properties/smk_status"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:smk_status:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "smk_age_start",
+            "variableTitle": "Age started smoking (years)",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/smoking.json",
+              "pointer": "/properties/smk_age_start"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:smk_age_start:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "menarche_age",
+            "variableTitle": "Age at first menstrual period (years)",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/womens_health.json",
+              "pointer": "/properties/menarche_age"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:menarche_age:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "parity",
+            "variableTitle": "Number of live births",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/womens_health.json",
+              "pointer": "/properties/parity"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:parity:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "age_first_birth",
+            "variableTitle": "Age at first live birth (years)",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/womens_health.json",
+              "pointer": "/properties/age_first_birth"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:age_first_birth:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "breastfed_ever",
+            "variableTitle": "Ever breastfed",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/womens_health.json",
+              "pointer": "/properties/breastfed_ever"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:breastfed_ever:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "bmi",
+            "variableTitle": "Body mass index (kg/m2)",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/health.json",
+              "pointer": "/properties/bmi"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:bmi:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "diabetes_dx",
+            "variableTitle": "Ever told you have diabetes",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/health.json",
+              "pointer": "/properties/diabetes_dx"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:diabetes_dx:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "diabetes_age",
+            "variableTitle": "Age at diabetes diagnosis (years)",
+            "path": null,
+            "requirement": "must be in the dataset — the schema requires it, and the dataset has no such column",
+            "keyword": "required",
+            "location": {
+              "file": "baseline/categories/health.json",
+              "pointer": "/properties/diabetes_age"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:diabetes_age:missing"
+          },
+          {
+            "level": "variable",
+            "variable": "canary",
+            "variableTitle": null,
+            "path": null,
+            "requirement": "must not be in the dataset — the schema allows no variables besides the ones it describes",
+            "keyword": "unevaluatedProperties",
+            "schemaValue": false,
+            "location": {
+              "file": "baseline/baseline.schema.json",
+              "pointer": "/items/unevaluatedProperties"
+            },
+            "severity": "error",
+            "records": null,
+            "failures": 1,
+            "percentOfRecords": null,
+            "ruleId": "schema:column:canary:unexpected"
+          },
+          {
+            "level": "value",
+            "variable": "participant_id",
+            "variableTitle": "Participant ID",
+            "path": null,
+            "requirement": "must match `^ACH[0-9]{4}$` (Participant ID)",
+            "keyword": "pattern",
+            "schemaValue": "^ACH[0-9]{4}$",
+            "location": {
+              "file": "common/defs.json",
+              "pointer": "/$defs/participant_id/pattern"
+            },
+            "severity": "error",
+            "records": 40,
+            "failures": 40,
+            "percentOfRecords": 100,
+            "ruleId": "schema:prop:participant_id:value"
+          },
+          {
+            "level": "value",
+            "variable": "age",
+            "variableTitle": "Age at interview (years)",
+            "path": null,
+            "requirement": "must be an integer 18–85, or a missing-value code (-9 Don't know)",
+            "keyword": "anyOf",
+            "location": {
+              "file": "baseline/categories/about_you.json",
+              "pointer": "/properties/age/anyOf"
+            },
+            "severity": "error",
+            "records": 5,
+            "failures": 5,
+            "percentOfRecords": 12.5,
+            "ruleId": "schema:prop:age:value"
+          }
+        ],
+        "rules": [],
+        "notes": [
+          {
+            "kind": "no-rules",
+            "text": "No QC rules were loaded for this run: the rules stage was skipped."
+          },
+          {
+            "kind": "schema-comment",
+            "text": "baseline/baseline.schema.json: Not enforceable here: participant_id is unique across rows, one record per participant (S01:Variables row 2, D009)."
+          }
+        ]
+      }
+    }
+  ],
+  "id": "20261013T024457Z-966b5e",
+  "receivedAt": "2026-10-13T02:44:57Z",
+  "takenAt": "2026-10-13T02:46:06Z",
+  "recorded": [
+    {
+      "type": "decision",
+      "event": "confirm",
+      "id": "D014"
+    },
+    {
+      "type": "topic",
+      "event": "approve",
+      "id": "womens_health"
+    },
+    {
+      "type": "topic",
+      "event": "approve",
+      "id": "health"
+    },
+    {
+      "type": "alignment",
+      "event": "add",
+      "id": "A01"
+    }
+  ]
+}

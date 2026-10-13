@@ -1,0 +1,16 @@
+variable,table,topic,status,source,note
+participant_id,baseline,about_you,include,S01:Variables row 5,not in the questionnaire (assigned at enrollment)
+site,baseline,about_you,include,S01:Variables row 6,not in the questionnaire
+age,baseline,about_you,include,S01:Variables row 7,also S02:¶4 (A1)
+sex,baseline,about_you,include,S01:Variables row 8,also S02:¶5 (A2)
+smk_ever,baseline,smoking,include,S01:Variables row 9,also S02:¶7 (B1)
+smk_status,baseline,smoking,include,S01:Variables row 10,also S02:¶9 (B2)
+cigs_day,baseline,smoking,include,S01:Variables row 11,also S02:¶10 (B3); the two sources print different ranges
+smk_age_start,baseline,smoking,include,S01:Variables row 12,also S02:¶11 (B4)
+menarche_age,baseline,womens_health,include,S01:Variables row 13,also S02:¶14 (C1)
+parity,baseline,womens_health,include,S01:Variables row 14,also S02:¶15 (C2)
+age_first_birth,baseline,womens_health,include,S01:Variables row 15,also S02:¶16 (C3)
+breastfed_ever,baseline,womens_health,include,S01:Variables row 16,also S02:¶17 (C4)
+bmi,baseline,health,include,S01:Variables row 17,also S02:¶19 (D1)
+diabetes_dx,baseline,health,include,S01:Variables row 18,also S02:¶20 (D2)
+diabetes_age,baseline,health,include,S01:Variables row 19,also S02:¶21 (D3)

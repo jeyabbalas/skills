@@ -38,16 +38,23 @@ jobs:
       - name: Test the release script
         run: uv run tests/test_release.py
 
-      # schemify's validator is executed, never read, so its behaviour is
-      # pinned by tests; the example package is the integration fixture and
-      # must stay green, with its shipped tools and pages current.
-      - name: Test schemify validator
-        run: uv run tests/test_schemify_validate.py
-
-      - name: Validate the schemify example package
+      # schemify's scripts are executed, never read, so their behaviour is
+      # pinned by tests: the package validator, the workspace tool with its
+      # server and 1.x migration, and the document extractor.
+      - name: Test schemify scripts
         run: |
-          uv run skills/schemify/scripts/validate.py summary examples/schemify/workspace/json_schema
-          uv run skills/schemify/scripts/render.py check examples/schemify/workspace/json_schema
+          uv run tests/test_schemify_validate.py
+          uv run tests/test_schemify_workspace.py
+          uv run tests/test_schemify_extract.py
+
+      # The example workspace is the integration fixture: its package must
+      # validate, and the workspace must be current with the skill's shipped
+      # files and its own state (`check --strict` fails on stale copies).
+      - name: Validate the schemify example workspace
+        run: |
+          uv run skills/schemify/scripts/validate.py summary examples/schemify/workspace/schemify/package
+          uv run skills/schemify/scripts/schemify.py --ws examples/schemify/workspace/schemify check --strict
+          uv run scripts/vendor_schemify_assets.py --check
 
       # Second opinion from the Claude Code CLI on the plugin/marketplace
       # manifests, which validate_skills.py only cross-checks against disk.

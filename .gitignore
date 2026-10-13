@@ -13,7 +13,7 @@ examples/**/book.pdf
 examples/**/book.epub
 examples/**/extract/
 # debug/: scratch renders of schemify packages used to reproduce page bugs against
-# a real steward's output. Regenerate with `render.py` rather than committing them.
+# a real steward's output. Rebuild them with schemify's `build` rather than committing them.
 debug/
 
 node_modules/
