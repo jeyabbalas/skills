@@ -293,11 +293,11 @@ def submit(ws: Path, items, sub="20260102T030405Z-a1b2c3", frm="author") -> str:
     return sub
 
 
-def stub_checks(ws: Path, tested=(), errors=0) -> None:
+def stub_checks(ws: Path, tested=(), errors=0, total=3) -> None:
     """Stand in for validate.py's last report (state/checks.json)."""
     doc = {"ok": True, "ran": True, "headline": STUB_HEADLINE, "at": sf.now()}
     if tested:
-        doc["topics"] = {f"sleep_diary/{t}": {"errors": errors, "warnings": 0, "coverage": {"total": 3, "covered": 3}}
+        doc["topics"] = {f"sleep_diary/{t}": {"errors": errors, "warnings": 0, "coverage": {"total": total, "covered": total}}
                          for t in tested}
         doc["fixtures"] = {"tables": {"sleep_diary": {"valid": {"status": "pass"},
                                                       "invalid": {"verdicts": [{"status": "caught"}]}}}}
@@ -719,7 +719,8 @@ def test_decide_belongs_to_the_agent(ws):
 @pytest.mark.parametrize("fields, problem", [
     ({"evidence": "inferred", "status": "encoded", "decision": "D001"}, "encoded only with 'consent'"),
     ({"evidence": "told", "status": "encoded"}, "rule cites its 'decision'"),
-    ({"evidence": "inferred", "status": "deferred"}, "rule cites its 'decision'"),
+    ({"evidence": "inferred", "status": "deferred"}, "a deferred inferred rule cites in 'consent' the decision that put it off"),
+    ({"evidence": "inferred", "status": "encoded", "consent": "D001"}, "an inferred rule is encoded with its 'decision'"),
     ({"evidence": "documented", "status": "waiting"}, "names what it waits for in 'waits_for'"),
     ({"evidence": "documented", "status": "encoded", "gates": []}, "only a not-expressible rule may have none"),
     ({"evidence": "quoted", "status": "encoded"}, "evidence is one of"),
@@ -739,6 +740,7 @@ def test_rules_are_validated(ws, fields, problem):
     {"evidence": "implied", "status": "not-expressible", "gates": []},
     {"evidence": "inferred", "status": "suspected"},
     {"evidence": "inferred", "status": "encoded", "decision": "D001", "consent": "D002"},
+    {"evidence": "inferred", "status": "deferred", "consent": "D002"},                  # "later": no guess decision yet
     {"evidence": "told", "status": "encoded", "decision": "D002"},
     {"evidence": "documented", "status": "waiting", "waits_for": ["sleep_minutes"]},
 ], ids=lambda v: str(v)[:40])
@@ -753,8 +755,8 @@ def test_rule_set_rechecks_the_whole_rule(ws):
     rec(ws, {**BASE_RULE, "evidence": "inferred", "status": "suspected"})            # R002
     assert "missing 'note'" in refused(ws, {"type": "rule", "event": "set", "id": "R002", "status": "declined",
                                             "decision": "D001"})
-    assert "rule cites its 'decision'" in refused(ws, {"type": "rule", "event": "set", "id": "R002",
-                                                       "status": "declined", "note": "no"})
+    assert "cites in 'consent' the decision that put it off" in refused(ws, {"type": "rule", "event": "set", "id": "R002",
+                                                                          "status": "declined", "note": "no"})
     rec(ws, guess(kind="rule", question="Is there a rule?", choice="yes"))           # D001
     assert "encoded only with 'consent'" in refused(ws, {"type": "rule", "event": "set", "id": "R002",
                                                          "status": "encoded", "decision": "D001", "note": "go"})
@@ -1073,6 +1075,8 @@ def test_topic_status_is_derived_from_files_checks_and_reviews(ws):
     assert topic_status()["sleep"] == "tested"
     stub_checks(ws, tested=["sleep"], errors=1)
     assert topic_status()["sleep"] == "drafted"
+    stub_checks(ws, tested=["sleep"], total=0)          # nothing to show (free text, dates, IDs): its toy data passing is enough
+    assert topic_status()["sleep"] == "tested"
     stub_checks(ws, tested=["sleep"])
     rec(ws, {"type": "topic", "event": "present", "id": "sleep", "note": "the bounds"})
     assert topic_status()["sleep"] == "in-review"
@@ -1842,6 +1846,27 @@ def test_tell_user_says_who_each_waiting_question_is_for(ws):
     assert "1 question(s) are waiting for you there." in lines
     assert any(line.startswith("1 question(s) wait there for the data steward") for line in lines)
     assert any(line.startswith("1 topic(s) wait there for your review") and "Something's wrong" in line for line in lines)
+    # answers and verdicts already sent, waiting in the inbox, are not waiting on the person any more
+    write_json(ws / "inbox/pending/20260101T000000Z-abc123.json",
+               {"schemifyInbox": 1, "from": "author", "items": [{"kind": "answer", "decision": "D001", "choice": "a"},
+                                                                {"kind": "topic", "topic": "sleep", "verdict": "approve"}]})
+    lines = sf.tell_user_lines(ws, sf.load_world(ws), "http://127.0.0.1:1/")
+    assert not any("waiting for you there" in line or "wait there for your review" in line for line in lines)
+    assert any(line.startswith("1 question(s) wait there for the data steward") for line in lines)
+
+
+def test_an_optional_question_left_blank_holds_nothing_up(ws):
+    # A text question worded "(optional)" that the person left blank keeps no batch open: not in `queue`'s open
+    # batches, not a reason to wait, not counted as waiting for them, not an open item in the README.
+    rec(ws, question(), {"type": "decision", "event": "open", "kind": "interview", "input": "text",
+                         "question": "Links to public pages about the study (optional)"})
+    rec(ws, post("D001", "D002"))
+    assert [b["id"] for b in sf.queue_items(ws, "author", None, 20)["openBatches"]] == ["B01"]
+    rec(ws, answer("D001"))
+    assert sf.queue_items(ws, "author", None, 20)["openBatches"] == []
+    assert "wait" not in next_actions(ws)
+    assert not any("waiting for you" in line for line in sf.tell_user_lines(ws, sf.load_world(ws), "http://127.0.0.1:1/"))
+    assert dec(ws, "D002")["status"] == "asked"         # still on the website: they may answer it later
 
 
 def test_topic_statuses_carry_the_latest_presentation(ws):
@@ -2005,6 +2030,11 @@ def test_check_reconciles_the_inventory_with_the_schemas(ws):
     assert [f["variable"] for f in find(res, "coverage-uninventoried")] == ["site_id"]
     for code in ("coverage-missing", "coverage-excluded", "coverage-uninventoried"):
         assert find(res, code)[0]["severity"] == "error" and find(res, code)[0]["hint"]
+    rows.append({"variable": "site_id", "table": "", "topic": "", "status": "include", "source": "S01:row 2", "note": ""})
+    write_inventory(ws, rows)                                       # listed, but the plan never filled its table
+    found = find(checked(ws), "coverage-uninventoried")
+    assert [f["variable"] for f in found] == ["site_id"] and "names table ''" in found[0]["message"]
+    assert "START.md, step 7" in found[0]["hint"]
 
 
 def test_check_treats_a_scaffolded_topic_as_planned(ws):
@@ -2367,7 +2397,7 @@ def test_build_writes_csv_twins_of_the_toy_data(ws):
     assert rows[0] == ["participant_id", "site_id", "age", "sleep_minutes", "nap_yesterday", "nap_minutes",
                        "flags", "late", "meta"]                     # topic order first, then extra keys as met
     assert rows[1] == ["P0001", "01", "34", "420", "0", "-666", "", "", ""]
-    assert rows[2] == ["P0002", "02", "null", "300.5", "1", "", "[1, 2]", "true", '{"k": "v"}']
+    assert rows[2] == ["P0002", "02", "", "300.5", "1", "", "[1, 2]", "true", '{"k": "v"}']   # null is an empty cell
     assert "\nP0001,01," in text                                     # string codes keep their leading zero
     invalid = list(csv.reader(io.StringIO((td / "invalid.csv").read_text(encoding="utf-8"))))
     assert invalid[0][-1] == "shoe_size" and invalid[1][0] == "P12" and invalid[1][1] == "" and invalid[1][-1] == "44"
@@ -2440,6 +2470,24 @@ def test_build_with_the_real_validator(ws):
         js = (ws / "site/data/state.js").read_text(encoding="utf-8")
         again = {e["file"]: e for e in json.loads(js[js.index("=") + 1:js.rindex(";")])["toyData"]}
         assert again["invalid"]["errors"] == bad["errors"]
+
+
+def test_toy_results_rerun_when_the_validator_changes(ws, monkeypatch):
+    # The cache key covers the validator: after a skill update brings a new validate.py, the website shows its
+    # findings, not the old one's (they may lack keys the page now reads, such as a nested finding's path).
+    write_json(ws / "package/toy-data/sleep_diary/invalid.json", [{"participant_id": "P12"}])
+    runs = []
+    monkeypatch.setattr(sf, "run_toy_check", lambda w, t, p: runs.append(p.name) or
+                        {"errors": [], "errorCount": 0, "truncated": False, "columns": {}})
+    world = sf.load_world(ws)
+    sf.toy_data_view(ws, world, True)
+    first = len(runs)
+    assert first >= 1
+    sf.toy_data_view(ws, world, True)
+    assert len(runs) == first                          # unchanged: served from state/toy-checks.json
+    monkeypatch.setattr(sf, "validator_stamp", lambda: "a newer validator")
+    sf.toy_data_view(ws, world, True)
+    assert len(runs) == 2 * first
 
 
 # ====================================================================== show, activity, share, CLI
@@ -2523,6 +2571,573 @@ def test_cli_finds_the_workspace_and_explains_failures(bare, tmp_path, tmp_path_
     assert code == 1 and "Several schemify workspaces" in out["error"] and "--ws" in out["hint"]
     proc = run(SCHEMIFY, "frobnicate", cwd=tmp_path)
     assert proc.returncode == 2 and proc.stdout == ""
+
+
+# ====================================================================== nested values
+
+YES_NO = [{"const": 0, "title": "No"}, {"const": 1, "title": "Yes"}]
+NAP_RULE = [
+    {"$comment": "Skip pattern R002: a nap without caffeine before it has no caffeine dose. Dictionary row 12: "
+                 "'Asked only if caffeine=1'.",
+     "x-provenance": {"default": "S01:row 12"},
+     "if": {"required": ["caffeine"], "properties": {"caffeine": {"const": 0}}},
+     "then": {"properties": {"caffeine_mg": {"const": -666}}}},
+    {"$comment": "Applicability R002: caffeine before a nap has a dose or an item-missing code, never the "
+                 "not-applicable code.",
+     "x-provenance": {"default": "S01:row 12"},
+     "if": {"required": ["caffeine"], "properties": {"caffeine": {"const": 1}}},
+     "then": {"properties": {"caffeine_mg": {"not": {"const": -666}}}}},
+]
+NESTED_ROWS = [
+    {"variable": v, "table": "sleep_diary", "topic": t, "status": "include", "source": s, "note": ""}
+    for v, t, s in (("address", "participant", "S01:row 4"), ("address.city", "participant", "S01:row 4"),
+                    ('address["bed partner"]', "participant", "S01:row 5"), ("naps", "sleep", "S01:row 10"),
+                    ("naps[].caffeine", "sleep", "S01:row 11"), ("naps[].caffeine_mg", "sleep", "S01:row 12"),
+                    ("disturbances", "sleep", "S01:row 13"), ("devices", "sleep", "S01:row 14"),
+                    ("devices.*", "sleep", "S01:row 14"), ("notes", "sleep", "S01:row 15"),
+                    ("notes.mood", "sleep", "S01:row 15"), ("wake", "sleep", "S01:row 16"),
+                    ("wake.alarm", "sleep", "S01:row 16"))
+]
+NAP_RULE_RECORD = {"type": "rule", "event": "add", "table": "sleep_diary", "gates": ["naps[].caffeine"],
+                   "targets": ["naps[].caffeine_mg"], "evidence": "documented", "refs": ["S01:row 12"],
+                   "reading": "in each nap: caffeine = 0 → caffeine_mg = -666 (= 1 → not -666)", "status": "encoded"}
+
+
+def nest(ws: Path) -> Path:
+    """Give the sleep-diary package one variable of every nested shape: a group (with a key that is not a plain
+    name), a list of entries holding a rule among its fields (R002), a list of values, a lookup, a mixed value, and a
+    group whose shape lives in the topic's own $defs."""
+    def participant(d):
+        d["properties"]["address"] = {
+            "title": "Home address", "x-provenance": {"default": "S01:row 4"}, "type": "object",
+            "properties": {"city": {"title": "City", "x-provenance": {"default": "S01:row 4"}, "type": "string"},
+                           "bed partner": {"title": "Shares a bed", "x-provenance": {"default": "S01:row 5"},
+                                           "oneOf": copy.deepcopy(YES_NO)}},
+            "required": ["city", "bed partner"], "additionalProperties": False}
+        d["required"].append("address")
+
+    def sleep(d):
+        d["$defs"] = {"wake": {"type": "object", "properties": {
+            "alarm": {"title": "Woke to an alarm", "x-provenance": {"default": "S01:row 16"}, "oneOf": copy.deepcopy(YES_NO)}},
+            "required": ["alarm"], "additionalProperties": False}}
+        d["properties"].update({
+            "naps": {"title": "Naps yesterday", "x-provenance": {"default": "S01:row 10"}, "type": "array", "maxItems": 5,
+                     "items": {"type": "object", "properties": {
+                         "caffeine": {"title": "Caffeine before the nap", "x-provenance": {"default": "S01:row 11"},
+                                      "oneOf": copy.deepcopy(YES_NO)},
+                         "caffeine_mg": {"title": "Caffeine before the nap (mg)", "x-provenance": {"default": "S01:row 12"},
+                                         "anyOf": [{"type": "integer", "minimum": 1, "maximum": 500}, NOT_APPLICABLE,
+                                                   DONT_KNOW]}},
+                               "required": ["caffeine", "caffeine_mg"], "additionalProperties": False,
+                               "allOf": copy.deepcopy(NAP_RULE)}},
+            "disturbances": {"title": "What disturbed sleep", "x-provenance": {"default": "S01:row 13"}, "type": "array",
+                             "uniqueItems": True, "items": {"oneOf": [{"const": 1, "title": "Noise"},
+                                                                      {"const": 2, "title": "Light"}]}},
+            "devices": {"title": "Screen time before bed", "x-provenance": {"default": "S01:row 14"}, "type": "object",
+                        "propertyNames": {"pattern": "^[a-z]+$"},
+                        "additionalProperties": {"title": "Minutes on the device", "x-provenance": {"default": "S01:row 14"},
+                                                 "type": "integer", "minimum": 0, "maximum": 600}},
+            "notes": {"title": "Diary notes", "x-provenance": {"default": "S01:row 15"}, "anyOf": [
+                {"type": "string"},
+                {"type": "object", "properties": {"mood": {"title": "Mood on waking", "x-provenance": {"default": "S01:row 15"},
+                                                           "oneOf": [{"const": 1, "title": "Good"}, {"const": 2, "title": "Poor"}]}},
+                 "required": ["mood"], "additionalProperties": False}]},
+            "wake": {"title": "Waking", "x-provenance": {"default": "S01:row 16"}, "$ref": "#/$defs/wake"},
+        })
+        d["required"] += ["naps", "disturbances", "devices", "notes", "wake"]
+    edit(ws, PARTICIPANT, participant)
+    edit(ws, SLEEP, sleep)
+    write_inventory(ws, INVENTORY + NESTED_ROWS)
+    rec(ws, NAP_RULE_RECORD)                                                                  # R002
+    return ws
+
+
+@pytest.fixture
+def nested(ws) -> Path:
+    return nest(ws)
+
+
+def nested_findings(set_id: str) -> dict:
+    """QuaC 1.2.0's findings without data for nested values, shaped like a real run's (research: QuaC fills `path`
+    only when no $ref stands in the way; `location` always says where the failing keyword is)."""
+    doc = findings_doc(set_id)
+    doc["schemaChecks"] = [
+        {"severity": "error", "level": "value", "variable": "naps", "path": "naps[].caffeine_mg",
+         "ruleId": "schema:prop:naps:value", "keyword": "const", "records": 9, "requirement": "when caffeine = 0, must be -666",
+         "location": {"file": SLEEP, "pointer": "/properties/naps/items/allOf/0/then/properties/caffeine_mg/const"}},
+        {"severity": "error", "level": "value", "variable": "naps", "path": None, "ruleId": "schema:prop:naps:value",
+         "keyword": "maximum", "records": 4, "requirement": "must be at most 500",
+         "location": {"file": SLEEP, "pointer": "/properties/naps/items/properties/caffeine_mg/anyOf/0/maximum"}},
+        {"severity": "error", "level": "value", "variable": "naps", "path": "naps[]", "ruleId": "schema:prop:naps:value",
+         "keyword": "required", "records": 3, "requirement": "must have the fields 'caffeine' and 'caffeine_mg'",
+         "location": {"file": SLEEP, "pointer": "/properties/naps/items/required"}},
+        {"severity": "error", "level": "value", "variable": "wake", "path": None, "ruleId": "schema:prop:wake:value",
+         "keyword": "oneOf", "records": 2, "requirement": "must match exactly one of: 0 or 1",
+         "location": {"file": SLEEP, "pointer": "/$defs/wake/properties/alarm/oneOf"}},
+        {"severity": "error", "level": "value", "variable": "nap_minutes", "ruleId": "schema:cond:2:then",
+         "keyword": "const", "requirement": "must be -666 when nap_yesterday is 0", "records": 1,
+         "location": {"file": MOTHER, "pointer": "/items/allOf/2/then/properties/nap_minutes"}},
+    ]
+    return doc
+
+
+@pytest.mark.parametrize("pointer, field", [
+    ("/properties/age/anyOf", None),
+    ("/properties/household/items/properties/age/maximum", "household[].age"),
+    ("/properties/household/items/required", "household[]"),
+    ("/properties/medications/items/allOf/0/then/properties/dose_mg/const", "medications[].dose_mg"),
+    ("/items/allOf/6/then/properties/household/items/properties/relation/const", "household[].relation"),
+    ("/items/allOf/3/then/properties/n_meds/const", None),
+    ("/properties/labs/additionalProperties/minimum", "labs.*"),
+    ("/$defs/x/oneOf", None),
+    ("/items/allOf/2/then/properties/nap_minutes", None),
+    ("/items/allOf/2", None),
+    ("/items/unevaluatedProperties", None),
+    ("/properties/address/properties/bed partner/oneOf", 'address["bed partner"]'),
+    ("/properties/notes/anyOf/1/properties/mood/oneOf", "notes.mood"),
+    ("/properties/a~1b/properties/c~0d/type", "a/b.c~d"),
+    ("/properties/x/properties/~1y/type", 'x["/y"]'),
+    ("/properties/visits/items/properties/labs/additionalProperties/maximum", "visits[].labs.*"),
+    (None, None),
+    ("", None),
+])
+def test_pointer_field_names_the_value_a_failing_keyword_sits_on(pointer, field):
+    assert sf.pointer_field(pointer) == field
+
+
+def test_check_keys_of_nested_checks_do_not_depend_on_quac_s_path():
+    pointer = "/properties/naps/items/properties/caffeine_mg/anyOf/0/maximum"
+    base = {"severity": "error", "variable": "naps", "ruleId": "schema:prop:naps:value", "keyword": "maximum",
+            "location": {"file": SLEEP, "pointer": pointer}}
+    keys = {sf.check_key(dict(base, path=p)) for p in (None, "", "naps[].caffeine_mg")} | {sf.check_key(base)}
+    assert keys == {f"schema:prop:naps:value|maximum|{SLEEP}|{pointer}|naps[].caffeine_mg"}
+    assert {sf.check_field(dict(base, path=p)) for p in (None, "naps[].caffeine_mg")} == {"naps[].caffeine_mg"}
+    for c in findings_doc("0123456789abcdef")["schemaChecks"] + [dict(findings_doc("0")["schemaChecks"][1], path="age")]:
+        loc = c.get("location") or {}                                     # a record-level check's key, exactly as before
+        assert sf.check_key(c) == f"{c.get('ruleId')}|{c.get('keyword')}|{loc.get('file')}|{loc.get('pointer')}|{c.get('path') or ''}"
+        assert sf.check_field(c) == (c.get("path") or c.get("variable"))
+    behind_ref = {"variable": "wake", "path": None, "ruleId": "schema:prop:wake:value", "keyword": "oneOf",
+                  "location": {"file": SLEEP, "pointer": "/$defs/wake/properties/alarm/oneOf"}}
+    assert sf.check_key(behind_ref).endswith("/oneOf|") and sf.check_field(behind_ref) == "wake"
+
+
+@pytest.mark.parametrize("parent, name, path", [
+    (None, "a.b c", "a.b c"),                     # a record-level key is written as is
+    ("a", "b", "a.b"), ("a[]", "b", "a[].b"), ("a", "é", "a.é"), ("a", "c~d", "a.c~d"),
+    ("a", "x.y", 'a["x.y"]'), ("a", "b c", 'a["b c"]'), ("a", "/x", 'a["/x"]'), ("a", "*", 'a["*"]'),
+    ("a", 'q"t', 'a["q\\"t"]'), ("a", "[0]", 'a["[0]"]'), ("a", "no\u00a0break", 'a["no\u00a0break"]'),
+    ("a", "x\n", 'a["x\\n"]'), ("a", "", 'a[""]'),
+])
+def test_field_paths_are_written_as_the_data_dictionary_writes_them(parent, name, path):
+    assert sf.join_path(parent, name) == path
+
+
+def test_the_package_lists_every_field_inside_a_variable(nested):
+    pkg = sf.Pkg(nested, sf.load_project(nested))
+    got = {f["path"]: (f["shape"], f["parent"], f["depth"], f["top"], f["file"], f["pointer"]) for f in pkg.properties.values()}
+    top = lambda name, file, shape="value": (shape, None, 0, name, file, f"/properties/{name}")
+    assert got == {
+        "participant_id": top("participant_id", PARTICIPANT), "site_id": top("site_id", PARTICIPANT),
+        "age": top("age", PARTICIPANT), "address": top("address", PARTICIPANT, "group"),
+        "address.city": ("value", "address", 1, "address", PARTICIPANT, "/properties/address/properties/city"),
+        'address["bed partner"]': ("value", "address", 1, "address", PARTICIPANT, "/properties/address/properties/bed partner"),
+        "sleep_minutes": top("sleep_minutes", SLEEP), "nap_yesterday": top("nap_yesterday", SLEEP),
+        "nap_minutes": top("nap_minutes", SLEEP), "naps": top("naps", SLEEP, "entries"),
+        "naps[].caffeine": ("value", "naps", 1, "naps", SLEEP, "/properties/naps/items/properties/caffeine"),
+        "naps[].caffeine_mg": ("value", "naps", 1, "naps", SLEEP, "/properties/naps/items/properties/caffeine_mg"),
+        "disturbances": top("disturbances", SLEEP, "list"), "devices": top("devices", SLEEP, "lookup"),
+        "devices.*": ("value", "devices", 1, "devices", SLEEP, "/properties/devices/additionalProperties"),
+        "notes": top("notes", SLEEP, "mixed"),
+        "notes.mood": ("value", "notes", 1, "notes", SLEEP, "/properties/notes/anyOf/1/properties/mood"),
+        "wake": top("wake", SLEEP, "group"),
+        "wake.alarm": ("value", "wake", 1, "wake", SLEEP, "/$defs/wake/properties/alarm"),       # where its node lives
+    }
+    f = pkg.properties["sleep_diary.devices.*"]
+    assert (f["name"], f["schema"]["title"], f["topic"]) == ("*", "Minutes on the device", "sleep")
+    assert pkg.properties['sleep_diary.address["bed partner"]']["name"] == "bed partner"
+    assert pkg.by_name["naps[].caffeine_mg"] == ["sleep_diary.naps[].caffeine_mg"] and pkg.by_name["age"] == ["sleep_diary.age"]
+    for f in pkg.properties.values():                                     # file + pointer find the field's own node
+        node = read_json(nested / "package/schemas" / f["file"])
+        for part in f["pointer"].split("/")[1:]:
+            node = node[int(part)] if isinstance(node, list) else node[part.replace("~1", "/").replace("~0", "~")]
+        assert node == f["schema"] and node.get("title"), f["path"]
+    assert not pkg.optional
+    edit(nested, SLEEP, lambda d: d["properties"].update(                   # a whole list may carry a special code
+        naps={"title": "Naps yesterday", "x-provenance": {"default": "S01:row 10"},
+              "anyOf": [{k: v for k, v in d["properties"]["naps"].items() if k not in ("title", "x-provenance")},
+                        NOT_APPLICABLE]}))
+    edit(nested, PARTICIPANT, lambda d: d["properties"]["address"]["required"].remove("city"))
+    pkg = sf.Pkg(nested, sf.load_project(nested))
+    assert pkg.properties["sleep_diary.naps"]["shape"] == "entries"
+    assert pkg.properties["sleep_diary.naps[].caffeine"]["pointer"] == "/properties/naps/anyOf/0/items/properties/caffeine"
+    assert pkg.optional == {"sleep_diary.address.city"}
+
+
+def test_the_field_walk_stops_at_a_shape_that_holds_itself_and_six_levels_down(ws):
+    def grow(d):
+        d["$defs"] = {"person": {"type": "object", "properties": {"kids": {
+            "title": "Children", "x-provenance": {"default": "S01:row 1"}, "type": "array", "items": {"$ref": "#/$defs/person"}}},
+            "required": ["kids"], "additionalProperties": False}}
+        d["properties"]["family"] = {"title": "Family", "x-provenance": {"default": "S01:row 1"}, "$ref": "#/$defs/person"}
+        deep = {"type": "string", "title": "Leaf", "x-provenance": {"default": "S01:row 1"}}
+        for _ in range(8):
+            deep = {"title": "Level", "x-provenance": {"default": "S01:row 1"}, "type": "object", "properties": {"x": deep}}
+        d["properties"]["deep"] = deep
+    edit(ws, PARTICIPANT, grow)
+    pkg = sf.Pkg(ws, sf.load_project(ws))
+    assert [p for p in pkg.by_name if p.startswith("family")] == ["family", "family.kids", "family.kids[].kids"]
+    assert max(f["depth"] for f in pkg.properties.values()) == sf.FIELD_DEPTH == 6
+    assert "deep.x.x.x.x.x.x" in pkg.by_name and "deep.x.x.x.x.x.x.x" not in pkg.by_name
+
+
+def test_the_field_walk_stops_where_validate_does_on_a_shape_shared_too_often(nested, monkeypatch):
+    monkeypatch.setattr(sf, "FIELD_LIMIT", 8)                       # nest() gives the table 7 fields inside values
+    leaf = {"title": "Q", "x-provenance": {"default": "S01:row 1"}, "type": "integer"}
+
+    def grow(d):
+        d["$defs"].update(
+            inner={"type": "object", "properties": {q: leaf for q in ("q0", "q1", "q2")},
+                   "required": ["q0", "q1", "q2"], "additionalProperties": False},
+            outer={"type": "object", "properties": {p: {"title": "P", "x-provenance": {"default": "S01:row 1"},
+                                                        "$ref": "#/$defs/inner"} for p in ("p0", "p1", "p2")},
+                   "required": ["p0", "p1", "p2"], "additionalProperties": False})
+        d["properties"]["dag"] = {"title": "Dag", "x-provenance": {"default": "S01:row 1"}, "$ref": "#/$defs/outer"}
+    edit(nested, SLEEP, grow)
+    pkg = sf.Pkg(nested, sf.load_project(nested))
+    assert [p for p in pkg.by_name if p.startswith("dag")] == ["dag", "dag.p0", "dag.p1", "dag.p2"]
+
+
+def test_a_percent_encoded_ref_finds_its_shape_as_validate_does(nested):
+    def wake(d):
+        d["$defs"]["early wake"] = d["$defs"]["wake"]
+        d["properties"]["wake"]["$ref"] = "#/$defs/early%20wake"         # a URI fragment: %20 is the space
+    edit(nested, SLEEP, wake)
+    pkg = sf.Pkg(nested, sf.load_project(nested))
+    assert pkg.properties["sleep_diary.wake"]["shape"] == "group"
+    assert pkg.properties["sleep_diary.wake.alarm"]["pointer"] == "/$defs/early wake/properties/alarm"
+
+
+DEEP = 30000            # past Python's own JSON reader before 3.14, and past any recursive walk after it
+
+
+def deepen(ws: Path, rel: str, put, text: str) -> None:
+    """Write `text` (JSON nested DEEP levels) where `put` places it in a schema file."""
+    edit(ws, rel, lambda d: put(d, "__DEEP__"))
+    p = ws / "package" / "schemas" / rel
+    p.write_text(p.read_text(encoding="utf-8").replace('"__DEEP__"', text), encoding="utf-8")
+
+
+@pytest.mark.parametrize("change", [
+    lambda ws: edit(ws, MOTHER, lambda d: d["items"]["allOf"][2]["if"].update(anyOf=5)),
+    lambda ws: edit(ws, SLEEP, lambda d: d["properties"]["naps"]["items"]["allOf"][0]["if"].update(allOf=True)),
+    lambda ws: edit(ws, MOTHER, lambda d: d.update(items=True)),
+    lambda ws: edit(ws, MOTHER, lambda d: d.update(items=["object"])),
+    lambda ws: write_json(ws / "package/schemas" / MOTHER, [1, 2]),
+    lambda ws: edit(ws, SLEEP, lambda d: d.update(properties="naps")),
+    lambda ws: write_json(ws / "package/schemas" / PARTICIPANT, ["properties"]),
+    lambda ws: edit(ws, MOTHER, lambda d: d["items"]["allOf"][2].update({"x-provenance": ["S01:row 9"]})),
+    lambda ws: write_json(ws / "package/toy-data/sleep_diary/valid.json", [1, None, "x", [{}], {"age": 3}]),
+    lambda ws: deepen(ws, SLEEP, lambda d, x: d["$defs"].update(deep=x), "[" * DEEP + "]" * DEEP),
+    lambda ws: deepen(ws, SLEEP, lambda d, x: d["properties"]["naps"].update({"not": x}),
+                      '{"not": ' * DEEP + "{}" + "}" * DEEP),
+    lambda ws: deepen(ws, MOTHER, lambda d, x: d["items"]["allOf"][2]["if"]["properties"].update(nap_yesterday=x),
+                      '{"required": ["x"], "properties": {"x": ' * (DEEP // 2) + '{"const": 1}' + "}}" * (DEEP // 2)),
+])
+def test_odd_schemas_never_crash_build_check_show_or_status(nested, change):
+    change(nested)
+
+    def run():
+        sf.build(nested, validate=False)
+        assert sf.check(nested, validate=False)["findings"]
+        sf.status_payload(nested)
+        return sf.show_items(nested, ["variable:naps[].caffeine_mg", "variable:naps", "topic:sleep", "R001", "R002"])
+    try:
+        shown = run()
+    except RecursionError as exc:                   # fail at once: pytest's traceback would compare every deep frame
+        shown = "RecursionError: {}".format(exc)
+    if isinstance(shown, str):
+        pytest.fail(shown, pytrace=False)
+    assert len(shown["items"]) == 5
+    code, out = cli("--ws", nested, "status")
+    assert code == 0 and out["ok"] is True
+
+
+def test_rules_inside_nested_values_are_listed_with_their_scope(nested):
+    edit(nested, MOTHER, lambda d: d["items"]["allOf"].append({                # a record-level rule reaching into a group
+        "$comment": "Skip pattern R003: no bed partner means no partner's city.", "x-provenance": {"default": "S01:row 5"},
+        "if": {"required": ["address"], "properties": {"address": {"required": ["bed partner"],
+                                                                   "properties": {"bed partner": {"const": 0}}}}},
+        "then": {"properties": {"address": {"properties": {"city": {"const": "-"}}}}}}))
+    pkg = sf.Pkg(nested, sf.load_project(nested))
+    keys = ("table", "index", "file", "pointer", "scope", "id", "prefix", "names", "targets")
+    assert [{k: r[k] for k in keys} for r in pkg.rules] == [
+        {"table": "sleep_diary", "index": 2, "file": MOTHER, "pointer": "/items/allOf/2", "scope": None, "id": "R001",
+         "prefix": "Skip pattern", "names": ["nap_minutes", "nap_yesterday"], "targets": ["nap_minutes"]},
+        {"table": "sleep_diary", "index": 3, "file": MOTHER, "pointer": "/items/allOf/3", "scope": None, "id": "R001",
+         "prefix": "Applicability", "names": ["nap_minutes", "nap_yesterday"], "targets": ["nap_minutes"]},
+        {"table": "sleep_diary", "index": 4, "file": MOTHER, "pointer": "/items/allOf/4", "scope": None, "id": "R003",
+         "prefix": "Skip pattern", "names": ['address.city', 'address["bed partner"]'], "targets": ["address.city"]},
+        {"table": "sleep_diary", "index": 0, "file": SLEEP, "pointer": "/properties/naps/items/allOf/0", "scope": "naps[]",
+         "id": "R002", "prefix": "Skip pattern", "names": ["naps[].caffeine", "naps[].caffeine_mg"],
+         "targets": ["naps[].caffeine_mg"]},
+        {"table": "sleep_diary", "index": 1, "file": SLEEP, "pointer": "/properties/naps/items/allOf/1", "scope": "naps[]",
+         "id": "R002", "prefix": "Applicability", "names": ["naps[].caffeine", "naps[].caffeine_mg"],
+         "targets": ["naps[].caffeine_mg"]},
+    ]
+    assert pkg.rules[3]["container"] == "/properties/naps/items" and pkg.rules[3]["comment"] == NAP_RULE[0]["$comment"]
+
+
+def test_rules_about_fields_left_out_name_them(nested):
+    edit(nested, MOTHER, lambda d: d["items"]["allOf"].append({                # presence, reaching into a group
+        "$comment": "Address routing R005: a city comes with the bed partner's answer.", "x-provenance": {"default": "S01:row 5"},
+        "if": {"required": ["address"], "properties": {"address": {"required": ["city"]}}},
+        "then": {"properties": {"address": {"required": ["bed partner"]}}}}))
+    edit(nested, SLEEP, lambda d: d["properties"]["naps"]["items"]["allOf"].append({
+        "$comment": "Nap routing R006: no caffeine, no dose.", "x-provenance": {"default": "S01:row 12"},
+        "if": {"required": ["caffeine"], "properties": {"caffeine": {"const": 0}}},
+        "then": {"properties": {"caffeine_mg": False}}}))
+    pkg = sf.Pkg(nested, sf.load_project(nested))
+    assert {r["id"]: (r["names"], r["targets"]) for r in pkg.rules if r["id"] in ("R005", "R006")} == {
+        "R005": (["address.city", 'address["bed partner"]'], ['address["bed partner"]']),
+        "R006": (["naps[].caffeine", "naps[].caffeine_mg"], ["naps[].caffeine_mg"])}
+
+
+def test_check_reconciles_rules_inside_nested_values(nested):
+    res = checked(nested)
+    assert res["findings"] == [] and res["ok"] is True                    # R002 is encoded where its fields are
+    rec(nested, {**NAP_RULE_RECORD, "status": "waiting", "waits_for": ["naps[].caffeine_mg"],
+                 "reading": "the same rule, recorded twice"},                                       # R003: its fields exist
+        {**NAP_RULE_RECORD, "status": "waiting", "targets": ["naps[].alarm"], "waits_for": ["naps[].alarm"]})   # R004
+    assert sf.rule_view(sf.load_world(nested), sf.Pkg(nested, sf.load_project(nested)))["ready"] == ["R003"]
+    assert ["R003" in f["message"] for f in find(checked(nested), "rule-ready")] == [True]
+    rec(nested, {"type": "rule", "event": "set", "id": "R002", "status": "deferred", "note": "testing the reconciliation"})
+    edit(nested, SLEEP, lambda d: d["properties"]["naps"]["items"]["allOf"].append(
+        {**NAP_RULE[0], "$comment": "Skip pattern R009: registered nowhere."}))
+    res = checked(nested)
+    assert [("R002" in f["message"], "deferred" in f["message"]) for f in find(res, "rule-status")] == [(True, True)]
+    assert [f["message"] for f in find(res, "rule-unregistered")] == [f"R009 is in {SLEEP} but has no rule record"]
+    rec(nested, {"type": "rule", "event": "set", "id": "R002", "status": "encoded", "note": "back"})
+    edit(nested, SLEEP, lambda d: d["properties"]["naps"]["items"].pop("allOf"))
+    assert ["R002" in f["message"] for f in find(checked(nested), "rule-not-encoded")] == [True]
+
+
+def test_check_holds_fields_inside_nested_values_to_the_inventory(nested):
+    rows = [dict(r, status="dropped", note="not delivered") if r["variable"] == "address.city" else dict(r)
+            for r in INVENTORY + NESTED_ROWS if r["variable"] != "naps[].caffeine"]
+    rows.append({"variable": "naps[].alarm", "table": "sleep_diary", "topic": "sleep", "status": "include",
+                 "source": "S01:row 17", "note": ""})
+    write_inventory(nested, rows)
+    res = checked(nested)
+    assert [f["variable"] for f in find(res, "coverage-missing")] == ["naps[].alarm"]
+    assert [f["variable"] for f in find(res, "coverage-excluded")] == ["address.city"]
+    assert [(f["variable"], f["message"]) for f in find(res, "coverage-uninventoried")] == [
+        ("naps[].caffeine", f"naps[].caffeine is in {SLEEP} but not in variables.csv")]
+    inv = sf.status_payload(nested)["counts"]["variables"]
+    assert (inv["total"], inv["inSchemas"], inv["dropped"]) == (len(rows), len(rows) - 2, 1)
+
+
+def test_check_warns_when_a_nested_field_is_planned_in_another_topic(nested):
+    assert not find(checked(nested), "inventory-topic-split")
+    rows = [dict(r, topic="participant") if r["variable"] in ("naps[].caffeine_mg", "wake.alarm") else dict(r)
+            for r in INVENTORY + NESTED_ROWS]
+    rows.append({"variable": "nap_minutes.raw", "table": "sleep_diary", "topic": "participant", "status": "deferred",
+                 "source": "S01:row 17", "note": "a dotted column, held by nothing"})
+    write_inventory(nested, rows)
+    found = find(checked(nested), "inventory-topic-split")
+    assert [(f["variable"], f["severity"]) for f in found] == [("naps[].caffeine_mg", "warning"), ("wake.alarm", "warning")]
+    assert "naps, which holds it, is in topic 'sleep'" in found[0]["message"]
+
+
+def test_checks_wait_for_planned_columns_never_for_fields_inside_them(nested):
+    names = ("pets", "pets[].kind", "naps[].alarm", "nap_minutes.raw")    # the last: a dotted column, not a field
+    write_inventory(nested, INVENTORY + NESTED_ROWS + [
+        {"variable": v, "table": "sleep_diary", "topic": "sleep", "status": "include", "source": "S01:row 17", "note": ""}
+        for v in names])
+    doc = findings_doc(sf.quac_set_id(nested / "package/schemas"))
+    doc["schemaChecks"] = [{"severity": "error", "level": "variable", "variable": v, "ruleId": f"schema:column:{v}:unexpected",
+                            "keyword": "unevaluatedProperties", "records": None,
+                            "location": {"file": MOTHER, "pointer": "/items/unevaluatedProperties"}} for v in names]
+    planned = sf.planned_checks(nested, doc, sf.Pkg(nested, sf.load_project(nested)), sf.load_world(nested))
+    assert planned == [sf.check_key(doc["schemaChecks"][0]), sf.check_key(doc["schemaChecks"][3])]
+
+
+def test_show_finds_a_field_by_its_path(nested):
+    rec(nested, question(targets=["naps[].caffeine_mg"], question="Is 500 mg the highest plausible dose?"))
+    items = sf.show_items(nested, ["variable:naps[].caffeine_mg", "variable:naps", "variable:devices.*", "topic:sleep",
+                                   "R002"])["items"]
+    var = items["variable:naps[].caffeine_mg"]
+    assert var["inSchemas"] == [{"table": "sleep_diary", "topic": "sleep", "file": "package/schemas/" + SLEEP,
+                                 "pointer": "/properties/naps/items/properties/caffeine_mg",
+                                 "x-provenance": {"default": "S01:row 12"}, "shape": "value", "parent": "naps"}]
+    assert [r["variable"] for r in var["inventory"]] == ["naps[].caffeine_mg"]
+    assert [d["id"] for d in var["decisions"]] == ["D001"] and [r["id"] for r in var["rules"]] == ["R002"]
+    naps = items["variable:naps"]["inSchemas"][0]
+    assert (naps["pointer"], naps["shape"], naps["fields"], naps["rulesInside"], "parent" in naps) == \
+        ("/properties/naps", "entries", ["naps[].caffeine", "naps[].caffeine_mg"], ["R002"], False)
+    assert items["variable:devices.*"]["inSchemas"][0]["pointer"] == "/properties/devices/additionalProperties"
+    topic = items["topic:sleep"]
+    assert {"naps", "naps[].caffeine_mg", "devices.*", "wake.alarm"} <= set(topic["properties"])
+    assert [r["id"] for r in topic["rules"]] == ["R001", "R002"]
+    assert [(e["scope"], e["pointer"], e["prefix"]) for e in items["R002"]["inSchemas"]] == [
+        ("naps[]", "/properties/naps/items/allOf/0", "Skip pattern"),
+        ("naps[]", "/properties/naps/items/allOf/1", "Applicability")]
+    code, out = cli("--ws", nested, "show", "variable:naps[].caffeine_mg", "R001")
+    assert code == 0 and out["items"]["variable:naps[].caffeine_mg"]["inSchemas"][0]["parent"] == "naps"
+    assert [e["scope"] for e in out["items"]["R001"]["inSchemas"]] == [None, None]
+
+
+def test_check_warns_about_a_structural_code_no_rule_sets(nested):
+    assert not find(checked(nested), "structural-unruled")                # nap_minutes has R001, caffeine_mg R002
+    edit(nested, SLEEP, lambda d: d["properties"]["disturbances"]["items"]["oneOf"].append(NOT_APPLICABLE))
+    edit(nested, PARTICIPANT, lambda d: d["properties"]["address"]["properties"]["city"].update(
+        anyOf=[{"type": "string"}, NOT_APPLICABLE]))
+    res = checked(nested)
+    hits = find(res, "structural-unruled")
+    assert [(f["variable"], f["severity"], f["table"]) for f in hits] == [
+        ("address.city", "warning", "sleep_diary"), ("disturbances", "warning", "sleep_diary")]
+    assert hits[0]["message"] == ("address.city can hold -666 (Not applicable (skipped by design)), a structural code, "
+                                  "but no rule sets it")
+    assert hits[0]["hint"] == "Record the rule that sets it (SKIP-LOGIC.md), or a rule decision saying why none does."
+    assert res["ok"] is True and res["blocking"] == 0
+    rec(nested, {**BASE_RULE, "gates": ["nap_yesterday"], "targets": ["disturbances"], "evidence": "inferred",
+                 "status": "suspected", "reading": "no night's sleep → disturbances not asked"})      # a record, any status
+    rec(nested, guess(kind="rule", topic="participant", targets=["address.city"], choice="none",
+                      question="Which rule leaves the city not applicable?", why="The form asks it of everyone."))
+    rec(nested, {"type": "decision", "event": "cancel", "id": "D001", "note": "asked the wrong question"})
+    assert [f["variable"] for f in find(checked(nested), "structural-unruled")] == ["address.city"]   # cancelled: no say
+    rec(nested, guess(kind="rule", topic="participant", targets=["address.city"], choice="none",
+                      question="Is any rule behind the city's not-applicable code?", why="None is documented."))
+    assert not find(checked(nested), "structural-unruled")
+
+
+def test_check_never_says_a_list_or_group_drops_a_code(nested):
+    ext = nested / "sources" / "S01" / "extract"
+    ext.mkdir(parents=True)
+    (ext / "table.csv").write_text("_row,A,B,C\n10,naps,Naps (up to 5),-888 = don't know\n"
+                                   "11,caffeine,Caffeine before the nap,0 = no; 1 = yes; -888 = don't know\n"
+                                   "14,devices,Minutes per device,0-600; -888\n", encoding="utf-8")
+    write_json(ext / "manifest.json", {"ok": True, "id": "S01", "kind": "csv"})
+    rec(nested, {"type": "source", "event": "extract", "id": "S01", "dir": "sources/S01/extract", "files": 1})
+    found = find(sf.check(nested, validate=False), "sentinel-dropped")
+    assert [x["variable"] for x in found] == ["devices.*", "naps[].caffeine"]      # the values inside, never the containers
+    assert found[1]["message"].startswith("naps[].caffeine: S01:row 11 lists -888 (Don't know)")
+    pkg = sf.Pkg(nested, sf.load_project(nested))
+    assert sf.accepts(pkg, SLEEP, pkg.properties["sleep_diary.naps"]["schema"], -888) is True       # no claim
+    assert sf.accepts(pkg, SLEEP, pkg.properties["sleep_diary.devices"]["schema"], -888) is True
+
+
+def test_findings_on_nested_values_name_their_field_topic_and_rule(nested):
+    doc = nested_findings(sf.quac_set_id(nested / "package/schemas"))
+    sf.take_submission(nested, submit(nested, [{"kind": "alignment", "label": "Wave 1", "findings": doc}]))
+    const, maximum, required, alarm, flat = doc["schemaChecks"]
+    a = sf.load_world(nested).alignment["A01"]
+    assert a["ruleMap"] == {"schema:cond:2:then": "R001", sf.check_key(const): "R002"}
+    checks = {c["key"]: c for c in sf.show_items(nested, ["A01"])["items"]["A01"]["checks"]}
+    assert [tuple(checks[sf.check_key(c)][k] for k in ("variable", "field", "topic", "rule")) for c in doc["schemaChecks"]] == [
+        ("naps", "naps[].caffeine_mg", "sleep", "R002"),
+        ("naps", "naps[].caffeine_mg", "sleep", None),          # QuaC left the path out; the pointer says where
+        ("naps", "naps[]", "sleep", None),
+        ("wake", "wake", "sleep", None),                        # behind a $ref: the column is all anyone knows
+        ("nap_minutes", "nap_minutes", "sleep", "R001")]
+    edit(nested, SLEEP, lambda d: d["properties"]["naps"]["items"]["allOf"].insert(       # positions move later…
+        0, {**NAP_RULE[0], "$comment": "Skip pattern R005: inserted ahead of R002."}))
+    pkg = sf.Pkg(nested, sf.load_project(nested))
+    assert sf.nested_rule_at(sf.nested_rules_index(pkg, "sleep_diary"), const["location"]) == "R005"
+    again = {c["key"]: c for c in sf.show_items(nested, ["A01"])["items"]["A01"]["checks"]}
+    assert again[sf.check_key(const)]["rule"] == "R002"                   # …but the run keeps what they meant then
+    rec(nested, {"type": "alignment", "event": "triage", "id": "A01", "check": sf.check_key(maximum),
+                 "verdict": "schema-fix", "note": "500 mg was my typo for 1000"})
+    later = nested_findings(sf.quac_set_id(nested / "package/schemas"))
+    later["schemaChecks"][1].update(keyword="minimum", location={
+        "file": SLEEP, "pointer": "/properties/naps/items/properties/caffeine_mg/anyOf/0/minimum"})
+    sf.take_submission(nested, submit(nested, [{"kind": "alignment", "label": "Wave 1", "findings": later}],
+                                      sub="20260102T030406Z-b2c3d4"))
+    checks = {c["key"]: c for c in sf.show_items(nested, ["A02"])["items"]["A02"]["checks"]}
+    minimum = checks[sf.check_key(later["schemaChecks"][1])]
+    assert minimum["earlier"] == [{"run": "A01", "label": "Wave 1", "dataset": None, "verdict": "schema-fix",
+                                   "decision": None, "note": "500 mg was my typo for 1000"}]   # same field, new key
+    assert "earlier" not in checks[sf.check_key(later["schemaChecks"][4])]
+
+
+def test_the_website_gets_every_field_and_where_each_rule_lives(nested):
+    sf.build(nested, validate=False)
+    js = (nested / "site/data/state.js").read_text(encoding="utf-8")
+    state = json.loads(js[js.index("=") + 1:js.rindex(";")])
+    assert state["format"] == 1
+    assert [f["path"] for f in state["fields"]] == [
+        "participant_id", "site_id", "age", "address", "address.city", 'address["bed partner"]', "sleep_minutes",
+        "nap_yesterday", "nap_minutes", "naps", "naps[].caffeine", "naps[].caffeine_mg", "disturbances", "devices",
+        "devices.*", "notes", "notes.mood", "wake", "wake.alarm"]
+    fields = {f["path"]: f for f in state["fields"]}
+    assert fields["naps[].caffeine_mg"] == {
+        "table": "sleep_diary", "topic": "sleep", "path": "naps[].caffeine_mg", "name": "caffeine_mg", "parent": "naps",
+        "depth": 1, "shape": "value", "file": SLEEP, "pointer": "/properties/naps/items/properties/caffeine_mg",
+        "title": "Caffeine before the nap (mg)"}
+    assert (fields["age"]["parent"], fields["age"]["depth"], fields["age"]["shape"]) == (None, 0, "value")
+    assert (fields["wake"]["title"], fields["wake.alarm"]["file"], fields["wake.alarm"]["pointer"]) == \
+        ("Waking", SLEEP, "/$defs/wake/properties/alarm")
+    assert [(r["id"], r["scope"], r["file"], r["pointer"], r["index"]) for r in state["encodedRules"]] == [
+        ("R001", None, MOTHER, "/items/allOf/2", 2), ("R001", None, MOTHER, "/items/allOf/3", 3),
+        ("R002", "naps[]", SLEEP, "/properties/naps/items/allOf/0", 0),
+        ("R002", "naps[]", SLEEP, "/properties/naps/items/allOf/1", 1)]
+    assert state["encodedRules"][2]["names"] == ["naps[].caffeine", "naps[].caffeine_mg"]
+    assert {t["id"]: (t["variables"], t["fields"], t["rules"]) for t in state["topics"]} == \
+        {"participant": (4, 2, 0), "sleep": (8, 5, 2)}
+    assert {t["id"]: t["fields"] for t in sf.status_payload(nested)["topics"]["items"]} == {"participant": 2, "sleep": 5}
+
+
+def test_the_readme_counts_fields_and_says_how_nested_values_are_written(nested):
+    sf.build(nested, validate=False)
+    readme = (nested / "package/README.md").read_text(encoding="utf-8")
+    assert "| 2 | 12 (7 fields inside them) |" in readme
+    assert ("- Every column is present in every record, and every field in every group and list entry: a missing or "
+            "not-applicable value is a declared code in the cell, never an absent key. A lookup holds only the names a "
+            "record has. Special codes carry") in readme
+    assert "Every column is required in every record" not in readme
+    assert "for example, `naps[].caffeine`" in readme and "that list's `items.allOf`" in readme
+    assert "one cell holding JSON text" in readme
+    assert "| R002 | sleep_diary, within `naps[]` |" in readme and "| R001 | sleep_diary |" in readme
+    assert "a rule among the fields of one nested value is an entry of that value's own `allOf`" in readme
+    edit(nested, PARTICIPANT, lambda d: (d["required"].remove("age"), d["properties"]["address"]["required"].remove("city")))
+    sf.build(nested, validate=False)
+    readme = (nested / "package/README.md").read_text(encoding="utf-8")
+    assert ("never an absent key — except where the delivery may leave one out (`age`, `address.city`): each such "
+            "property says so with a `required` facet in its `x-provenance`, citing the decision.") in readme
+
+
+def test_a_flat_package_s_readme_keeps_its_wording(ws):
+    sf.build(ws, validate=False)
+    readme = (ws / "package/README.md").read_text(encoding="utf-8")
+    assert ("- Every column is required in every record: a missing or not-applicable value is a declared code in the "
+            "cell, never an absent key. Special codes carry `\"x-value-kind\": \"sentinel\"`.") in readme
+    assert "| 2 | 6 |" in readme and "inside them" not in readme and "nested value" not in readme
+    edit(ws, PARTICIPANT, lambda d: d["required"].remove("age"))                    # a column the delivery may leave out
+    sf.build(ws, validate=False)
+    readme = (ws / "package/README.md").read_text(encoding="utf-8")
+    assert ("- Every column is present in every record: a missing or not-applicable value is a declared code in the cell, "
+            "never an absent key — except where the delivery may leave one out (`age`)") in readme
+
+
+def test_take_files_a_comment_on_a_field_under_its_topic(nested):
+    sf.take_submission(nested, submit(nested, [{"kind": "comment", "text": "Doses are milligrams of caffeine.",
+                                                "target": {"type": "variable", "table": "sleep_diary",
+                                                           "name": "naps[].caffeine_mg"}}]))
+    d = next(d for d in sf.load_world(nested).decisions.values() if d.get("kind") == "feedback")
+    assert (d["targets"], d["topic"], d["table"]) == (["naps[].caffeine_mg"], "sleep", "sleep_diary")
+    assert d["question"] == "Comment on variable naps[].caffeine_mg (table sleep_diary)"
+
+
+def test_a_browser_check_refuses_at_once_when_the_mother_does_not_parse(ws, page):
+    page()
+    (ws / "package/schemas" / MOTHER).write_text("{ not json", encoding="utf-8")
+    started = time.monotonic()
+    with pytest.raises(sf.Fail, match=f"package/schemas/{MOTHER}, does not parse") as ei:
+        sf.run_data_check(ws, "X01", timeout=30)
+    assert time.monotonic() - started < 5 and not (ws / "state/recheck.json").exists()
+    assert "Nothing was sent to the website" in ei.value.error and "`build`" in ei.value.hint
+    (ws / "package/schemas" / MOTHER).unlink()
+    with pytest.raises(sf.Fail, match="is missing"):
+        sf.run_data_check(ws, "X01", timeout=30)
 
 
 # ====================================================================== serve.py

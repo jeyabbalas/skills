@@ -82,6 +82,85 @@
   function lsGet(k, d) { try { var v = localStorage.getItem(skey(k)); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(skey(k), JSON.stringify(v)); return true; } catch (e) { return false; } }
 
+  // ------------------------------------------------------------------ paths
+  // A field inside a variable's value is named by its path, as json-schema-data-dictionary 0.8.0 names its row
+  // (formatVariablePath): the record-level key, then .name (or ["name"] when the name is not plain) for a field of a
+  // group, [] for a list's entries, .* for a lookup's values — household[].age. A finding's display path puts
+  // positions, counted from 1, in the brackets: household[2].age. joinPath, pointerField and checkKey are twins of
+  // join_path, pointer_field and check_key in scripts/schemify.py (validate.py has join_path too): change them together.
+  var PLAIN_NAME = /^(?!\/)[^.[\]"*\s]+$/;
+  function joinPath(parent, name) {
+    if (parent === null || parent === undefined) return name;
+    return parent + (PLAIN_NAME.test(name) ? "." + name : "[" + JSON.stringify(name) + "]");
+  }
+  function pointerField(pointer) {     // the field a failing keyword sits on, from QuaC's location pointer; null for a record-level one
+    var toks = String(pointer || "").split("/").slice(1).map(function (t) { return t.replace(/~1/g, "/").replace(/~0/g, "~"); });
+    var i = 0, path = null, nested = false;
+    if (toks.length > 2 && toks[0] === "items" && toks[1] === "allOf") {      // the mother: /items/allOf/N/(if|then)/…
+      i = 3;
+      if (i < toks.length && (toks[i] === "then" || toks[i] === "if")) i += 1;
+      else return null;
+    }
+    while (i < toks.length) {
+      var t = toks[i];
+      if (t === "properties" && i + 1 < toks.length) { if (path !== null) nested = true; path = joinPath(path, toks[i + 1]); i += 2; }
+      else if (t === "items" && path !== null) { path += "[]"; nested = true; i += 1; }
+      else if (t === "additionalProperties" && path !== null && i + 1 < toks.length && toks[i + 1] !== "$ref") { path += ".*"; nested = true; i += 1; }
+      else if ((t === "anyOf" || t === "oneOf" || t === "allOf") && i + 1 < toks.length && /^[0-9]+$/.test(toks[i + 1])) {
+        i += 2;
+        if (t === "allOf" && i < toks.length && (toks[i] === "then" || toks[i] === "if")) i += 1;
+      } else break;                                                            // a keyword: stop
+    }
+    return nested ? path : null;                                               // nested: extended beyond its first segment
+  }
+  function pathSteps(path, top) {      // household[2].age → household, [2], .age (each with where it ends); null when it does not read as a path
+    path = String(path);
+    var first = typeof top === "string" && (path === top || (path.indexOf(top) === 0 && /^[.[]/.test(path.slice(top.length)))) ? top : /^[^.[]*/.exec(path)[0];
+    var steps = [{ kind: "property", name: first, end: first.length }], i = first.length, m;
+    while (i < path.length) {
+      var rest = path.slice(i);
+      if ((m = /^\.\*/.exec(rest))) steps.push({ kind: "any" });
+      else if ((m = /^\.([^.[\]"*\s]+)/.exec(rest))) steps.push({ kind: "property", name: m[1] });
+      else if ((m = /^\[\]/.exec(rest))) steps.push({ kind: "items" });
+      else if ((m = /^\[([0-9]+)\]/.exec(rest))) steps.push({ kind: "index", n: Number(m[1]) });
+      else if ((m = /^\[("(?:[^"\\]|\\.)*")\]/.exec(rest))) { try { steps.push({ kind: "property", name: JSON.parse(m[1]) }); } catch (e) { return null; } }
+      else return null;
+      i += m[0].length;
+      steps[steps.length - 1].end = i;
+    }
+    return steps;
+  }
+  function instancePointer(column, path) {    // household[2].age → /household/1/age: positions count from 1 in paths, from 0 in pointers
+    var steps = pathSteps(path, column), out = "";
+    if (!steps) return null;
+    for (var i = 0; i < steps.length; i++) {
+      var s = steps[i], t = s.kind === "property" ? s.name : s.kind === "index" && s.n > 0 ? String(s.n - 1) : null;
+      if (t === null) return null;
+      out += "/" + t.replace(/~/g, "~0").replace(/\//g, "~1");
+    }
+    return out;
+  }
+  function atPointer(node, pointer) {  // the node a JSON pointer names in a parsed document
+    if (typeof pointer !== "string" || (pointer && pointer.charAt(0) !== "/")) return undefined;
+    var toks = pointer ? pointer.split("/").slice(1) : [];
+    for (var i = 0; i < toks.length; i++) {
+      if (!node || typeof node !== "object") return undefined;
+      var t = toks[i].replace(/~1/g, "/").replace(/~0/g, "~");
+      if (Array.isArray(node)) node = /^(0|[1-9][0-9]*)$/.test(t) ? node[Number(t)] : undefined;
+      else node = Object.prototype.hasOwnProperty.call(node, t) ? node[t] : undefined;
+    }
+    return node;
+  }
+  function topName(table, path, extra) {      // the record-level key a path starts with: the longest known name it begins with
+    var best = null;
+    path = String(path);
+    [].concat(X.tops && X.tops.get(table) || [], extra || []).forEach(function (t) {
+      if ((path === t || (path.indexOf(t) === 0 && /^[.[]/.test(path.slice(t.length)))) && (best === null || t.length > best.length)) best = t;
+    });
+    return best !== null ? best : /^[^.[]*/.exec(path)[0];
+  }
+  function varRoute(table, path) { return "dictionary/var/" + encodeURIComponent(table) + "/" + encodeURIComponent(path); }
+
   // ------------------------------------------------------------------ indexes
   function reindex() {
     X.dec = new Map(); (S.decisions || []).forEach(function (d) { X.dec.set(d.id, d); });
@@ -90,21 +169,46 @@
     X.topic = new Map(); (S.topics || []).forEach(function (t) { X.topic.set(t.id, t); });
     X.table = new Map(); (S.tables || []).forEach(function (t) { X.table.set(t.name, t); });
     X.doc = new Map(); (S.schemas || []).forEach(function (d) { X.doc.set(d.path, d); });
-    X.props = new Map(); X.byName = new Map();
+    X.props = new Map(); X.byName = new Map();          // keyed "<table>.<path>" and by path; a record-level variable's path is its name
+    if (Array.isArray(S.fields) && S.fields.length) indexFields(); else indexProperties();
+    X.tops = new Map();
+    X.props.forEach(function (p) { if (!p.depth) { if (!X.tops.has(p.table)) X.tops.set(p.table, []); X.tops.get(p.table).push(p.path); } });
+    X.props.forEach(function (p) { if (!p.top) p.top = p.depth ? topName(p.table, p.path) : p.path; });
+    X.encoded = new Map();
+    (S.encodedRules || []).forEach(function (r) { if (r.id) { if (!X.encoded.has(r.id)) X.encoded.set(r.id, []); X.encoded.get(r.id).push(r); } });
+    X.stamp = S.quacSetId || String((S.schemas || []).length) + ":" + (S.generatedAt || "");
+  }
+  function addProp(p) {
+    p.key = p.table + "." + p.path;
+    X.props.set(p.key, p);
+    if (!X.byName.has(p.name)) X.byName.set(p.name, []);
+    X.byName.get(p.name).push(p.key);
+  }
+  function indexFields() {             // every field at every depth (state.js `fields`), its node found by file and pointer
+    S.fields.forEach(function (f) {
+      if (!f || !f.table || typeof f.path !== "string") return;
+      var doc = X.doc.get(f.file), node = doc ? atPointer(doc.schema, f.pointer) : undefined;
+      var sch = node && typeof node === "object" && !Array.isArray(node) ? node : f.title ? { title: f.title } : {};
+      addProp({ table: f.table, topic: f.topic, name: f.path, path: f.path, leaf: f.name, parent: f.parent || null,
+                depth: typeof f.depth === "number" ? f.depth : f.parent ? 1 : 0, shape: f.shape || null, title: f.title || "",
+                top: f.top || null, schema: sch, file: f.file, pointer: f.pointer });
+    });
+  }
+  function indexProperties() {         // a state.js from before nested values: each topic file's record-level properties
     (S.topics || []).forEach(function (tp) {
       var doc = X.doc.get(tp.file);
       var props = doc && doc.schema && doc.schema.properties;
       if (!props || typeof props !== "object") return;
       Object.keys(props).forEach(function (name) {
-        var key = tp.table + "." + name;
-        X.props.set(key, { key: key, table: tp.table, topic: tp.id, name: name, schema: props[name] || {}, file: tp.file });
-        if (!X.byName.has(name)) X.byName.set(name, []);
-        X.byName.get(name).push(key);
+        addProp({ table: tp.table, topic: tp.id, name: name, path: name, depth: 0, schema: props[name] || {}, file: tp.file });
       });
     });
-    X.encoded = new Map();
-    (S.encodedRules || []).forEach(function (r) { if (r.id) { if (!X.encoded.has(r.id)) X.encoded.set(r.id, []); X.encoded.get(r.id).push(r); } });
-    X.stamp = S.quacSetId || String((S.schemas || []).length) + ":" + (S.generatedAt || "");
+  }
+  function entryList(p) {              // the list whose entries hold a field (household[].age → household), or null
+    var steps = p && pathSteps(p.path, p.top);
+    if (!steps) return null;
+    for (var i = steps.length - 1; i > 0; i--) if (steps[i].kind === "items") return X.props.get(p.table + "." + p.path.slice(0, steps[i - 1].end)) || null;
+    return null;
   }
   function unsureEffect(d) {            // the steward is the last person to ask: their "not sure" stays an open question
     var who = role() === "steward" ? "listed as an open question in the package README" : "marked for the data steward";
@@ -234,7 +338,7 @@
         return loadScript("site/data/state.js").then(function () {
           var fresh = window.SCHEMIFY_STATE;
           if (fresh && fresh.generatedAt !== S.generatedAt) {
-            S = fresh; reindex(); renderAll(true);
+            S = fresh; reindex(); retryToyGrid(); renderAll(true);
             toast("Updated — your agent changed something.");
           }
         });
@@ -245,8 +349,9 @@
   // ------------------------------------------------------------------ routing
   function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else route(); }
   function route() {
-    var raw = decodeURIComponent((location.hash || "#overview").slice(1));
-    var parts = raw.split("/");
+    var parts = (location.hash || "#overview").slice(1).split("/").map(function (s) {   // a path's own "/" arrives encoded
+      try { return decodeURIComponent(s); } catch (e) { return s; }
+    });
     var tab = TABS.some(function (t) { return t[0] === parts[0]; }) ? parts[0] : "overview";
     UI.tab = tab;
     document.body.classList.toggle("sf-on-dictionary", tab === "dictionary");
@@ -260,7 +365,7 @@
     if (tab === "dictionary") {
       renderDictionary();
       if (parts[1] === "topic" && parts[2]) setTimeout(function () { gotoTopic(parts[2]); }, 60);
-      if (parts[1] === "var" && parts[2] && parts[3]) setTimeout(function () { gotoVariable(parts[2], parts[3], true); }, 60);
+      if (parts[1] === "var" && parts[2] && parts[3]) setTimeout(function () { gotoVariable(parts[2], parts.slice(3).join("/"), true); }, 60);
     }
     if (tab === "evidence" && (parts[1] === "sources" || parts[1] === "decisions" || parts[1] === "people")) { UI.evTab = parts[1]; renderEvidence(); }
     if (tab === "evidence" && parts[1] === "decision" && parts[2]) { UI.evTab = "decisions"; UI.dFilter = "all"; UI.dSearch = parts[2]; renderEvidence(); }
@@ -609,7 +714,7 @@
     if (d.topic && X.topic.get(d.topic)) top.appendChild(h("a", { href: "#dictionary/topic/" + d.topic }, X.topic.get(d.topic).title));
     (d.targets || []).slice(0, 4).forEach(function (t) {
       var keys = X.byName.get(t) || [];
-      top.appendChild(keys.length ? h("a", { href: "#dictionary/var/" + X.props.get(keys[0]).table + "/" + t }, h("code", null, t)) : h("code", null, t));
+      top.appendChild(keys.length ? h("a", { href: "#" + varRoute(X.props.get(keys[0]).table, t) }, h("code", null, t)) : h("code", null, t));
     });
     if (d.importance === "high") top.appendChild(chip("important", "bad"));
     card.appendChild(top);
@@ -750,6 +855,7 @@
     if (!mother) return null;
     var t = lib.schemaDocumentsToTable(tableDocs(), { rootUri: mother.uri });
     hideProvenance(t);
+    dropRuleComments(t, ruleComments());
     DICT.tables[name] = { stamp: X.stamp, table: t };
     return t;
   }
@@ -760,16 +866,75 @@
     ["Additional information", "additionalInformation"].forEach(function (key) {
       var info = node[key];
       if (!info || typeof info !== "object" || Array.isArray(info)) return;
-      delete info["x-provenance"];
-      Object.keys(info).forEach(function (k) {           // x-unit → Unit: plain words, not keyword names
-        if (k.indexOf("x-") !== 0) return;
-        var plain = k.slice(2).replace(/-/g, " ");
-        info[plain.charAt(0).toUpperCase() + plain.slice(1)] = info[k];
-        delete info[k];
-      });
+      dropProvenance(info);
+      plainWords(info);
       if (!Object.keys(info).length) node[key] = null;
     });
     Object.keys(node).forEach(function (k) { hideProvenance(node[k], seen); });
+  }
+  function dropProvenance(obj) {            // x-provenance at any depth (a list's entries bring theirs under `items`); true when that empties obj
+    var had = Object.keys(obj).length;
+    delete obj["x-provenance"];
+    Object.keys(obj).forEach(function (k) {
+      var v = obj[k];
+      if (v && typeof v === "object" && !Array.isArray(v) && dropProvenance(v)) delete obj[k];
+    });
+    return had > 0 && !Object.keys(obj).length;
+  }
+  function plainWords(info) {               // x-unit → Unit: plain words, not keyword names — and so for what a list's items say
+    Object.keys(info).forEach(function (k) {
+      if (k.indexOf("x-") !== 0) return;
+      var plain = k.slice(2).replace(/-/g, " ");
+      info[plain.charAt(0).toUpperCase() + plain.slice(1)] = info[k];
+      delete info[k];
+    });
+    if (info.items && typeof info.items === "object" && !Array.isArray(info.items)) plainWords(info.items);
+  }
+  // A rule among one group's or entry's fields lives in that object's allOf. With its x-provenance beside if/then,
+  // json-schema-data-dictionary 0.8.0 also appends the rule's $comment to the list's or group's own row (Description
+  // and its note, __comment); the Skip logic tab shows the rule, so those exact lines go.
+  function ruleComments() {
+    var enc = S.encodedRules || [];
+    if (!enc.some(function (r) { return r && "scope" in r; })) return nestedRuleComments((S.schemas || []).map(function (d) { return d.schema; }));
+    return enc.filter(function (r) { return r && r.scope && typeof r.comment === "string" && r.comment.trim(); })
+      .map(function (r) { return r.comment.trim(); });
+  }
+  function nestedRuleComments(schemas) {    // a state.js without rule scopes: every allOf entry with an `if`, except the mother's own
+    var out = [];
+    function walk(node, motherItems) {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach(function (n) { walk(n, false); }); return; }
+      if (!motherItems && Array.isArray(node.allOf)) node.allOf.forEach(function (e) {
+        if (e && typeof e === "object" && e["if"] !== undefined && typeof e.$comment === "string" && e.$comment.trim()) out.push(e.$comment.trim());
+      });
+      Object.keys(node).forEach(function (k) { if (k !== "const" && k !== "enum" && k !== "default" && k !== "examples") walk(node[k], false); });
+    }
+    schemas.forEach(function (s) {
+      if (s && typeof s === "object" && !Array.isArray(s)) Object.keys(s).forEach(function (k) { walk(s[k], k === "items"); });
+    });
+    return out;
+  }
+  function dropRuleComments(table, comments) {
+    if (!comments.length) return;
+    var blocks = comments.map(function (c) { return c.split("\n"); });
+    function strip(text) {                  // whole lines equal to a comment, nothing else
+      var lines = text.split("\n");
+      blocks.forEach(function (b) {
+        for (var i = 0; i + b.length <= lines.length; i++) {
+          var hit = true;
+          for (var j = 0; j < b.length && hit; j++) hit = lines[i + j] === b[j];
+          if (hit) { lines.splice(i, b.length); i--; }
+        }
+      });
+      return lines.join("\n");
+    }
+    var rows = (table.rows || []).slice();
+    (table.categories || []).forEach(function (c) { (c.rows || []).forEach(function (r) { if (rows.indexOf(r) < 0) rows.push(r); }); });
+    rows.forEach(function (row) {
+      if (!row || typeof row.Description !== "string") return;
+      row.Description = strip(row.Description);
+      if (typeof row.__comment === "string") { var note = strip(row.__comment); if (note.trim()) row.__comment = note; else delete row.__comment; }
+    });
   }
   function varFlags(key) {
     var p = X.props.get(key);
@@ -791,8 +956,8 @@
       var row = table.rows[i];
       var cell = tr.querySelector(".dd-col-name") || tr.firstElementChild;
       if (!row || !cell) return;
-      var name = row["Variable name"];
-      if (row.__depth) return;                                  // nested fields share their parent's details
+      var name = row["Variable name"];                          // a field inside a value: its path, household[].age
+      if (row.__depth && !X.props.has(DICT.table + "." + name)) return;   // one the field model does not know shares its parent's details
       var flags = varFlags(DICT.table + "." + name);
       var dot = document.createElement("span");
       dot.className = "sf-row-dot" + (flags.fb ? " sf-fb" : flags.open ? " sf-open" : flags.guess ? " sf-warn" : "");
@@ -856,7 +1021,7 @@
   }
   function shadowRootOf() { return DICT.el ? (DICT.el.shadowRoot || DICT.el) : null; }
   function gotoVariable(table, name, open) {
-    if (UI.tab !== "dictionary") { go("dictionary/var/" + table + "/" + name); return; }
+    if (UI.tab !== "dictionary") { go(varRoute(table, name)); return; }
     if (DICT.table !== table) { UI.dictTable = table; renderDictionary(); }
     setTimeout(function () {
       var root = shadowRootOf(); if (!root) return;
@@ -998,7 +1163,7 @@
     var key = table + "." + name, p = X.props.get(key);
     var sch = (p && p.schema) || {};
     UI.openDrawer = { type: "variable", table: table, name: name };
-    var body = drawerShell(name, (sch.title || "") + (p ? " · " + ((X.topic.get(p.topic) || {}).title || p.topic) : ""));
+    var body = drawerShell(name, (sch.title || (p && p.title) || "") + (p ? " · " + ((X.topic.get(p.topic) || {}).title || p.topic) : ""));
     var t = getTable(table);
     var row = t && t.rows.filter(function (r) { return r["Variable name"] === name; })[0];
     if (row) {
@@ -1116,10 +1281,14 @@
       groups.get(gate).push([id, halves]);
     });
     groups.forEach(function (list, gate) {
-      var keys = X.byName.get(gate) || [];
-      var title = keys.length ? (X.props.get(keys[0]).schema.title || "") : "";
+      var keys = X.byName.get(gate) || [];                 // a gate inside a value is named by its path: household[].relation
+      var gp = keys.length ? X.props.get(keys[0]) : null;
+      var title = gp ? (gp.schema.title || gp.title || "") : "";
+      var within = gp ? entryList(gp) : null;              // a rule among one entry's fields: "in each Household members entry"
+      var wt = within ? (within.schema.title || within.title || "") : "";
       var g = h("div", { class: "sf-gate" }, h("div", { class: "sf-gate-head" }, h("code", null, gate), h("span", { class: "sf-muted" }, title),
-        keys.length ? h("a", { class: "sf-small", href: "#dictionary/var/" + X.props.get(keys[0]).table + "/" + gate }, "in the dictionary") : null));
+        wt ? h("span", { class: "sf-muted sf-small" }, "in each " + wt + " entry") : null,
+        gp ? h("a", { class: "sf-small", href: "#" + varRoute(gp.table, gate) }, "in the dictionary") : null));
       list.forEach(function (pair) { g.appendChild(ruleRow(pair[0], pair[1])); });
       encodedCard.appendChild(g);
     });
@@ -1298,9 +1467,23 @@
   }
 
   // ------------------------------------------------------------------ data check
-  function checkKey(c) {
-    var loc = c.location || {};
-    return [c.ruleId, c.keyword, loc.file, loc.pointer, c.path || ""].join("|");
+  function checkKey(c) {               // schemify.py's check_key, character for character: triage and `planned` are keyed by it
+    var loc = c.location || {}, f = pointerField(loc.pointer);
+    return [c.ruleId, c.keyword, loc.file, loc.pointer].map(pyStr).join("|") + "|" + (f !== null ? f : (c.path || ""));
+  }
+  function pyStr(v) { return v === null || v === undefined ? "None" : String(v); }    // how Python's f-string writes a missing part
+  function own(o, k) { return !!o && typeof k === "string" && Object.prototype.hasOwnProperty.call(o, k); }
+  function nestedRuleAt(table, loc) {  // the rule among one object's fields whose then/if the failing keyword sits in (schemify.py's nested_rule_at)
+    var ptr = typeof loc.pointer === "string" ? loc.pointer : "", re = /\/allOf\/[0-9]+(?=\/(?:then|if)(?:\/|$))/g, m;
+    var index = {};                                        // its entry's pointer → rule id, for this table's rules inside values
+    (S.encodedRules || []).forEach(function (r) {
+      if (r && r.scope !== null && r.scope !== undefined && table && r.table === table.name && r.file === loc.file) index[r.pointer] = r.id;
+    });
+    while ((m = re.exec(ptr))) {
+      var at = ptr.slice(0, m.index + m[0].length);
+      if (own(index, at) && index[at]) return index[at];
+    }
+    return null;
   }
   function parseFindings(doc, ruleMap) {
     if (!doc || typeof doc !== "object" || Array.isArray(doc)) return { error: "This file is not QuaC findings." };
@@ -1311,15 +1494,18 @@
     var table = (S.tables || []).filter(function (t) { return t.mother === root || root.slice(-t.mother.length) === t.mother; })[0] ||
       (S.tables || []).filter(function (t) { return (sch.id || "") && X.doc.get(t.mother) && X.doc.get(t.mother).uri === sch.id; })[0] || null;
     var checks = doc.schemaChecks.filter(function (c) { return c.severity === "error" || c.severity === "warning"; }).map(function (c) {
-      var m = /^schema:cond:(\d+):/.exec(c.ruleId || "");
-      var rule = ruleMap && c.ruleId && ruleMap[c.ruleId] ? ruleMap[c.ruleId] : null;   // stored when the run was imported
+      var m = /^schema:cond:(\d+):/.exec(c.ruleId || ""), loc = c.location || {}, ck = checkKey(c);
+      var rule = own(ruleMap, c.ruleId) && ruleMap[c.ruleId] ? ruleMap[c.ruleId] :      // stored when the run was imported: a mother
+        own(ruleMap, ck) && ruleMap[ck] ? ruleMap[ck] : null;                            // rule by its ruleId, a nested one by check key
       if (!rule && m && table) {
-        var enc = (S.encodedRules || []).filter(function (r) { return r.table === table.name && r.index === Number(m[1]); })[0];
+        var enc = (S.encodedRules || []).filter(function (r) { return r.table === table.name && !r.scope && r.index === Number(m[1]); })[0];
         rule = enc ? enc.id : null;
       }
-      var key = table && c.variable ? table.name + "." + c.variable : null;
-      var prop = key ? X.props.get(key) : null;
-      return { c: c, key: checkKey(c), rule: rule, topic: prop ? prop.topic : null };
+      if (!rule) rule = nestedRuleAt(table, loc);
+      var field = pointerField(loc.pointer) || c.path || c.variable || null;
+      var key = table && c.variable ? table.name + "." + c.variable : null;      // QuaC's variable: the record-level column
+      var prop = (key ? X.props.get(key) : null) || (table && field ? X.props.get(table.name + "." + field) : null) || null;
+      return { c: c, key: ck, rule: rule, topic: prop ? prop.topic : null, field: field };
     });
     return { doc: doc, table: table, checks: checks, setId: sch.setId, matches: !!(S.quacSetId && sch.setId === S.quacSetId),
              version: doc.findingsSchemaVersion };
@@ -1337,7 +1523,8 @@
     parsed.checks.slice().sort(function (a, b) { return (b.c.records || 0) - (a.c.records || 0); }).forEach(function (x) {
       var c = x.c, tri = triage ? triage[x.key] : null;
       tbody.appendChild(h("tr", null,
-        h("td", null, c.variable ? h("code", null, c.variable) : h("span", { class: "sf-muted" }, "the whole dataset"),
+        h("td", null, x.field && x.field !== c.variable ? h("code", null, x.field) :           // a field inside a value: its path
+          c.variable ? h("code", null, c.variable) : h("span", { class: "sf-muted" }, "the whole dataset"),
           x.topic && X.topic.get(x.topic) ? h("div", { class: "sf-muted sf-small" }, X.topic.get(x.topic).title) : null),
         h("td", null, c.requirement || "", x.rule ? h("div", null, h("a", { href: "#skip-logic/" + x.rule, class: "sf-small" }, "rule " + x.rule)) : null),
         h("td", { class: "sf-nowrap" }, c.records !== null && c.records !== undefined ? [c.records + (c.percentOfRecords !== null && c.percentOfRecords !== undefined ? " (" + c.percentOfRecords + "%)" : ""),
@@ -1356,36 +1543,73 @@
   // pinned version the first time the Data check tab opens. Without it (offline, a blocked CDN,
   // an old browser) the same rows show in a plain table.
   var DT = { version: "0.10.0", worker: "assets/worker-BpxbYHX2.js",   // the worker's file name is fixed per version (VENDORED.md)
-             loading: null, failed: null, table: null, box: null, loaded: null, gen: 0, ids: null, pending: null };
+             loading: null, failed: null, table: null, box: null, loaded: null, gen: 0, ids: null, pending: null, turn: 0 };
   DT.base = "https://cdn.jsdelivr.net/npm/@jeyabbalas/data-table@" + DT.version + "/dist/";
   var KW = { anyOf: "not an allowed value", oneOf: "not an allowed value", "enum": "not an allowed value", "const": "breaks a rule",
              not: "breaks a rule", type: "wrong type", minimum: "too small", maximum: "too large", exclusiveMinimum: "too small",
              exclusiveMaximum: "too large", pattern: "wrong format", format: "wrong format", minLength: "too short", maxLength: "too long",
-             required: "missing", unevaluatedProperties: "not a variable", additionalProperties: "not a variable", uniqueItems: "duplicate row" };
+             required: "missing", unevaluatedProperties: "not a variable", additionalProperties: "not a variable", uniqueItems: "duplicate row",
+             "false": "should be left out" };
+  var LIST_KW = { minItems: "too few entries", maxItems: "too many entries", uniqueItems: "repeated entry",       // on a variable's
+                  contains: "required entry missing", minContains: "required entry missing", maxContains: "too many matching entries" };   // list
   var KIND = { "wrong-type": "wrong type", "unknown-level": "a code the dictionary does not define", "range-break": "out of range",
                "invented-sentinel": "a made-up special code", "pattern-break": "wrong format", "skip-break": "breaks a skip rule",
                "applicability-break": "breaks an applicability rule", "routing-break": "breaks a routing rule", "missing-key": "a missing value",
-               "undeclared-column": "a column the dictionary does not have", "duplicate-row": "a duplicate row" };
+               "undeclared-column": "a column the dictionary does not have", "duplicate-row": "a duplicate row",
+               "entry-count": "too few or too many entries", "duplicate-entry": "a repeated entry" };
 
   function toyColumns(entry) {
     var seen = new Set(), out = [];
     (entry.rows || []).forEach(function (r) { Object.keys(r || {}).forEach(function (k) { if (!seen.has(k)) { seen.add(k); out.push(k); } }); });
     return out;
   }
-  function toyVarTitle(entry, name) {
-    var c = (entry.columns || {})[name];
+  function toyTop(entry, path) { return topName(entry.table, path, toyColumns(entry)); }
+  function toyVarTitle(entry, name) {   // a column's title, or a field's (household[].age)
+    var c = (entry.columns || {})[name] || (entry.fields || {})[name];
     if (c && c.title) return c.title;
     var prop = X.props.get(entry.table + "." + name);
-    return (prop && prop.schema && prop.schema.title) || name;
+    return (prop && ((prop.schema && prop.schema.title) || prop.title)) || name;
+  }
+  // A finding inside a value (validate.py's `data` findings): `column` is the record-level key it is pinned to,
+  // `path` where it is (household[2].age), `field` that path without positions (household[].age). Older findings
+  // have neither; on a record-level variable, path = field = column.
+  function toyNested(f) { return !!(f && f.column && f.path && f.path !== f.column); }
+  function toyText(f) {                 // a nested finding says where first — unless its message already does
+    var msg = f.message || "";
+    return toyNested(f) && !(msg.indexOf(f.path) === 0 && /^($|[\s:,;])/.test(msg.slice(f.path.length))) ? f.path + ": " + msg : msg;
+  }
+  function kwLabel(f) {
+    if (f.column && own(LIST_KW, f.keyword)) return LIST_KW[f.keyword];   // the table's own uniqueItems stays "duplicate row"
+    if (toyNested(f) && f.keyword === "required") return "missing field";
+    if (toyNested(f) && f.keyword === "additionalProperties") return "undeclared field";
+    return KW[f.keyword];
+  }
+  function kindLabel(entry, c) {        // a planted mistake's kind; a missing or undeclared field inside a value says so
+    var inside = !!c.column && toyTop(entry, c.column) !== c.column;
+    if (inside && c.kind === "missing-key") return "a missing field";
+    if (inside && c.kind === "undeclared-column") return "a field the dictionary does not have";
+    return KIND[c.kind] || c.kind;
+  }
+  function covers(f, col) {             // a finding covers its field and the field's ancestors: household[].age covers household
+    var field = f.field || f.column;
+    if (f.column === col || (col && field === col)) return true;
+    if (!col || !f.column || field === f.column) return false;             // one on a record-level variable covers that column alone
+    var fs = pathSteps(field, f.column), cs = pathSteps(col, f.column);
+    if (!fs || !cs || cs.length > fs.length) return false;
+    return cs.every(function (s, i) {                                       // a lookup's .* stands for any of its names, on either side
+      var t = fs[i], named = function (k) { return k === "property" || k === "any"; };
+      if (s.kind === "any" || t.kind === "any") return named(s.kind) && named(t.kind);
+      return s.kind === t.kind && s.name === t.name;
+    });
   }
   function toyCases(entry) {
     var byRow = new Map();
     (entry.errors || []).forEach(function (f) { if (!byRow.has(f.row)) byRow.set(f.row, []); byRow.get(f.row).push(f); });
     var cases = (entry.planted || []).map(function (c) {
       var errs = byRow.get(c.row) || [];
-      var hit = errs.filter(function (f) { return f.column === c.column || (c.kind === "duplicate-row" && !f.column); });
+      var hit = errs.filter(function (f) { return covers(f, c.column) || (c.kind === "duplicate-row" && !f.column); });
       var verdict = !errs.length ? "missed" : !hit.length ? "wrong-column" : hit.length === errs.length ? "caught" : "caught-extra";
-      return { row: c.row, column: c.column, kind: c.kind, reason: c.reason, errors: errs, verdict: verdict };
+      return { row: c.row, column: c.column, kind: c.kind, reason: c.reason, path: c.path, errors: errs, hits: hit, verdict: verdict };
     });
     var planted = new Set(cases.map(function (c) { return c.row; }));
     var unplanned = [];
@@ -1414,29 +1638,36 @@
   }
   function toyIssueList(entry) {
     var ol = h("ol", { class: "sf-toy-issues", "aria-label": "Mismatches" });
-    var verdictChip = { caught: chip("caught", "ok"), "caught-extra": chip("caught, and other cells fail too", "warn"),
-                        "wrong-column": chip("caught on another column", "warn"), missed: chip("slipped through", "bad") };
-    function item(row, column, title, lines, verdict) {
+    var verdicts = { caught: ["caught", "ok"], "caught-extra": ["caught, and other cells fail too", "warn"],
+                     "wrong-column": ["caught on another column", "warn"], missed: ["slipped through", "bad"] };
+    function verdictChip(v) { return chip(verdicts[v][0], verdicts[v][1]); }   // one per item: a node appended twice moves
+    function item(row, column, title, lines, verdict, path) {    // column: the record-level one; path: where inside its value, if anywhere
+      var inside = !!path && path !== column;
       ol.appendChild(h("li", { class: "sf-toy-issue" },
-        h("button", { type: "button", class: "sf-toy-go", onclick: function () { revealToy(entry, row, column); } },
-          h("span", { class: "sf-muted" }, "Row " + (row + 1) + " · "), title),
+        h("button", { type: "button", class: "sf-toy-go", onclick: function () { revealToy(entry, row, column, inside ? path : null); } },
+          h("span", { class: "sf-muted" }, "Row " + (row + 1) + " · "), inside && title === path.replace(/\[[0-9]+\]/g, "[]") ? null : title,
+          inside ? [" ", h("code", null, path)] : null),
         lines.map(function (l) { return h("div", { class: "sf-small" + (l[1] ? " sf-muted" : "") }, l[0]); }),
-        verdict ? h("div", null, verdictChip[verdict]) : null));
+        verdict ? h("div", null, verdictChip(verdict)) : null));
     }
     if (entry.file === "invalid") {
       var tc = toyCases(entry);
       tc.cases.forEach(function (c) {
-        var lines = [["Planted: " + (KIND[c.kind] || c.kind) + (c.reason ? " — " + c.reason : ""), false]];
+        var lines = [["Planted: " + kindLabel(entry, c) + (c.reason ? " — " + c.reason : ""), false]];
         if (c.errors[0]) lines.push([c.errors[0].message, true]);
-        item(c.row, c.column, c.column ? toyVarTitle(entry, c.column) : "the whole row", lines, c.verdict);
+        var top = c.column ? toyTop(entry, c.column) : null;
+        item(c.row, top, c.column ? toyVarTitle(entry, c.column) : "the whole row", lines, c.verdict,
+             (c.hits[0] && toyNested(c.hits[0]) ? c.hits[0].path : null) || c.path || c.column);
       });
       tc.unplanned.forEach(function (u) {
-        item(u.row, u.errors[0].column, u.errors[0].column ? toyVarTitle(entry, u.errors[0].column) : "the whole row",
-             [["Fails, but no mistake was planted here: " + u.errors[0].message, false]], "missed");
+        var f = u.errors[0];
+        item(u.row, f.column, f.column ? toyVarTitle(entry, f.field || f.column) : "the whole row",
+             [["Fails, but no mistake was planted here: " + f.message, false]], "missed", toyNested(f) ? f.path : null);
       });
     } else {
       (entry.errors || []).slice(0, 200).forEach(function (f) {
-        item(f.row, f.column, f.column ? toyVarTitle(entry, f.column) : "the whole row", [[f.message, false], [f.hint || "", true]], null);
+        item(f.row, f.column, f.column ? toyVarTitle(entry, f.field || f.column) : "the whole row", [[f.message, false], [f.hint || "", true]], null,
+             toyNested(f) ? f.path : null);
       });
     }
     if (!ol.firstChild) return h("p", { class: "sf-muted sf-small" }, "Nothing to list: every row passes.");
@@ -1448,16 +1679,17 @@
     (entry.errors || []).forEach(function (f) {
       if (ids[f.row] === undefined) return;
       var c = planted.get(f.row);
-      var msg = f.message + (f.hint ? "\n" + f.hint : "") + (c && c.reason ? "\nPlanted on purpose: " + c.reason : "");
-      var a = { severity: "error", message: msg, code: f.rule || KW[f.keyword] || f.keyword || "mismatch",
+      var msg = toyText(f) + (f.hint ? "\n" + f.hint : "") + (c && c.reason ? "\nPlanted on purpose: " + c.reason : "");
+      var a = { severity: "error", message: msg, code: f.rule || kwLabel(f) || f.keyword || "mismatch",
                 source: entry.file === "invalid" ? (c ? "planted mistake" : "not planted") : "this row should pass", rowId: Number(ids[f.row]) };
-      if (f.column && has.has(f.column)) { a.scope = "cell"; a.column = f.column; } else a.scope = "row";
+      if (f.column && has.has(f.column)) { a.scope = "cell"; a.column = f.column; } else a.scope = "row";   // a nested one: on its variable's cell
+      if (toyNested(f)) { var ptr = instancePointer(f.column, f.path); a.metadata = ptr ? { pointer: ptr, path: f.path } : { path: f.path }; }
       out.push(a);
     });
     if (entry.file === "invalid") toyCases(entry).cases.forEach(function (c) {
       if (c.verdict === "missed" && ids[c.row] !== undefined)
         out.push({ scope: "row", rowId: Number(ids[c.row]), severity: "warning", code: "slipped through", source: "planted mistake",
-                   message: "This row breaks one thing on purpose (" + (KIND[c.kind] || c.kind) + (c.reason ? ": " + c.reason : "") +
+                   message: "This row breaks one thing on purpose (" + kindLabel(entry, c) + (c.reason ? ": " + c.reason : "") +
                             "), yet it passes — the schemas do not catch it yet." });
     });
     return out;
@@ -1478,6 +1710,11 @@
       document.head.appendChild(h("link", { rel: "stylesheet", href: DT.base + "data-table.css", "data-sf-dt": "" }));
     DT.loading = import(DT.base + "data-table.js");
     return DT.loading;
+  }
+  function retryToyGrid() {            // a new build's data: a load that failed once (offline, a blocked CDN) gets another try
+    if (!DT.failed) return;
+    DT.failed = null; DT.loaded = null;
+    if (!DT.table) { DT.loading = null; DT.box = null; }
   }
   function startWorker() {
     // A browser starts no worker from another origin's script; a blob: URL belongs to this page.
@@ -1525,14 +1762,17 @@
       clear(slot).appendChild(staticToyTable(entry, DT.failed));
     }).then(function () { if (wait.parentNode) wait.remove(); });
   }
-  function revealToy(entry, row, column) {
+  function revealToy(entry, row, column, path) {     // path: a value inside the column's cell (household[2].age), shown in the inspector
     if (DT.table && DT.ids && !DT.failed && DT.loaded === toyKey(entry)) {
       var rid = DT.ids[row];
       if (rid === undefined) return;
       if (DT.box) DT.box.scrollIntoView({ block: "nearest" });
       var col = column && toyColumns(entry).indexOf(column) >= 0 ? column : undefined;
+      var turn = ++DT.turn;
       DT.table.actions.revealRow(Number(rid), col).then(function (shown) {
         if (shown === null) toast("That row is hidden by a filter in the table — clear the filters to see it.");
+        else if (shown && col && path && path !== col && (!shown.column || shown.column === col))
+          setTimeout(function () { inspectToy({ row: shown.row, column: col }, turn, 0); }, 0);
       }, function () { /* a newer move took over */ });
       return;
     }
@@ -1542,12 +1782,22 @@
       cell.classList.add("sf-cell-flash"); setTimeout(function () { cell.classList.remove("sf-cell-flash"); }, 1600);
     }
   }
+  function inspectToy(cell, turn, tries) {   // the value inspector shows the cell's entries, counted from 1 as in the path
+    var box = DT.table && DT.table.container, opened = false;
+    if (turn !== DT.turn || !box || typeof box.openValueInspector !== "function") return;
+    try { opened = box.openValueInspector(cell); } catch (e) { return; }
+    // Its row may still be rendering (false); and the first open of a page load waits for the inspector's code, which
+    // the table drops when anything happens meanwhile (true, yet no panel): look, and ask again while it is missing.
+    if (tries < 5) setTimeout(function () {
+      if (turn === DT.turn && !(DT.box && DT.box.querySelector(".dt-value-inspector:not([hidden])"))) inspectToy(cell, turn, tries + 1);
+    }, opened ? 400 : 120);
+  }
   function staticToyTable(entry, reason) {
     var cols = toyColumns(entry).slice(0, 300), rows = (entry.rows || []).slice(0, 500);
     var bad = new Map();
     (entry.errors || []).forEach(function (f) {
       var k = f.row + "|" + (f.column && cols.indexOf(f.column) >= 0 ? f.column : "");
-      bad.set(k, (bad.get(k) ? bad.get(k) + "\n\n" : "") + f.message + (f.hint ? "\n" + f.hint : ""));
+      bad.set(k, (bad.get(k) ? bad.get(k) + "\n\n" : "") + toyText(f) + (f.hint ? "\n" + f.hint : ""));
     });
     var head = h("tr", null, h("th", { scope: "col" }, "Row"), cols.map(function (c) { return h("th", { scope: "col", title: toyVarTitle(entry, c) }, c); }));
     var body = h("tbody");
@@ -1758,6 +2008,16 @@
   function quacSendSchemas(rid) {
     var files = (S.schemas || []).map(function (x) { return x.path; });
     var t = (S.tables || []).filter(function (x) { return x.name === QC.table; })[0] || ((S.tables || []).length === 1 ? S.tables[0] : null);
+    var mother = t && t.mother ? X.doc.get(t.mother) : null;
+    if (t && t.mother && !(mother && mother.schema && typeof mother.schema === "object")) {
+      // QuaC drops a check whose main schema file is not among the files, without a word: say why here, and to a waiting agent
+      var why = (S.schemasBroken || {})[t.mother];
+      QC.request = rid; QC.status = "failed";
+      QC.detail = "the schemas were not sent: " + t.mother + " does not parse" + (why ? " (" + String(why).slice(0, 160) + ")" : "") +
+        " — your agent fixes it, then asks QuaC again";
+      renderQuacCardAgain(); quacPresence();
+      return;
+    }
     QC.request = rid; QC.status = "loading"; QC.detail = ""; renderQuacCardAgain();
     Promise.all(files.map(function (path) {
       return fetch("package/schemas/" + path.split("/").map(encodeURIComponent).join("/"), { cache: "no-store" })

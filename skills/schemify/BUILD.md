@@ -17,7 +17,7 @@ Table of contents
 | step | done when | topic status |
 |---|---|---|
 | 1. Orient | you know the topic's variables, their locators, its open decisions, and the rules waiting on it | planned |
-| 2. Draft | the category file exists; every judgment is a decision; every property has `x-provenance` | drafted |
+| 2. Draft | the category file exists; every variable's shape is settled; every judgment is a decision; every property and nested field has `x-provenance` | drafted |
 | 3. Skip logic | every rule touching the topic is recorded; licensed ones are encoded | drafted |
 | 4. Toy data | valid and invalid rows cover the topic's codes, bounds, and rules | drafted |
 | 5. Verify | `build` shows no errors for the topic and full toy-data coverage | tested |
@@ -36,13 +36,14 @@ Statuses are computed — never set them by hand. A topic is finished for you at
 
 Fill `package/schemas/<table>/categories/<topic>.json` — the scaffold made it with empty `properties` — following SCHEMA-STYLE.md exactly. For every variable in the topic:
 
-1. Transcribe: title (the source's label, lightly cleaned — a rewording is a `guess`), codes and their labels verbatim, special codes, ranges, formats. Copy the source's coding text into `$comment`. A code the source lists without a label is a `gap` question — never write a label for it.
-2. Add `x-provenance`: `default` cites the variable's own line in the source; list a facet only where its origin differs.
-3. Every place you go beyond the source is a decision, recorded as you go:
+1. Shape first: does it hold one value, or several — a group of fields, a list of values, a list of entries, a lookup? Look for the signals in NESTED.md ("Spotting a nested variable") even when the digest says `value`, and follow how the plan settled its delivery. A nested variable whose delivery nobody settled is a `structure` question (NESTED.md) — draft it once it is answered, never as flat columns meanwhile. Each field inside is then drafted by the steps below, with its own title, codes, and `x-provenance`.
+2. Transcribe: title (the source's label, lightly cleaned — a rewording is a `guess`), codes and their labels verbatim, special codes, ranges, formats. Copy the source's coding text into `$comment`. A code the source lists without a label is a `gap` question — never write a label for it.
+3. Add `x-provenance`: `default` cites the variable's own line in the source; list a facet only where its origin differs.
+4. Every place you go beyond the source is a decision, recorded as you go:
    - a choice no person needs to make now (a plausibility bound, a normalized label, an id pattern) → `{"type": "decision", "event": "decide", "kind": "guess", "topic": …, "targets": […], "question": "…", "choice": "…", "why": "…", "applied": true}` — cite it on the facet;
    - sources that disagree → a `conflict` question; a source that is silent where it matters → `gap`; unclear wording → `ambiguity`. Each is `open`, with `provisional` naming the option you encode meanwhile — the loosest reading the sources support — and cited on the facet. Post them in step 6.
-4. A variable that cannot be drafted yet (its code sheet is missing, its meaning is unknown) → `variables.csv` status `deferred`, the note naming the decision; it stays out of the schema.
-5. A variable no source defines but a person asked for → `variables.csv` status `added`, `source` the decision.
+5. A variable that cannot be drafted yet (its code sheet is missing, its meaning is unknown) → `variables.csv` status `deferred`, the note naming the decision; it stays out of the schema.
+6. A variable no source defines but a person asked for → `variables.csv` status `added`, `source` the decision.
 
 The mother already references the file (START.md, step 8).
 
@@ -52,7 +53,7 @@ Follow SKIP-LOGIC.md: scan the topic's sources for every signal; record each rul
 
 ## 4. Toy data
 
-Extend `package/toy-data/<table>/valid.json`, `invalid.json`, and `invalid-ledger.json` to cover the topic: every code and special code, each bound, both halves of each encoded rule, one planted mistake per invalid row (DATA-CHECK.md, "Toy data"). Rows touching a suspected rule stay consistent with it, and none tests it yet.
+Extend `package/toy-data/<table>/valid.json`, `invalid.json`, and `invalid-ledger.json` to cover the topic: every code and special code, each bound, both halves of each encoded rule, one planted mistake per invalid row (DATA-CHECK.md, "Toy data") — inside nested values too, entry by entry. Every row holds the columns of every built topic and no other (the mother rejects the rest), so a new topic's columns go into every existing row too, each consistent with that row's scenario. Rows touching a suspected rule stay consistent with it, and none tests it yet.
 
 ## 5. Verify
 

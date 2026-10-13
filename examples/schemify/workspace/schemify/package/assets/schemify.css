@@ -260,7 +260,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 22px 20px 120px; }
 .sf-q { padding: 16px 18px; }
 .sf-q-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: .84rem; color: var(--sf-muted); }
 .sf-q-title { font-size: 1.04rem; font-weight: 650; margin: 2px 0 6px; }
-.sf-q-context { color: var(--sf-ink-2); }
+.sf-q-context { color: var(--sf-ink-2); white-space: pre-line; }
 .sf-evidence { margin: 8px 0 12px; display: grid; gap: 8px; }
 .sf-quote { border-left: 3px solid var(--sf-line-strong); padding: 4px 0 4px 12px; color: var(--sf-ink-2); }
 .sf-quote cite { display: block; font-style: normal; font-size: .82rem; color: var(--sf-muted); margin-bottom: 2px; }
@@ -384,6 +384,7 @@ body { --dt-font-family: var(--sf-font); --dt-primary: var(--sf-accent); }
   text-align: left; cursor: pointer; }
 .sf-toy-go:hover { text-decoration: underline; }
 .sf-toy-go:focus-visible { outline: none; box-shadow: var(--sf-focus); border-radius: 4px; }
+.sf-toy-go code { font-weight: 500; overflow-wrap: anywhere; }
 .sf-toy-static { max-height: 540px; overflow: auto; }
 .sf-toy-static td, .sf-toy-static th { white-space: nowrap; }
 .sf-toy-static .sf-cell-bad { background: var(--sf-bad-weak); box-shadow: inset 3px 0 0 var(--sf-bad); cursor: help; }

@@ -32,9 +32,11 @@ Arguments
   --max-pages N  PDFs only: extract pages 1..N (default: every page)
   --documentation
                  required for a delimited file (.csv, .tsv, or a .txt laid out as
-                 a table): such a file is as often a dataset as a data dictionary,
-                 and nothing in it tells the two apart. Pass it only when the user
-                 has said the file describes variables (one row per variable or
+                 a table) and for a JSON file (.json, .jsonl, .ndjson): such a file
+                 is as often a dataset as a data dictionary (a JSON file can be an
+                 array of records, or a JSON Schema or REDCap metadata export), and
+                 nothing in it tells the two apart. Pass it only when the user has
+                 said the file describes variables (one row or entry per variable or
                  code), never for a file of records.
 
 Output
@@ -61,6 +63,7 @@ Output
   code      text.md (.sas .do .r .sps .py .sql;   "L<N>" = source line N
             embedded data lines blanked)
   json/xml  pretty.json / pretty.xml              "L<N>" of the pretty copy
+  jsonl     text.md (.jsonl .ndjson, as text)     "L<N>" = source line N
 
   A line break inside one cell or paragraph is written as the two characters
   \\n, so each physical line is one row, paragraph or text line. Workbooks:
@@ -73,8 +76,8 @@ Output
 Refused (exit 2)
   Data files (.sav .zsav .por .dta .sas7bdat .xpt .rds .rdata .rda .parquet
   .feather .arrow .db .sqlite .sqlite3 .h5 .hdf5, also recognised by content),
-  delimited files without --documentation, unknown formats, files over 200 MB,
-  password-protected files.
+  delimited and JSON files (.json .jsonl .ndjson) without --documentation,
+  unknown formats, files over 200 MB, password-protected files.
 
 Exit codes
   0  extracted: stdout is the manifest, {"ok": true, ...}
@@ -118,7 +121,7 @@ OUTLINE_CAP = 200
 EMPTY_PAGE_CHARS = 20
 MERGE_FILL_MAX = 100_000
 PIP_FALLBACK = "python3 -m pip install --user openpyxl pypdf python-docx xlrd striprtf"
-SUPPORTED = (".xlsx .xlsm .xls .csv .tsv .txt .md .pdf .docx .html .htm .rtf .json .xml "
+SUPPORTED = (".xlsx .xlsm .xls .csv .tsv .txt .md .pdf .docx .html .htm .rtf .json .jsonl .ndjson .xml "
              ".sas .do .ado .r .rmd .qmd .sps .py .sql")
 
 EXT_KIND = {
@@ -126,7 +129,7 @@ EXT_KIND = {
     ".csv": "csv", ".tsv": "tsv", ".tab": "tsv", ".pdf": "pdf", ".docx": "docx",
     ".html": "html", ".htm": "html", ".xhtml": "html", ".rtf": "rtf",
     ".txt": "txt", ".text": "txt", ".md": "md", ".markdown": "md",
-    ".json": "json", ".xml": "xml",
+    ".json": "json", ".jsonl": "jsonl", ".ndjson": "jsonl", ".xml": "xml",
     ".sas": "code", ".do": "code", ".ado": "code", ".r": "code", ".rmd": "code", ".qmd": "code",
     ".sps": "code", ".py": "code", ".sql": "code",
 }
@@ -229,8 +232,8 @@ def build_parser():
                    help="workbooks: extract this sheet even though it looks like records "
                         "(only after the user says it describes variables); repeatable")
     p.add_argument("--documentation", action="store_true",
-                   help="the user confirmed this delimited file describes variables, "
-                        "not records (required for .csv, .tsv and tabular .txt)")
+                   help="the user confirmed this file describes variables, not records "
+                        "(required for .csv, .tsv, tabular .txt, .json, .jsonl and .ndjson)")
     return p
 
 
@@ -1901,6 +1904,7 @@ EXTRACTORS = {
     "tsv": lambda s, r, a: extract_delimited(s, r, a, "tsv"),
     "txt": lambda s, r, a: extract_plain(s, r, a, table_ok=True),
     "md": lambda s, r, a: extract_plain(s, r, a),
+    "jsonl": lambda s, r, a: extract_plain(s, r, a),      # one JSON value per line: cited by line, as text
     "code": lambda s, r, a: extract_code(s, r, a),
 }
 DEPS = {"xlsx": ["openpyxl"], "xls": ["xlrd"], "pdf": ["pypdf"], "docx": ["docx", "lxml.etree"]}
@@ -1970,6 +1974,14 @@ def execute(argv):
                    "Ask the user whether this file describes variables (one row per variable or "
                    "code) or holds records (one row per person, visit, or sample). Only if it "
                    "describes variables, re-run with --documentation.", 2)
+    if not args.documentation and kind in ("json", "jsonl"):
+        raise Fail("A JSON file can be a dataset (an array of records, or one record per line) or "
+                   "documentation (a JSON Schema, a REDCap metadata export); the script cannot "
+                   "tell them apart, and the agent must not open data files.",
+                   "Ask the user whether this file describes variables (a schema, a codebook or "
+                   "metadata export: one entry per variable or code) or holds records (one entry "
+                   "per person, visit, or sample). Only if it describes variables, re-run with "
+                   "--documentation.", 2)
 
     out = Path(args.out)
     skill = schemify_skill_above(out)

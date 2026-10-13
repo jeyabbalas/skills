@@ -13,7 +13,9 @@ Run:  uv run tests/test_schemify_validate.py
        && pytest tests/test_schemify_validate.py)
 
 Every test builds its own package in tmp_path - a small sleep-diary study
-with one table, two topics, a skip pair, provenance.json and toy data - and
+with one table, two topics, a skip pair, provenance.json and toy data; with
+nested=True a third topic of nested values (a household list of entries with
+a skip pair inside, an address group, a symptoms list, a labs lookup) - and
 mutates it; nothing under examples/ is read.
 """
 
@@ -215,22 +217,153 @@ PROVENANCE = {
 }
 
 
+# Nested values: a third topic whose every column holds more than one value.
+
+HOUSE = "sleep_diary/categories/household.json"
+NESTED_COLUMNS = ["household", "address", "symptoms", "labs"]
+REFUSED = {"const": -777, "title": "Refused", "x-value-kind": "sentinel"}
+BLANK = {"const": None, "title": "Missing (blank cell)", "x-value-kind": "sentinel"}
+
+
+def household_doc():
+    return {
+        "$schema": DRAFT, "$id": BASE + HOUSE, "title": "Household",
+        "description": "Who the participant lives with, where, and how they felt.",
+        "type": "object", "x-variable-group": "household",
+        "properties": {
+            "household": {
+                "title": "Household roster", "x-provenance": prov(30, maxItems="S01:Variables row 30"),
+                "type": "array", "minItems": 1, "maxItems": 4,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "relation": {"title": "Relation to the participant", "x-provenance": prov(31),
+                                     "oneOf": codes((1, "Self"), (2, "Spouse"), (3, "Child")) + [DK]},
+                        "age": {"title": "Age (years)", "x-provenance": prov(32), "x-unit": "years",
+                                "anyOf": [{"type": "integer", "minimum": 0, "maximum": 120}, NA, BLANK]},
+                    },
+                    "required": ["relation", "age"],
+                    "additionalProperties": False,
+                    "allOf": [
+                        rule("Skip pattern R020: the participant's own age is asked elsewhere "
+                             "(relation = 1).", clause(relation={"const": 1}),
+                             {"properties": {"age": {"const": -666}}}),
+                        rule("Applicability R020: every other member has an age or a missing code.",
+                             clause(relation={"enum": [2, 3]}),
+                             {"properties": {"age": {"not": {"const": -666}}}}),
+                    ],
+                },
+            },
+            "address": {
+                "title": "Home address", "x-provenance": prov(33), "type": "object",
+                "properties": {
+                    "street": {"title": "Street", "x-provenance": prov(34, required="D006"),
+                               "type": "string"},
+                    "postcode": {"title": "Postcode", "x-provenance": prov(35),
+                                 "anyOf": [{"type": "string", "pattern": "^[A-Z]{2}[0-9]$"},
+                                           {"const": "REFUSED", "title": "Refused",
+                                            "x-value-kind": "sentinel"}]},
+                },
+                "required": ["postcode"],
+                "additionalProperties": False,
+            },
+            "symptoms": {
+                "title": "Symptoms last night", "x-provenance": prov(36), "type": "array",
+                "uniqueItems": True,
+                "items": {"oneOf": codes((1, "Fever"), (2, "Cough"), (3, "Headache")) + [REFUSED]},
+            },
+            "labs": {
+                "title": "Lab results", "x-provenance": prov(37), "type": "object",
+                "propertyNames": {"pattern": "^[a-z][a-z0-9_]*$"},
+                "additionalProperties": {"title": "Result", "x-provenance": prov(38),
+                                         "type": "number", "minimum": 0},
+            },
+        },
+        "required": ["household", "address", "symptoms", "labs"],
+    }
+
+
+NESTED_VALID = [
+    {"household": [{"relation": 1, "age": -666}],
+     "address": {"street": "1 Elm Road", "postcode": "AB1"}, "symptoms": [], "labs": {"ldl": 0}},
+    {"household": [{"relation": 1, "age": -666}, {"relation": 2, "age": 0},
+                   {"relation": 3, "age": 120}, {"relation": -888, "age": None}],
+     "address": {"postcode": "REFUSED"}, "symptoms": [1, 2], "labs": {}},
+    {"household": [{"relation": 1, "age": -666}, {"relation": 2, "age": 40}],
+     "address": {"street": "2 Oak Lane", "postcode": "CD2"}, "symptoms": [3, -777],
+     "labs": {"hdl": 1.5}},
+]
+
+
+def with_nested(rows):
+    """The rows with the nested columns added, cycling through NESTED_VALID."""
+    return [dict(r, **copy.deepcopy(NESTED_VALID[k % len(NESTED_VALID)]))
+            for k, r in enumerate(rows)]
+
+
+def nested_invalid_rows():
+    rows, ledger = invalid_rows()
+    rows, cases = with_nested(rows), ledger["violations"]
+    base = with_nested([row(60, "01", 30, 1, 400, 1, 30, 0)])[0]
+
+    def plant(kind, column, reason, change):
+        r = copy.deepcopy(base)
+        r["participant_id"] = "P{:04d}".format(70 + len(rows))
+        change(r)
+        cases.append({"row": len(rows), "column": column, "kind": kind, "reason": reason})
+        rows.append(r)
+
+    plant("range-break", "household[].age", "ages are at most 120",
+          lambda r: r["household"].append({"relation": 2, "age": 130}))
+    plant("missing-key", "household[].relation", "every entry has a relation",
+          lambda r: r["household"].append({"age": 30}))
+    plant("undeclared-column", "household[].pulse", "pulse is not a field of household",
+          lambda r: r["household"][0].update(pulse=60))
+    plant("entry-count", "household", "at most four people",
+          lambda r: r["household"].extend([{"relation": 3, "age": 5}] * 4))
+    plant("duplicate-entry", "symptoms", "a symptom is chosen once",
+          lambda r: r.update(symptoms=[2, 2]))
+    plant("skip-break", "household[].age", "R020: the participant's own age is -666",
+          lambda r: r["household"][0].update(age=40))
+    plant("applicability-break", "household[].age", "R020: a spouse has an age",
+          lambda r: r["household"].append({"relation": 2, "age": -666}))
+    plant("pattern-break", "address.postcode", "postcodes are two letters and a digit",
+          lambda r: r["address"].update(postcode="zz"))
+    plant("range-break", "labs", "a result is never negative",
+          lambda r: r["labs"].update(hdl=-1))
+    plant("unknown-level", "symptoms", "9 is not a symptom code",
+          lambda r: r.update(symptoms=[9]))
+    return rows, ledger
+
+
+NESTED_PROVENANCE = copy.deepcopy(PROVENANCE)
+NESTED_PROVENANCE["decisions"]["D006"] = {
+    "kind": "convention", "question": "May the street be left out?",
+    "answer": "Yes, when the participant gave none.", "by": "steward", "status": "answered",
+    "needsReview": False}
+
+
 def write_json(path, doc):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def build_package(root):
-    """Write the fixture package under root (the PKG folder) and return root."""
+def build_package(root, nested=False):
+    """Write the fixture package under root (the PKG folder) and return root;
+    nested=True adds the household topic of nested values."""
     schemas = root / "schemas"
     write_json(schemas / DEFS, defs_doc())
     write_json(schemas / PARTICIPANT, participant_doc())
     write_json(schemas / SLEEP, sleep_doc())
-    write_json(schemas / MOTHER, mother_doc())
-    write_json(root / "provenance.json", PROVENANCE)
+    mother = mother_doc()
+    if nested:
+        write_json(schemas / HOUSE, household_doc())
+        allof(mother).insert(2, {"$ref": "categories/household.json"})
+    write_json(schemas / MOTHER, mother)
+    write_json(root / "provenance.json", NESTED_PROVENANCE if nested else PROVENANCE)
     toy = root / "toy-data" / "sleep_diary"
-    write_json(toy / "valid.json", VALID)
-    bad, ledger = invalid_rows()
+    write_json(toy / "valid.json", with_nested(VALID) if nested else VALID)
+    bad, ledger = nested_invalid_rows() if nested else invalid_rows()
     write_json(toy / "invalid.json", bad)
     write_json(toy / "invalid-ledger.json", ledger)
     return root
@@ -255,6 +388,11 @@ def v():
 @pytest.fixture
 def pkg(tmp_path):
     return build_package(tmp_path / "package")
+
+
+@pytest.fixture
+def npkg(tmp_path):
+    return build_package(tmp_path / "package", nested=True)
 
 
 def load(pkg, rel):
@@ -323,11 +461,13 @@ def clause(**tests):
 
 
 def write_csv(path, rows, columns=COLUMNS, delimiter=","):
+    """A CSV or TSV of rows; a nested value is written as JSON text."""
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=delimiter, lineterminator="\n")
     writer.writerow(columns)
     for r in rows:
-        writer.writerow(["" if r.get(c) is None else r.get(c) for c in columns])
+        writer.writerow(["" if r.get(c) is None else json.dumps(r[c]) if isinstance(
+            r.get(c), (list, dict)) else r.get(c) for c in columns])
     path.write_text(buffer.getvalue(), encoding="utf-8")
     return path
 
@@ -342,7 +482,7 @@ def test_green_check_is_clean(v, pkg):
     assert report["files"] == 4 and report["truncated"] is False
     assert report["tables"] == [{"table": "sleep_diary", "mother": MOTHER,
                                  "categories": [PARTICIPANT, SLEEP], "properties": 8,
-                                 "rules": 2}]
+                                 "fields": 0, "rules": 2}]
 
 
 def test_green_summary_headline(v, pkg):
@@ -360,8 +500,8 @@ def test_green_summary_headline(v, pkg):
                                                        "routing": 0},
                                "by_table": {"sleep_diary": 2}}
     sleep = report["topics"]["sleep_diary/sleep"]
-    assert sleep == {"file": SLEEP, "properties": 4, "rules_targeting": 2, "errors": 0,
-                     "warnings": 0, "provenance_ok": True,
+    assert sleep == {"file": SLEEP, "properties": 4, "fields": 0, "rules_targeting": 2,
+                     "errors": 0, "warnings": 0, "provenance_ok": True,
                      "coverage": {"covered": 4, "total": 4}}
     assert report["topics"]["sleep_diary/participant"]["coverage"] == {"covered": 3, "total": 3}
 
@@ -386,8 +526,8 @@ def test_green_rules_normalized(v, pkg):
     assert report["ok"] is True and report["findings"] == []
     skip, applicability = report["rules"]
     assert skip == {
-        "table": "sleep_diary", "id": "R001", "kind": "skip", "domain": None, "index": 2,
-        "file": MOTHER, "pointer": "/items/allOf/2", "comment": SKIP["$comment"],
+        "table": "sleep_diary", "id": "R001", "kind": "skip", "domain": None, "scope": None,
+        "index": 2, "file": MOTHER, "pointer": "/items/allOf/2", "comment": SKIP["$comment"],
         "reading": SKIP["$comment"].split(": ", 1)[1],
         "provenance": {"default": "S01:Variables row 9"},
         "when": {"any": [{"all": [{"variable": "nap_yesterday", "test": "eq", "value": 0}]}]},
@@ -397,7 +537,8 @@ def test_green_rules_normalized(v, pkg):
     assert applicability["then"]["effects"] == [{"variable": "nap_minutes", "effect": "ne",
                                                  "value": -666}]
     assert report["variables"]["sleep_diary"]["nap_minutes"] == {
-        "topic": "sleep", "file": SLEEP, "pointer": "/properties/nap_minutes"}
+        "topic": "sleep", "file": SLEEP, "pointer": "/properties/nap_minutes", "shape": "value",
+        "parent": None, "title": "Nap duration yesterday (minutes)"}
     assert len(report["variables"]["sleep_diary"]) == 8
 
 
@@ -1270,6 +1411,930 @@ def test_multi_table_scoping_and_attribution(v, pkg, tmp_path, monkeypatch, caps
     assert code == 2 and "household" in out["error"]
 
 
+# ----------------------------------------------------------- nested values
+
+
+def nested_row(**change):
+    """A valid row of the nested package (VALID[0] and its nested values), changed."""
+    return dict(with_nested(VALID[:1])[0], **change)
+
+
+def checker_for(v, pkg):
+    an = v.analyze(pkg)
+    return v.RowChecker(an, an.tables["sleep_diary"])
+
+
+def placed(found):
+    return [(f["column"], f["field"], f["path"], f["keyword"], f["message"]) for f in found]
+
+
+def test_join_path_names_fields_like_the_data_dictionary(v):
+    join = v.join_path
+    assert join(None, "my field") == "my field"                 # a column is kept as is
+    assert join("household[]", "age") == "household[].age"
+    assert join("labs", "ldl") == "labs.ldl"
+    assert join("odd", "my field") == 'odd["my field"]'
+    assert join("odd", "a.b") == 'odd["a.b"]'
+    assert join("odd", 'q"k') == 'odd["q\\"k"]'
+    assert join("odd", "*") == 'odd["*"]'
+    assert join("odd", "/x") == 'odd["/x"]'
+    assert join("odd", "") == 'odd[""]'
+    assert join("odd", "ünï") == "odd.ünï" and join("odd", "1") == "odd.1"
+    assert join("odd", "a b") == 'odd["a b"]'        # JavaScript's \s
+    assert join("odd", "a\x1cb") == "odd.a\x1cb"                # not JavaScript whitespace
+    assert join("odd", "tail\n") == 'odd["tail\\n"]'
+
+
+def test_green_nested_package(v, npkg):
+    report = check(v, npkg)
+    assert report["ok"] is True and report["findings"] == []
+    assert report["tables"][0]["properties"] == 12 and report["tables"][0]["fields"] == 5
+    fixtures = v.fixtures_report(v.analyze(npkg))
+    assert fixtures["ok"] is True and fixtures["findings"] == []
+    table = fixtures["tables"]["sleep_diary"]
+    assert table["invalid"]["cases"] == table["invalid"]["caught"] == 19
+    assert {x["status"] for x in table["invalid"]["verdicts"]} == {"caught"}
+    assert table["coverage"] == {
+        "properties": {"covered": 14, "total": 14},
+        "rules": {"fired": ["R001:skip", "R001:applicability", "R020:skip", "R020:applicability"],
+                  "unfired": [],
+                  "caught": ["R001:skip", "R001:applicability", "R020:skip", "R020:applicability"],
+                  "uncaught": []}}
+
+
+def test_nested_fields_have_paths_shapes_and_parents(v, npkg):
+    variables = v.rules_report(v.analyze(npkg))["variables"]["sleep_diary"]
+    assert list(variables)[8:] == ["household", "household[].relation", "household[].age",
+                                   "address", "address.street", "address.postcode", "symptoms",
+                                   "labs", "labs.*"]
+    assert {path: (info["shape"], info["parent"]) for path, info in variables.items()
+            if path in NESTED_COLUMNS or info["parent"]} == {
+        "household": ("entries", None), "household[].relation": ("value", "household"),
+        "household[].age": ("value", "household"), "address": ("group", None),
+        "address.street": ("value", "address"), "address.postcode": ("value", "address"),
+        "symptoms": ("list", None), "labs": ("lookup", None), "labs.*": ("value", "labs")}
+    assert variables["household[].age"] == {
+        "topic": "household", "file": HOUSE, "pointer": "/properties/household/items/properties/age",
+        "shape": "value", "parent": "household", "title": "Age (years)"}
+    assert variables["labs.*"]["pointer"] == "/properties/labs/additionalProperties"
+
+
+def test_odd_names_are_quoted_in_paths_and_findings(v, npkg):
+    def change(d):
+        address = d["properties"]["address"]
+        address["properties"]["post code"] = {"title": "Old post code", "x-provenance": prov(39),
+                                              "type": "string", "pattern": "^[0-9]{4}$"}
+        address["required"].append("post code")
+    edit(npkg, HOUSE, change)
+    assert check(v, npkg)["ok"] is True
+    checker = checker_for(v, npkg)
+    assert 'address["post code"]' in checker.model.fields
+    found = checker.check_row(nested_row(address={"postcode": "AB1", "post code": "12"}), 0)
+    assert placed(found) == [("address", 'address["post code"]', 'address["post code"]', "pattern",
+                              'address["post code"] is "12", which does not match ^[0-9]{4}$.')]
+
+
+def test_nested_fields_need_titles_provenance_and_titled_codes(v, npkg):
+    def change(d):
+        props = d["properties"]
+        entry = props["household"]["items"]["properties"]
+        entry["age"].pop("title")
+        entry["relation"].pop("x-provenance")
+        entry["relation"]["oneOf"][1].pop("title")
+        props["labs"]["additionalProperties"].pop("title")
+        props["symptoms"]["items"]["oneOf"][0].pop("title")
+    edit(npkg, HOUSE, change)
+    report = check(v, npkg)
+    assert {f["variable"]: f["pointer"] for f in only(report, "missing-title")} == {
+        "household[].age": "/properties/household/items/properties/age",
+        "labs.*": "/properties/labs/additionalProperties"}
+    missing = only(report, "missing-provenance")[0]
+    assert (missing["variable"], missing["topic"], missing["severity"]) == (
+        "household[].relation", "household", "error")
+    assert sorted((f["variable"], f["pointer"]) for f in only(report, "code-without-title")) == [
+        ("household[].relation", "/properties/household/items/properties/relation/oneOf/1"),
+        ("symptoms", "/properties/symptoms/items/oneOf/0")]
+
+
+def test_nested_special_codes_need_a_guard_and_a_kind(v, npkg):
+    def change(d):
+        age = d["properties"]["household"]["items"]["properties"]["age"]
+        age["anyOf"] += [{"const": 99, "title": "Not stated", "x-value-kind": "sentinel"},
+                         {"const": -1, "title": "Refused"}]
+    edit(npkg, HOUSE, change)
+    report = check(v, npkg)
+    guard = only(report, "guard-missing")[0]
+    assert (guard["variable"], guard["pointer"]) == (
+        "household[].age", "/properties/household/items/properties/age/anyOf/0")
+    assert "99" in guard["message"]
+    kind = only(report, "sentinel-kind-missing")[0]
+    assert kind["pointer"] == "/properties/household/items/properties/age/anyOf/4"
+
+
+def test_nested_objects_are_typed_closed_and_complete(v, npkg):
+    def change(d):
+        props = d["properties"]
+        props["household"]["items"].pop("additionalProperties")
+        props["household"]["items"]["required"] = ["relation"]
+        props["address"].pop("type")
+        props["symptoms"].pop("type")
+        props["labs"].pop("propertyNames")
+    edit(npkg, HOUSE, change)
+    report = check(v, npkg)
+    opened = only(report, "nested-open")[0]
+    assert (opened["pointer"], opened["variable"], opened["severity"]) == (
+        "/properties/household/items", "household", "error")
+    assert opened["message"].startswith("household[] does not close its fields")
+    incomplete = only(report, "required-incomplete")[0]
+    assert incomplete["message"] == "household[]: required omits age."
+    assert incomplete["pointer"] == "/properties/household/items/required"
+    assert sorted(f["pointer"] for f in only(report, "nested-shape")) == [
+        "/properties/address/type", "/properties/symptoms/type"]
+    assert only(report, "lookup-names")[0]["severity"] == "warning"
+
+
+def test_a_field_may_be_left_out_only_under_a_cited_decision(v, npkg):
+    assert "required-incomplete" not in codes_of(check(v, npkg))    # street cites D006
+    edit(npkg, HOUSE, lambda d: d["properties"]["address"]["properties"]["street"][
+        "x-provenance"].update(required="S01:Variables row 34"))
+    found = only(check(v, npkg), "required-incomplete")[0]
+    assert (found["message"], found["variable"]) == ("address: required omits street.", "address")
+
+    def leave_out(d):                                               # a column, the same way
+        d["required"].remove("caffeine")
+        d["properties"]["caffeine"]["x-provenance"]["required"] = "D006"
+    edit(npkg, SLEEP, leave_out)
+    assert [f["message"] for f in only(check(v, npkg), "required-incomplete")] == [
+        "address: required omits street."]
+    gaps = [f["message"] for f in only(v.fixtures_report(v.analyze(npkg)), "coverage-gap")]
+    assert "valid.json never leaves out caffeine." in gaps
+    without = nested_row()
+    del without["caffeine"]
+    assert checker_for(v, npkg).check_row(without, 0) == []
+
+
+def test_value_facets_on_nested_fields_name_their_codes(v, npkg):
+    def change(d):
+        props = d["properties"]
+        props["household"]["items"]["properties"]["relation"]["x-provenance"]["value:9"] = "S01:row 31"
+        props["symptoms"]["x-provenance"].update({"value:2": "S01:row 36", "value:7": "S01:row 36"})
+    edit(npkg, HOUSE, change)
+    found = only(check(v, npkg), "provenance-unknown-code")
+    assert sorted((f["variable"], f["pointer"].rsplit("/", 1)[-1]) for f in found) == [
+        ("household[].relation", "value:9"), ("symptoms", "value:7")]
+
+
+def test_list_items_carry_no_annotations(v, npkg):
+    edit(npkg, HOUSE, lambda d: d["properties"]["household"]["items"].update(
+        title="Member", description="One person."))
+    found = only(check(v, npkg), "items-annotation")[0]
+    assert found["severity"] == "warning" and found["variable"] == "household"
+    assert found["message"] == "household's items carries title and description."
+
+
+def test_items_if_is_still_a_conditional_outside_the_rules(v, npkg):
+    edit(npkg, HOUSE, lambda d: d["properties"]["household"]["items"].update(
+        {"if": clause(relation={"const": 1}), "then": {"properties": {"age": {"const": -666}}}}))
+    found = only(check(v, npkg), "conditional-outside-mother")[0]
+    assert (found["pointer"], found["variable"]) == ("/properties/household/items/if", "household")
+    assert "among one group's or entry's fields in that object's allOf" in found["message"]
+
+
+def test_rules_of_a_category_the_mother_does_not_reference_yet_are_where_rules_belong(v, npkg):
+    edit(npkg, MOTHER, lambda d: allof(d).remove({"$ref": "categories/household.json"}))
+    report = check(v, npkg)
+    assert "conditional-outside-mother" not in codes_of(report)     # the R020 pair is in place
+    assert only(report, "orphan-category")[0]["file"] == HOUSE
+
+
+def test_meta_errors_inside_nested_values_name_the_field(v, npkg):
+    edit(npkg, HOUSE, lambda d: d["properties"]["household"]["items"]["properties"]["age"][
+        "anyOf"][0].update(minimum="0"))
+    found = only(check(v, npkg), "meta-invalid")[0]
+    assert (found["variable"], found["topic"]) == ("household[].age", "household")
+
+
+def test_nested_rules_parse_with_scope_and_full_paths(v, npkg):
+    report = v.rules_report(v.analyze(npkg))
+    assert report["ok"] is True and report["findings"] == []
+    assert [rule["scope"] for rule in report["rules"]] == [None, None, "household[]", "household[]"]
+    skip, applicability = report["rules"][2:]
+    assert {key: skip[key] for key in ("id", "kind", "scope", "index", "file", "pointer")} == {
+        "id": "R020", "kind": "skip", "scope": "household[]", "index": 0, "file": HOUSE,
+        "pointer": "/properties/household/items/allOf/0"}
+    assert skip["when"] == {"any": [{"all": [
+        {"variable": "household[].relation", "test": "eq", "value": 1}]}]}
+    assert skip["then"] == {"mode": "all", "effects": [
+        {"variable": "household[].age", "effect": "eq", "value": -666}]}
+    assert applicability["index"] == 1 and applicability["when"]["any"][0]["all"][0] == {
+        "variable": "household[].relation", "test": "in", "values": [2, 3]}
+
+
+def test_nested_rule_meaning_is_checked_among_its_objects_fields(v, npkg):
+    def change(d):
+        rules = d["properties"]["household"]["items"]["allOf"]
+        rules[0]["if"] = clause(relaton={"const": 1})
+        rules.append(rule("Age routing R021: a child's age is unknown.",
+                          clause(relation={"const": 3}), {"properties": {"age": {"const": -999}}}))
+        rules.append({"$comment": "a note, not a rule"})
+    edit(npkg, HOUSE, change)
+    report = check(v, npkg)
+    dangling = only(report, "rule-dangling")[0]
+    assert (dangling["variable"], dangling["rule"], dangling["file"], dangling["topic"]) == (
+        "household[].relaton", "R020", HOUSE, "household")
+    assert dangling["message"] == ("R020 (Skip pattern) tests household[].relaton, which "
+                                   "household[] does not hold.")
+    undeclared = only(report, "rule-undeclared-code")[0]
+    assert (undeclared["variable"], undeclared["rule"]) == ("household[].age", "R021")
+    assert only(report, "allof-entry")[0]["pointer"] == "/properties/household/items/allOf/3"
+    rules = v.rules_report(v.analyze(npkg))
+    assert {"rule-dangling", "rule-undeclared-code", "allof-entry"} <= set(codes_of(rules))
+
+
+def test_a_pair_keeps_both_halves_in_one_place(v, npkg):
+    edit(npkg, HOUSE, lambda d: d["properties"]["household"]["items"]["allOf"].pop(1))
+    add_rule(npkg, rule("Applicability R020: a reported nap has a duration.",
+                        clause(nap_yesterday={"const": 1}),
+                        {"properties": {"nap_minutes": {"not": {"const": -666}}}}))
+    found = only(check(v, npkg), "duplicate-rule")[0]
+    assert found["message"] == ("R020's Skip pattern half is in household[] but its "
+                                "Applicability half is in the record.")
+
+
+def test_rules_in_a_shared_shape(v, npkg):
+    def change(d):
+        member = d["properties"]["household"]["items"]
+        member["properties"]["age"].pop("title")
+        d["$defs"] = {"member": member}
+        d["properties"]["household"]["items"] = {"$ref": "#/$defs/member"}
+        d["properties"]["guests"] = {"title": "Overnight guests", "x-provenance": prov(41),
+                                     "type": "array", "items": {"$ref": "#/$defs/member"}}
+        d["required"].append("guests")
+    edit(npkg, HOUSE, change)
+    an = v.analyze(npkg)
+    fields = an.tables["sleep_diary"].fields
+    assert fields["guests[].age"].schema is fields["household[].age"].schema
+    report = v.check_report(an, None)
+    shared = only(report, "rule-in-shared-shape")
+    assert [f["pointer"] for f in shared] == ["/$defs/member/allOf/0", "/$defs/member/allOf/1"]
+    assert "used at household[] and guests[]" in shared[0]["message"]
+    assert len(only(report, "missing-title")) == 1              # one node, linted once
+
+
+def test_contains_tests_on_a_list_of_values(v, npkg):
+    add_rule(npkg, rule("Nap routing R022: a fever means a nap is reported or unknown.",
+                        clause(symptoms={"contains": {"const": 1}}),
+                        {"properties": {"nap_yesterday": {"enum": [1, -888]}}}))
+    add_rule(npkg, rule("Nap routing R023: a nap without fever has a known length.",
+                        clause(symptoms={"not": {"contains": {"const": 1}}},
+                               nap_yesterday={"const": 1}),
+                        {"properties": {"nap_minutes": {"not": {"const": -888}}}}))
+    report = v.rules_report(v.analyze(npkg))
+    assert report["ok"] is True
+    r22, r23 = report["rules"][2:4]
+    assert r22["when"]["any"][0]["all"] == [{"variable": "symptoms", "test": "includes", "value": 1}]
+    assert r23["when"]["any"][0]["all"][0] == {"variable": "symptoms", "test": "excludes", "value": 1}
+    found = checker_for(v, npkg).check_row(nested_row(symptoms=[1], nap_yesterday=0,
+                                                      nap_minutes=-666), 0)
+    assert [(f["field"], f["rule"], f["allof_index"]) for f in found] == [("nap_yesterday", "R022", 5)]
+
+    def wrong(d):
+        allof(d)[5]["if"]["properties"]["symptoms"] = {"contains": {"const": 9}}
+        allof(d)[6]["if"]["properties"]["nap_yesterday"] = {"contains": {"const": 1}}
+    edit(npkg, MOTHER, wrong)
+    report = check(v, npkg)
+    level = only(report, "trigger-undeclared-level")[0]
+    assert (level["variable"], level["rule"]) == ("symptoms", "R022")
+    assert "symptoms including 9" in level["message"]
+    assert "nap_yesterday is not a list of values" in only(report, "rule-shape")[0]["message"]
+
+
+def test_list_effects_are_routing_rules(v, npkg):
+    add_rule(npkg, rule("Symptom routing R024: no caffeine, no symptoms listed.",
+                        clause(caffeine={"const": 0}), {"properties": {"symptoms": {"maxItems": 0}}}))
+    add_rule(npkg, rule("Household routing R025: a nap means someone is listed.",
+                        clause(nap_yesterday={"const": 1}),
+                        {"properties": {"household": {"minItems": 1}}}))
+    rules = v.rules_report(v.analyze(npkg))["rules"]
+    assert [effect for r in rules[2:4] for effect in r["then"]["effects"]] == [
+        {"variable": "symptoms", "effect": "empty"}, {"variable": "household", "effect": "nonempty"}]
+    found = checker_for(v, npkg).check_row(nested_row(caffeine=0, symptoms=[2]), 0)
+    assert [(f["field"], f["keyword"], f["rule"], f["message"]) for f in found] == [
+        ("symptoms", "maxItems", "R024", "symptoms has 1 entry; it must be empty here.")]
+
+    def as_skip(d):
+        allof(d)[5]["$comment"] = "Skip pattern R024: no caffeine, no symptoms listed."
+        allof(d)[6]["then"]["properties"] = {"caffeine": {"minItems": 1}}
+    edit(npkg, MOTHER, as_skip)
+    report = check(v, npkg)
+    assert "not a const pin" in only(report, "skip-shape")[0]["message"]
+    assert "caffeine is not a list" in only(report, "rule-shape")[0]["message"]
+
+
+def test_record_rules_reach_into_groups_but_not_lists(v, npkg):
+    add_rule(npkg, rule("Address routing R026: site 05 never gives a postcode.",
+                        clause(site_id={"const": "05"}),
+                        {"properties": {"address": {"properties": {"postcode": {"const": "REFUSED"}}}}}))
+    add_rule(npkg, rule("Sleep routing R027: a refused postcode means caffeine is reported.",
+                        clause(address={"required": ["postcode"],
+                                         "properties": {"postcode": {"const": "REFUSED"}}}),
+                        {"properties": {"caffeine": {"enum": [0, 1]}}}))
+    report = v.rules_report(v.analyze(npkg))
+    assert report["ok"] is True
+    r26, r27 = report["rules"][2:4]
+    assert r26["then"]["effects"] == [{"variable": "address.postcode", "effect": "eq",
+                                       "value": "REFUSED"}]
+    assert r27["when"] == {"any": [{"all": [
+        {"variable": "address.postcode", "test": "eq", "value": "REFUSED"}]}]}
+    found = checker_for(v, npkg).check_row(nested_row(site_id="05"), 0)
+    assert [(f["column"], f["field"], f["path"], f["rule"], f["allof_index"]) for f in found] == [
+        ("address", "address.postcode", "address.postcode", "R026", 5)]
+    add_rule(npkg, rule("Age routing R028: caffeine drinkers' households are adults.",
+                        clause(caffeine={"const": 1}),
+                        {"properties": {"household": {"properties": {"age": {"const": 40}}}}}))
+    found = only(check(v, npkg), "rule-shape")[0]
+    assert found["message"].startswith("R028 (Age routing) reaches into household, which is a "
+                                       "list of entries")
+    assert "R028" not in [r["id"] for r in v.rules_report(v.analyze(npkg))["rules"]]
+
+
+def test_nested_row_findings_name_the_field_and_the_path(v, npkg):
+    checker = checker_for(v, npkg)
+
+    def run(**change):
+        return placed(checker.check_row(nested_row(**change), 0))
+
+    me = {"relation": 1, "age": -666}
+    assert run(age=12) == [("age", "age", "age", "anyOf", "age is 12, which is not an allowed value.")]
+    assert run(household=[me, {"relation": 2, "age": 130}]) == [
+        ("household", "household[].age", "household[2].age", "anyOf",
+         "household[2].age is 130, which is not an allowed value.")]
+    assert run(labs={"hdl": -1}) == [("labs", "labs.*", "labs.hdl", "minimum",
+                                      "labs.hdl is -1, below the minimum 0.")]
+    assert run(labs={"HDL": 1}) == [("labs", "labs", "labs", "pattern",
+                                     'labs has the name "HDL", which does not match '
+                                     '^[a-z][a-z0-9_]*$.')]
+    assert run(household=[me, {"age": 3}]) == [
+        ("household", "household[].relation", "household[2].relation", "required",
+         "household[2].relation is missing.")]
+    assert run(household=[dict(me, pulse=60)]) == [
+        ("household", "household[].pulse", "household[1].pulse", "additionalProperties",
+         "household[1].pulse is not a field of household.")]
+    assert run(address={"postcode": "AB1", "city": "X", "zip": 1})[1][2] == "address.zip"
+    assert run(household=[me] + [{"relation": 3, "age": 5}] * 4) == [
+        ("household", "household", "household", "maxItems",
+         "household has 5 entries; at most 4 are allowed.")]
+    assert run(household=[]) == [("household", "household", "household", "minItems",
+                                  "household has 0 entries; at least 1 is required.")]
+    assert run(symptoms=[2, 3, 2]) == [("symptoms", "symptoms", "symptoms", "uniqueItems",
+                                        "symptoms repeats an entry (symptoms[3] is the same as "
+                                        "symptoms[1]).")]
+    assert run(symptoms=[9]) == [("symptoms", "symptoms[]", "symptoms[1]", "oneOf",
+                                  "symptoms[1] is 9, which is not an allowed value.")]
+    found = checker.check_row(nested_row(household=[{"relation": 1, "age": 40}]), 0)
+    assert placed(found) == [("household", "household[].age", "household[1].age", "const",
+                              "household[1].age is 40; -666 is required here.")]
+    assert (found[0]["rule"], found[0]["rule_scope"]) == ("R020", "household[]")
+    assert "allof_index" not in found[0]
+    assert found[0]["hint"].startswith("R020 (Skip pattern) applies to household[1]: ")
+    found = checker.check_row(nested_row(household=[me, {"age": 3}]), 0)
+    assert found[0]["hint"] == ("household[2] needs relation. When the value is missing, write "
+                                "one of its missing-value codes: -888 (Don't know).")
+
+
+def test_a_sentinel_beside_a_group_still_points_inside(v, npkg):
+    def change(d):
+        address = d["properties"]["address"]
+        group = {key: address.pop(key) for key in ("type", "properties", "required",
+                                                    "additionalProperties")}
+        address["anyOf"] = [group, NA]
+    edit(npkg, HOUSE, change)
+    checker = checker_for(v, npkg)
+    assert checker.model.fields["address"].shape == "group"
+    assert checker.check_row(nested_row(address=-666), 0) == []
+    assert placed(checker.check_row(nested_row(address={"postcode": 5}), 0)) == [
+        ("address", "address.postcode", "address.postcode", "anyOf",
+         "address.postcode is 5, which is not an allowed value.")]
+    found = checker.check_row(nested_row(address=7), 0)
+    assert found[0]["message"] == "address is 7, which is not an allowed value."
+    assert found[0]["hint"] == ("Allowed in address: a group of fields: street, postcode, or -666 "
+                                "(Not applicable (skipped by design)).")
+
+
+def test_direct_check_matches_jsonschema_on_nested_rows(v, npkg, monkeypatch):
+    rows, _ = nested_invalid_rows()
+    an = v.analyze(npkg)
+    fast = v.RowChecker(an, an.tables["sleep_diary"])
+    monkeypatch.setattr(v, "plain_table", lambda an, model: False)
+    full = v.RowChecker(an, an.tables["sleep_diary"])
+    assert fast.direct is True and full.direct is False
+    assert fast.check_rows(rows) == full.check_rows(rows)
+    assert any(f.get("rule_scope") == "household[]" for f in full.check_rows(rows))
+
+
+def test_ledger_cases_name_fields_and_their_ancestors(v, npkg):
+    def change(ledger):
+        cases = ledger["violations"]
+        cases[9]["column"] = "household"            # an ancestor of household[].age
+        cases[16]["column"] = "address.street"      # the wrong field
+        cases[17]["column"] = "labs.hdl"            # a concrete key of the lookup: labs.*
+        cases[10]["path"] = "household[2].relation"
+    edit_toy(npkg, "invalid-ledger.json", change)
+    edit_toy(npkg, "invalid.json", lambda rows: rows[13].update(caffeine=5))
+    report, by_row = verdicts(v, npkg)
+    assert by_row[9]["status"] == "caught" and by_row[10]["status"] == "caught"
+    assert by_row[17]["status"] == "caught"
+    assert by_row[16]["status"] == "missed-wrong-column"
+    assert by_row[16]["failed_on"] == ["address.postcode"]
+    assert by_row[13]["status"] == "caught-with-extra"
+    assert by_row[13]["failed_on"] == ["caffeine", "symptoms"]
+    assert "but also on caffeine" in only(report, "caught-with-extra")[0]["message"]
+    assert by_row[14]["rules"] == ["R020"]
+
+
+def left_out(npkg):
+    """The nested package with fields the data may leave out (D006): a household
+    member's age, and the street. R020 leaves the participant's own age out and
+    requires every other member's, R022 leaves a refused postcode's street
+    out, and R023 requires a street from a participant who did not nap; the
+    valid rows follow them, and invalid.json holds one break of each."""
+    def house(d):
+        items = d["properties"]["household"]["items"]
+        items["required"] = ["relation"]
+        items["properties"]["age"]["x-provenance"]["required"] = "D006"
+        items["allOf"] = [
+            rule("Skip pattern R020: the participant's own line leaves the age out (relation = 1).",
+                 clause(relation={"const": 1}), {"properties": {"age": False}}),
+            rule("Applicability R020: every other member's line gives an age.",
+                 clause(relation={"enum": [2, 3]}), {"required": ["age"]})]
+        d["properties"]["address"]["allOf"] = [
+            rule("Address routing R022: a refused postcode comes without a street.",
+                 clause(postcode={"const": "REFUSED"}), {"properties": {"street": False}})]
+    edit(npkg, HOUSE, house)
+    add_rule(npkg, rule("Address routing R023: a participant who did not nap gives a street.",
+                        clause(nap_yesterday={"const": 0}),
+                        {"properties": {"address": {"required": ["street"]}}}))
+
+    def follow(rows):
+        for r in rows:
+            for entry in r["household"]:
+                if entry.get("relation") == 1:
+                    entry.pop("age", None)
+            if r["nap_yesterday"] == 0:
+                r["address"] = {"street": "3 Ash Way", "postcode": "EF3"}
+    edit_toy(npkg, "valid.json", follow)
+    base = with_nested([row(60, "01", 30, 1, 400, 1, 30, 0)])[0]
+    follow([base])
+    rows, cases = [], []
+    for kind, column, reason, change in [
+            ("skip-break", "household[].age", "R020: the participant's own line has no age",
+             lambda r: r["household"][0].update(age=40)),
+            ("applicability-break", "household[].age", "R020: a spouse's line gives an age",
+             lambda r: r["household"].append({"relation": 2})),
+            ("routing-break", "address.street", "R022: a refused postcode, so no street",
+             lambda r: r.update(address={"street": "4 Elm Road", "postcode": "REFUSED"})),
+            ("routing-break", "address.street", "R023: no nap, so a street",
+             lambda r: r.update(nap_yesterday=0, nap_minutes=-666, address={"postcode": "AB1"})),
+            ("missing-key", "household[].relation", "every entry has a relation",
+             lambda r: r["household"].append({"age": 30}))]:
+        r = copy.deepcopy(base)
+        r["participant_id"] = "P{:04d}".format(80 + len(rows))
+        change(r)
+        cases.append({"row": len(rows), "column": column, "kind": kind, "reason": reason})
+        rows.append(r)
+    write_json(toy(npkg, "invalid.json"), rows)
+    write_json(toy(npkg, "invalid-ledger.json"), {"violations": cases})
+    return npkg
+
+
+def test_presence_rules_parse_on_fields_the_data_may_leave_out(v, npkg):
+    left_out(npkg)
+    fixtures = v.fixtures_report(v.analyze(npkg))
+    table = fixtures["tables"]["sleep_diary"]
+    assert table["valid"]["status"] == "pass"
+    assert {x["status"] for x in table["invalid"]["verdicts"]} == {"caught"}
+    assert [x.get("rules") for x in table["invalid"]["verdicts"]] == [
+        ["R020"], ["R020"], ["R022"], ["R023"], None]
+    assert table["coverage"]["rules"]["unfired"] == []
+    assert table["coverage"]["rules"]["uncaught"] == ["R001:skip", "R001:applicability"]
+    add_rule(npkg, rule("Address routing R024: a street comes with a postcode that was not refused.",
+                        {"required": ["address"], "properties": {"address": {"required": ["street"]}}},
+                        {"properties": {"address": {"properties": {
+                            "postcode": {"not": {"const": "REFUSED"}}}}}}))
+    report = check(v, npkg)
+    assert report["ok"] is True and report["findings"] == []
+    rules = {(r["id"], r["kind"]): r for r in v.rules_report(v.analyze(npkg))["rules"]}
+    assert rules[("R020", "skip")]["then"] == {"mode": "all", "effects": [
+        {"variable": "household[].age", "effect": "absent"}]}
+    assert rules[("R020", "applicability")]["then"] == {"mode": "all", "effects": [
+        {"variable": "household[].age", "effect": "present"}]}
+    assert rules[("R022", "routing")]["scope"] == "address"
+    assert rules[("R022", "routing")]["then"]["effects"] == [
+        {"variable": "address.street", "effect": "absent"}]
+    assert rules[("R023", "routing")]["scope"] is None
+    assert rules[("R023", "routing")]["then"]["effects"] == [
+        {"variable": "address.street", "effect": "present"}]
+    assert rules[("R024", "routing")]["when"] == {"any": [{"all": [
+        {"variable": "address.street", "test": "present"}]}]}
+    fired = v.fixtures_report(v.analyze(npkg))["tables"]["sleep_diary"]["coverage"]["rules"]
+    assert "R024:routing" in fired["fired"]
+
+
+def test_presence_rules_need_a_field_the_data_may_leave_out(v, npkg):
+    def change(d):                       # relation and age are in every entry
+        d["properties"]["household"]["items"]["allOf"] += [
+            rule("Household routing R030: an age is always given.",
+                 clause(relation={"const": 2}), {"required": ["age"]}),
+            rule("Household routing R031: no age for a child.",
+                 clause(relation={"const": 3}), {"properties": {"age": False}}),
+            rule("Household routing R032: any line with a relation.",
+                 {"required": ["relation"]}, {"properties": {"age": {"not": {"const": -666}}}})]
+    edit(npkg, HOUSE, change)
+    report = check(v, npkg)
+    found = {f["rule"]: f for f in only(report, "rule-shape")}
+    assert found["R030"]["message"] == ("R030 (Household routing) requires household[].age to be "
+                                        "present, which it always is: its object's required lists it.")
+    assert found["R030"]["pointer"] == "/properties/household/items/allOf/2/then/required/0"
+    assert found["R031"]["message"] == ("R031 (Household routing) leaves household[].age out, but "
+                                        "its object's required lists it, so every value the rule "
+                                        "applies to fails.")
+    assert found["R032"]["message"].startswith("R032 (Household routing)'s clause at /if only "
+                                               "requires household[].relation;")
+    rules = v.rules_report(v.analyze(npkg))["rules"]
+    assert [r["id"] for r in rules if r["scope"] == "household[]"] == ["R020", "R020"]
+
+    left_out(npkg)
+
+    def kinds(d):                        # age may be left out now: the kinds still hold
+        rules = d["properties"]["household"]["items"]["allOf"]
+        rules[0]["then"] = {"required": ["age"]}
+        rules[1]["then"] = {"properties": {"age": False}}
+        rules.append(rule("Household routing R033: both at once.", clause(relation={"const": 3}),
+                          {"required": ["age"], "properties": {"age": False}}))
+    edit(npkg, HOUSE, kinds)
+    report = check(v, npkg)
+    assert "is a Skip pattern, but its effect on household[].age" in only(
+        report, "skip-shape")[0]["message"]
+    assert "is an Applicability half, but its effect on household[].age" in only(
+        report, "applicability-shape")[0]["message"]
+    assert only(report, "rule-shape")[0]["message"] == (
+        "R033 (Household routing) both requires household[].age and leaves it out, so it never "
+        "holds.")
+
+
+def test_rows_breaking_presence_rules_name_the_field_and_the_rule(v, npkg, monkeypatch):
+    left_out(npkg)
+
+    def both(d):                          # the postcode may be left out too
+        address = d["properties"]["address"]
+        address["required"] = []
+        address["properties"]["postcode"]["x-provenance"]["required"] = "D006"
+    edit(npkg, HOUSE, both)
+    add_rule(npkg, rule("Address routing R025: a napper's address is not asked.",
+                        clause(nap_minutes={"const": 45}),
+                        {"properties": {"address": {"properties": {"street": False,
+                                                                   "postcode": False}}}}))
+    me = {"relation": 1}
+    rows = [nested_row(household=[{"relation": 1, "age": 40}]),
+            nested_row(household=[me, {"relation": 2}]),
+            nested_row(household=[me], address={"street": "4 Elm Road", "postcode": "REFUSED"}),
+            nested_row(household=[me], address={"postcode": "AB1"}),
+            nested_row(household=[me], nap_yesterday=1, nap_minutes=45,
+                       address={"street": "4 Elm Road", "postcode": "AB1"})]
+    checker = checker_for(v, npkg)
+    found = checker.check_rows(rows)
+    assert [(f["row"],) + placed([f])[0] for f in found] == [
+        (0, "household", "household[].age", "household[1].age", "false",
+         "household[1].age is present, but R020 (Skip pattern) leaves it out here."),
+        (1, "household", "household[].age", "household[2].age", "required",
+         "household[2].age is missing."),
+        (2, "address", "address.street", "address.street", "false",
+         "address.street is present, but R022 (Address routing) leaves it out here."),
+        (3, "address", "address.street", "address.street", "required",
+         "address.street is missing."),
+        (4, "address", "address.street", "address.street", "false",
+         "address.street is present, but R025 (Address routing) leaves it out here."),
+        (4, "address", "address.postcode", "address.postcode", "false",
+         "address.postcode is present, but R025 (Address routing) leaves it out here.")]
+    assert [f["rule"] for f in found] == ["R020", "R020", "R022", "R023", "R025", "R025"]
+    assert found[0]["hint"] == ("R020 (Skip pattern) applies to household[1]: the participant's "
+                                "own line leaves the age out (relation = 1).")
+    assert found[1]["hint"] == ("R020 (Applicability) applies to household[2]: every other "
+                                "member's line gives an age.")
+    assert found[3]["hint"] == ("R023 (Address routing) applies to this row: a participant who "
+                                "did not nap gives a street.")
+    assert (found[1]["rule_scope"], found[3]["allof_index"]) == ("household[]", 5)
+    an = v.analyze(npkg)
+    monkeypatch.setattr(v, "plain_table", lambda an, model: False)
+    full = v.RowChecker(an, an.tables["sleep_diary"])
+    assert full.direct is False and full.check_rows(rows) == found
+
+
+def test_a_list_size_effect_lets_a_code_stand_alone(v, npkg):
+    add_rule(npkg, rule("Symptom routing R030: a refusal stands alone in the symptom list.",
+                        {"required": ["symptoms"], "properties": {"symptoms": {"contains": {"const": -777}}}},
+                        {"properties": {"symptoms": {"maxItems": 1}}}))
+    report = check(v, npkg)
+    assert report["ok"] is True and report["findings"] == []
+    found = [r for r in v.rules_report(v.analyze(npkg))["rules"] if r["id"] == "R030"]
+    assert found[0]["then"] == {"mode": "all", "effects": [
+        {"variable": "symptoms", "effect": "count", "maxItems": 1}]}
+    checker = checker_for(v, npkg)
+    assert checker.check_row(nested_row(symptoms=[-777]), 0) == []
+    bad = checker.check_row(nested_row(symptoms=[2, -777]), 0)
+    assert placed(bad) == [("symptoms", "symptoms", "symptoms", "maxItems",
+                            "symptoms has 2 entries; at most 1 is allowed.")]
+    assert bad[0]["rule"] == "R030"
+    for effect, words in (({"minItems": 0}, "says nothing"), ({"minItems": 3, "maxItems": 2}, "never holds")):
+        edit(npkg, MOTHER, lambda d: allof(d)[-1]["then"]["properties"].update(symptoms=effect))
+        assert words in only(check(v, npkg), "rule-shape")[0]["message"]
+    edit(npkg, MOTHER, lambda d: allof(d)[-1].update(then={"properties": {"address": {"maxItems": 2}}}))
+    assert "but address is not a list" in only(check(v, npkg), "rule-shape")[0]["message"]
+
+
+def test_contains_constrains_a_list_as_a_whole(v, npkg):
+    def change(d):
+        household = d["properties"]["household"]
+        household.update(contains={"required": ["relation"], "properties": {"relation": {"const": 1}}},
+                         minContains=1, maxContains=1)
+        household["x-provenance"]["contains"] = "S01:Variables row 30"
+        d["properties"]["address"]["contains"] = {"const": 1}           # not a list
+    edit(npkg, HOUSE, change)
+    report = check(v, npkg)
+    assert [f["pointer"] for f in only(report, "discouraged-keyword")] == [
+        "/properties/address/contains"]
+    checker = checker_for(v, npkg)
+    assert placed(checker.check_row(nested_row(household=[{"relation": 2, "age": 40}]), 0)) == [
+        ("household", "household", "household", "contains",
+         "household has no entry with relation = 1; it needs exactly 1.")]
+    assert placed(checker.check_row(nested_row(household=[{"relation": 1, "age": -666}] * 2), 0)) == [
+        ("household", "household", "household", "maxContains",
+         "household has 2 entries with relation = 1; at most 1 is allowed.")]
+    two = nested_row(participant_id="P0099", household=[{"relation": 1, "age": -666}] * 2)
+    edit_toy(npkg, "invalid.json", lambda rows: rows.append(two))
+    edit_toy(npkg, "invalid-ledger.json", lambda l: l["violations"].append(
+        {"row": 19, "column": "household", "kind": "entry-count", "reason": "one participant"}))
+    report, by_row = verdicts(v, npkg)
+    assert by_row[19]["status"] == "caught" and report["ok"] is True
+
+
+def test_text_lengths_need_a_cited_source(v, npkg):
+    def change(d):
+        address = d["properties"]["address"]["properties"]
+        address["street"]["maxLength"] = 10
+        address["postcode"]["anyOf"][0]["minLength"] = 3
+    edit(npkg, HOUSE, change)
+    found = only(check(v, npkg), "discouraged-keyword")
+    assert sorted(f["pointer"] for f in found) == [
+        "/properties/address/properties/postcode/anyOf/0/minLength",
+        "/properties/address/properties/street/maxLength"]
+    assert all("x-provenance's" in f["hint"] for f in found)
+
+    def cite(d):
+        address = d["properties"]["address"]["properties"]
+        address["street"]["x-provenance"]["maxLength"] = "S01:Variables row 34"
+        address["postcode"]["x-provenance"]["minLength"] = "S01:Variables row 35"
+    edit(npkg, HOUSE, cite)
+    assert check(v, npkg)["ok"] is True and "discouraged-keyword" not in codes_of(check(v, npkg))
+    found = checker_for(v, npkg).check_row(nested_row(address={"street": "12 Long Road",
+                                                               "postcode": "AB1"}), 0)
+    assert placed(found) == [("address", "address.street", "address.street", "maxLength",
+                              "address.street is 12 characters long; at most 10 are allowed.")]
+    assert found[0]["hint"] == "Allowed in address.street: text of at most 10 characters."
+
+
+def test_multiple_of_stays_discouraged(v, pkg):
+    edit(pkg, SLEEP, lambda d: d["properties"]["sleep_minutes"]["anyOf"][0].update(multipleOf=5))
+    found = only(check(v, pkg), "discouraged-keyword")[0]
+    assert "72.3 is not a float multiple of 0.1" in found["hint"]
+
+
+def test_coverage_of_nested_codes_list_lengths_and_rules(v, npkg):
+    def change(rows):
+        for r in rows:
+            r["household"] = [{"relation": 2, "age": 40}, {"relation": 3, "age": 120}]
+            r["symptoms"] = [1]
+    edit_toy(npkg, "valid.json", change)
+    report = v.fixtures_report(v.analyze(npkg))
+    assert report["ok"] is True
+    gaps = {f["message"]: f for f in only(report, "coverage-gap")}
+    assert set(gaps) >= {
+        "valid.json never shows household[].relation = 1 or -888.",
+        "valid.json never shows household[].age = 0, -666 or null.",
+        "valid.json never shows household with 1 entry.",
+        "valid.json never shows 2, 3 or -777 in symptoms.",
+        "valid.json never shows symptoms with 0 entries.",
+        "valid.json never shows symptoms with two or more entries.",
+        "No valid.json value at household[] triggers R020 (Skip pattern)."}
+    assert gaps["valid.json never shows household with 1 entry."]["variable"] == "household"
+    coverage = report["tables"]["sleep_diary"]["coverage"]
+    assert coverage["rules"]["unfired"] == ["R020:skip"]
+    assert coverage["properties"] == {"covered": 10, "total": 14}
+
+
+def test_a_topic_of_nested_values_counts_toward_coverage(v, npkg):
+    report = v.summary_report(v.analyze(npkg))
+    house = report["topics"]["sleep_diary/household"]
+    assert house == {"file": HOUSE, "properties": 4, "fields": 5, "rules_targeting": 2,
+                     "errors": 0, "warnings": 0, "provenance_ok": True,
+                     "coverage": {"covered": 7, "total": 7}}
+    edit_toy(npkg, "valid.json", lambda rows: [r.update(labs={}) for r in rows])
+    house = v.summary_report(v.analyze(npkg))["topics"]["sleep_diary/household"]
+    assert house["coverage"] == {"covered": 5, "total": 7} and house["warnings"] == 2
+
+
+def test_summary_counts_nested_fields(v, npkg):
+    report = v.summary_report(v.analyze(npkg))
+    assert report["ok"] is True
+    assert report["check"]["tables"][0]["fields"] == 5
+    census = report["provenance"]
+    assert (census["properties"], census["traced"], census["rules"]) == (17, 17, 4)
+    assert report["rules"]["by_kind"] == {"skip": 2, "applicability": 2, "routing": 0}
+    assert report["headline"] == ("5 schema files valid · 4 rules · toy data: 10 valid rows pass, "
+                                  "19/19 seeded errors caught · provenance: 17/17 properties "
+                                  "traced (2 guesses need review)")
+
+
+def test_data_reports_nested_fields(v, npkg, tmp_path):
+    path = tmp_path / "data.json"
+    write_json(path, with_nested(VALID))
+    report = data(v, npkg, path)
+    assert report["ok"] is True and report["findings"] == []
+    assert list(report["columns"]) == COLUMNS + NESTED_COLUMNS
+    assert report["columns"]["household"]["allowed"] == (
+        "a list of entries, each with relation, age (at least 1, at most 4)")
+    assert report["columns"]["symptoms"]["allowed"] == (
+        "a list of values, each one of 1 (Fever), 2 (Cough), 3 (Headache), -777 (Refused) "
+        "(each at most once)")
+    assert report["columns"]["labs"]["allowed"] == (
+        "names matching ^[a-z][a-z0-9_]*$, each a number at least 0")
+    assert list(report["fields"]) == ["household[].relation", "household[].age",
+                                      "address.street", "address.postcode", "labs.*"]
+    assert report["fields"]["household[].age"] == {
+        "title": "Age (years)", "topic": "household", "column": "household", "shape": "value",
+        "allowed": "a whole number from 0 to 120, or one of -666 (Not applicable (skipped by "
+                   "design)), null (Missing (blank cell))"}
+    flat = tmp_path / "flat.json"
+    write_json(flat, VALID)
+    assert data(v, build_package(tmp_path / "flat"), flat)["fields"] == {}
+
+
+def test_data_csv_cells_hold_nested_values_as_json(v, npkg, tmp_path):
+    rows = with_nested(VALID[:3])
+    path = write_csv(tmp_path / "data.csv", rows, COLUMNS + NESTED_COLUMNS)
+    report = data(v, npkg, path)
+    assert report["ok"] is True and report["rows"] == 3
+    parsed, _, _ = v.read_delimited(path, ",", checker_for(v, npkg))
+    assert [{c: r[c] for c in NESTED_COLUMNS} for r in parsed] == [
+        {c: r[c] for c in NESTED_COLUMNS} for r in rows]
+    rows[1]["household"][2]["age"] = 121
+    report = data(v, npkg, write_csv(tmp_path / "bad.csv", rows, COLUMNS + NESTED_COLUMNS))
+    assert [(f["row"], f["column"], f["path"]) for f in report["findings"]] == [
+        (1, "household", "household[3].age")]
+
+
+def test_deep_and_self_holding_shapes_warn(v, npkg):
+    def level(n):
+        if n == 0:
+            return {"title": "Leaf", "x-provenance": prov(50), "type": "integer"}
+        return {"title": "Level {}".format(n), "x-provenance": prov(50), "type": "object",
+                "properties": {"x": level(n - 1)}, "required": ["x"],
+                "additionalProperties": False}
+
+    def change(d):
+        d["$defs"] = {"node": {
+            "type": "object",
+            "properties": {"name": {"title": "Name", "x-provenance": prov(51), "type": "string"},
+                           "kids": {"title": "Children", "x-provenance": prov(51),
+                                    "type": "array", "items": {"$ref": "#/$defs/node"}}},
+            "required": ["name", "kids"], "additionalProperties": False}}
+        d["properties"]["deep"] = level(8)
+        d["properties"]["tree"] = {"title": "Family tree", "x-provenance": prov(51),
+                                   "$ref": "#/$defs/node"}
+        d["required"] += ["deep", "tree"]
+    edit(npkg, HOUSE, change)
+    an = v.analyze(npkg)
+    fields = an.tables["sleep_diary"].fields
+    assert "deep.x.x.x.x.x.x" in fields and "deep.x.x.x.x.x.x.x" not in fields
+    assert [p for p in fields if p.startswith("tree")] == [
+        "tree", "tree.name", "tree.kids", "tree.kids[].name", "tree.kids[].kids"]
+    deep = sorted(f["variable"] for f in only(v.check_report(an, None), "nesting-too-deep"))
+    assert deep == ["deep.x.x.x.x.x.x", "tree.kids[].kids"]
+
+
+def test_a_list_with_contains_is_never_asked_to_be_empty(v, npkg):
+    def change(d):
+        symptoms = d["properties"]["symptoms"]
+        symptoms["contains"] = {"const": 1}
+        symptoms["x-provenance"]["contains"] = "S01:Variables row 36"
+    edit(npkg, HOUSE, change)
+    edit_toy(npkg, "valid.json", lambda rows: [r.update(symptoms=[1, 2, 3, -777] if k % 2 else [1])
+                                               for k, r in enumerate(rows)])
+    report = v.fixtures_report(v.analyze(npkg))
+    assert report["tables"]["sleep_diary"]["valid"]["status"] == "pass"
+    assert not [f["message"] for f in report["findings"]          # an empty list fails contains
+                if f["code"] == "coverage-gap" and "symptoms with" in f["message"]]
+    edit_toy(npkg, "valid.json", lambda rows: [r.update(symptoms=[1, 2, 3, -777]) for r in rows])
+    gaps = [f["message"] for f in only(v.fixtures_report(v.analyze(npkg)), "coverage-gap")]
+    assert "valid.json never shows symptoms with 1 entry." in gaps
+
+
+def test_a_rule_reaching_past_six_levels_is_reported_not_raised(v, npkg, monkeypatch, capsys):
+    reach_if, reach_then = {"const": 1}, {"const": 1}
+    for _ in range(8):
+        reach_if = {"required": ["x"], "properties": {"x": reach_if}}
+        reach_then = {"properties": {"x": reach_then}}
+    add_rule(npkg, rule("Address routing R060: far down.", clause(address=reach_if),
+                        {"properties": {"address": reach_then}}))
+    messages = [f["message"] for f in only(check(v, npkg), "rule-shape")]
+    assert any("clause at /if/properties/address" in m and "more than six levels" in m for m in messages)
+    assert any("effect at /then/properties/address" in m and "more than six levels" in m
+               for m in messages)
+    deep_if = '{"required": ["x"], "properties": {"x": ' * 1500 + '{"const": 1}' + "}}" * 1500
+    deep_then = '{"properties": {"x": ' * 1500 + '{"const": 1}' + "}}" * 1500
+    edit(npkg, MOTHER, lambda d: allof(d)[-1].update({"if": clause(address="IF"),
+                                                      "then": {"properties": {"address": "THEN"}}}))
+    path = npkg / "schemas" / MOTHER                   # deeper than Python recurses (unreadable before 3.12)
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text.replace('"IF"', deep_if).replace('"THEN"', deep_then), encoding="utf-8")
+    for command in ("check", "rules", "fixtures", "summary"):
+        code, out = run_main(v, monkeypatch, capsys, command, npkg)
+        assert code == 1 and "failed unexpectedly" not in str(out.get("error"))
+
+
+def test_a_shape_reached_by_many_paths_is_read_once(v, npkg, monkeypatch):
+    def change(d):
+        d["$defs"] = {"l{}".format(k): {"anyOf": [{"type": "array", "items": {
+            "$ref": "#/$defs/l{}".format(k + 1)}}] * 8} for k in range(8)}
+        d["$defs"].update({"j{}".format(k): {"anyOf": [{"$ref": "#/$defs/j{}".format(k + 1)}] * 16}
+                           for k in range(5)}, l8={"type": "integer"}, j5={"type": "integer"})
+        d["properties"]["grid"] = {"title": "Grid", "x-provenance": prov(52), "$ref": "#/$defs/l0"}
+        d["properties"]["code"] = {"title": "Code", "x-provenance": prov(53), "$ref": "#/$defs/j0"}
+        d["required"] += ["grid", "code"]
+    edit(npkg, HOUSE, change)                       # 8**8 and 16**5 paths through a few small $defs
+    calls = {}
+
+    def counted(name, fn):
+        def wrapper(*args, **kwargs):
+            calls[name] = calls.get(name, 0) + 1
+            assert calls[name] < 5000, "{} reads a shared shape once per path".format(name)
+            return fn(*args, **kwargs)
+        return wrapper
+    monkeypatch.setattr(v.Analysis, "shape_alone", counted("shape_of", v.Analysis.shape_alone))
+    monkeypatch.setattr(v, "json_types", counted("json_types", v.json_types))
+    an = v.analyze(npkg)
+    fields = an.tables["sleep_diary"].fields
+    assert fields["grid"].shape == "list" and fields["grid"].column_types() == {"array"}
+    assert fields["code"].column_types() == {"integer"}
+
+
+def test_a_shape_shared_too_often_stops_at_the_field_limit(v, npkg, monkeypatch):
+    monkeypatch.setattr(v, "FIELD_LIMIT", 6)            # the household topic has 5 fields inside values
+    leaf = {"title": "Q", "x-provenance": prov(54), "type": "integer"}
+
+    def change(d):
+        d["$defs"] = {
+            "inner": {"type": "object", "properties": {q: leaf for q in ("q0", "q1", "q2")},
+                      "required": ["q0", "q1", "q2"], "additionalProperties": False},
+            "outer": {"type": "object", "properties": {
+                p: {"title": "P", "x-provenance": prov(54), "$ref": "#/$defs/inner"}
+                for p in ("p0", "p1", "p2")}, "required": ["p0", "p1", "p2"],
+                "additionalProperties": False}}
+        d["properties"]["dag"] = {"title": "Dag", "x-provenance": prov(54), "$ref": "#/$defs/outer"}
+        d["required"].append("dag")
+    edit(npkg, HOUSE, change)
+    an = v.analyze(npkg)
+    assert [p for p in an.tables["sleep_diary"].fields if p.startswith("dag")] == [
+        "dag", "dag.p0", "dag.p1", "dag.p2"]
+    assert [(f["variable"], f["message"]) for f in only(v.check_report(an, None), "nesting-too-deep")] == [
+        ("dag.p0", "sleep_diary reached 6 fields inside nested values, so the fields inside dag.p0 "
+                   "and past it are not checked.")]
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda d: d["properties"]["household"].update(items=5),
+    lambda d: d["properties"]["household"]["items"].update(properties=[1], required="all"),
+    lambda d: d["properties"]["household"]["items"].update(allOf="rules"),
+    lambda d: d["properties"]["household"]["items"]["allOf"].extend([5, {"if": 3, "then": []}]),
+    lambda d: d["properties"]["address"].update(additionalProperties="no"),
+    lambda d: d["properties"]["labs"].update(additionalProperties={"$ref": "#/$defs/missing"}),
+    lambda d: d["properties"]["symptoms"].update(items={"$ref": "#"}),
+    lambda d: d["properties"]["symptoms"].update(contains=[1], minContains="one"),
+    lambda d: d["properties"]["household"]["items"]["allOf"][0].update({"if": {"anyOf": 5}}),
+    lambda d: d["properties"]["address"].update(type=["object", "array"], items={"type": "integer"}),
+])
+def test_odd_nested_schemas_never_traceback(v, npkg, monkeypatch, capsys, mutate, tmp_path):
+    edit(npkg, HOUSE, mutate)
+    for command in ("check", "rules", "fixtures", "summary"):
+        code, out = run_main(v, monkeypatch, capsys, command, npkg)
+        assert code in (0, 1, 2) and isinstance(out, dict) and "ok" in out
+        assert "failed unexpectedly" not in str(out.get("error"))
+    path = tmp_path / "rows.json"
+    write_json(path, nested_invalid_rows()[0])
+    code, out = run_main(v, monkeypatch, capsys, "data", npkg, "--file", path)
+    assert code in (1, 2) and "ok" in out and "failed unexpectedly" not in str(out.get("error"))
+
+
 # --------------------------------------------------------------- hardening
 
 
@@ -1297,6 +2362,7 @@ def test_hardening_never_traceback(v, pkg, monkeypatch, capsys, mutate):
         code, out = run_main(v, monkeypatch, capsys, command, pkg)
         assert code in (0, 1, 2) and isinstance(out, dict) and "ok" in out
         assert code != 2 or "error" in out
+        assert "failed unexpectedly" not in str(out.get("error"))
 
 
 def test_odd_data_never_traceback(v, pkg, tmp_path, monkeypatch, capsys):

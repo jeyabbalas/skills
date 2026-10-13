@@ -22,7 +22,7 @@ Table of contents
 | strong | software special missings (SAS `.A`–`.Z`, Stata `.a`–`.z`, SPSS user-missing) with distinct labels | a skip code distinct from item-missing | ask the delivered literal |
 | medium | gate/detail name pairs: `ever_`, `has_`, `any_`, `cur_`, `_yn`, `_flag` beside `age_`, `agefirst`, `num_`, `_per_day`, `_years`, `_dur`, `_dt`, `_specify`, `_oth`, `_txt` | a family below | `implied` if an N/A label names this gate's universe or the questionnaire's layout routes it; otherwise `inferred` — ask first |
 | medium | sex-specific blocks (menarche, pregnancies, PSA); age-limited items (screening, retirement) | a demographic gate | ask *which* variable gates |
-| medium | roster/loop slots `child1_…childN_`, `med1_…`; a count beside them | count-gated slots | one pair per slot |
+| medium | roster/loop slots `child1_…childN_`, `med1_…`; a count beside them | count-gated slots (a list delivered wide) | one pair per slot; delivered as a list of entries instead, rules sit among each entry's fields (SKIP-LOGIC.md, Rules inside nested values) |
 | medium | "other, specify" pairs; checkbox groups with a "none of the above" member | structural pairs | see families |
 | medium | wave/visit suffixes `_w2`/`_v3` with a participation flag; proxy/mode variables | block gates | compound consequences |
 | medium | a codebook frequency column where the NA count equals the gate's "No" count | the gate, exposed | quote both counts as evidence |
@@ -112,7 +112,7 @@ Forms: `pair` (skip half pins NA, applicability half forbids NA) · `pin` (subst
 | marital | `Never married` → years married NA | | pair | implied | widowed/divorced: duration of the ended marriage may be asked |
 | migration | `born in study country` → age at immigration NA | | pair (complement trigger) | implied | trigger needs a coded country or flag; free text → not-expressible |
 | education | `level` below degree-bearing → degree type NA | | pair/narrow | implied | |
-| household roster | `n_children<k` → `child_k_*` NA; `≥k` → applicable | | pair per slot | documented/implied | slot shape from `$defs`; one pair per slot; slots capped while the count runs higher |
+| household roster | `n_children<k` → `child_k_*` NA; `≥k` → applicable | | pair per slot | documented/implied | wide: slot shape from `$defs`, one pair per slot, slots capped while the count runs higher; a list of entries: the list's length is the count — "as many entries as `n_children`" is not expressible, and routing inside each entry is its own rule |
 
 **Study logistics and instrument structure**
 
@@ -153,7 +153,7 @@ The family is a clue; the meaning is a question. Never transcribe a study's code
 
 Three distinctions every rule question makes explicit:
 
-- **Structural NA vs item missing.** A rule exists only for structural NA; refused and don't know are legal everywhere, in and out of universe. One merged "missing" code has lost the distinction — say so, encode no skip rule, and record the decision.
+- **Structural NA vs item missing.** A rule exists only for structural NA; refused and don't know are legal everywhere, in and out of universe. One merged "missing" code has lost the distinction — say so, encode no skip pair, and record the decision. A source that still states where the merged code goes ("non-fasting visits record glucose as 999") gives a one-way pin: a `<Domain> routing` rule, with no twin and without marking the code structural.
 - **What lands in the cell** for a skipped person: a code, a blank, a zero, or last wave's value carried forward — panel studies preload prior answers, and an NA pin would be wrong.
 - **Delivered ≠ questionnaire.** The instrument skipped; SAS wrote `.`; the CSV wrote blank; a recode wrote -666. A rule question always establishes the *delivered* representation, because that is what the validator reads; a blank-delivered skip needs a `convention` decision (a code, or `null` — SCHEMA-STYLE.md) before any pair can be written.
 
@@ -174,6 +174,13 @@ Three distinctions every rule question makes explicit:
 | sentinel as trigger (X not asked → Y not asked) | yes | skip pair with the structural code as the test |
 | checkbox mutual exclusion | yes | one `then.properties` with every target |
 | other → specify text non-empty | partly | forbid the string sentinel; cannot assert content |
+| among the fields of one list entry or one group (non-fasting visit → glucose NA) | yes | the canonical form in that object's own `allOf` |
+| choose-many includes a code → follow-up applies | yes | `contains` test |
+| a code that stands alone in a choose-many list ("none of these", "not collected") | yes | `contains` test on the list → `{"maxItems": 1}` on the same list |
+| gate → a whole list or group not asked | yes | pin its delivered form: a special code, `null`, `{"maxItems": 0}`, or `false` when it is left out |
+| a field the data leaves out when not asked (no age on the participant's own roster line) | yes | presence pair: `false` / `then.required` (SKIP-LOGIC.md, "Fields left out") |
+| a list must hold an entry of a kind (the roster lists the participant once) | yes, but no rule | the list's `contains` with `minContains`/`maxContains` |
+| a gate in one entry, a target in another; any entry → a record field; entry counts tied to another field | no | `not-expressible` |
 | arithmetic (pack-years, sums, BMI) | no | `not-expressible` + root `$comment` + `x-derivation` |
 | date/age ordering (quit ≥ start; dx ≤ death) | no | `not-expressible` |
 | range depending on another numeric field | no | `not-expressible` |
@@ -203,7 +210,7 @@ Rules live in the mother file, so category order only decides *when* a pair is w
 
 - **Gate drafted first, dependents later** — `sex` confirmed in demographics; the reproductive category arrives three sittings on. The rule record waits on the dependents; the pair is written when they are drafted; demographics is not reopened; fixtures extend for both halves.
 - **Dependent drafted first, gate later** — `age_first_birth` sits in demographics with "-666 = N/A"; `parity` is in reproductive history, not yet drafted. Keep the sentinel branch, write no conditional, record the rule `waiting` on `parity`. When `parity` is drafted, a documented or implied rule is encoded; an inferred one goes through consent (SKIP-LOGIC.md) first.
-- **Gate in another table** — sex in `participant`, the women's block in `visit`; proxy status in a paradata table. Each table is one flat grain, so a rule never crosses: `not-expressible`, README "Documented but not enforced". If a person chooses to carry the gate into the dependent table as a column, it becomes an `added` variable on their instruction (a decision) and the rule becomes in-row — offer it, never do it unasked.
+- **Gate in another table** — sex in `participant`, the women's block in `visit`; proxy status in a paradata table. A rule never crosses tables or rows — only, within a row, into a group's or an entry's own fields: `not-expressible`, README "Documented but not enforced". If a person chooses to carry the gate into the dependent table as a column, it becomes an `added` variable on their instruction (a decision) and the rule becomes in-row — offer it, never do it unasked.
 - **Bidirectional facts are two rules** — `status=Current → ever=Yes` and `ever=No → status=Never` are separate rules, separately evidenced; encode only the directions a source or a person supports; never manufacture a twin for a substantive pin.
 - **Stacked gates** (`sex` → `mammogram_ever` → `mammogram_age_last`): one pair per gate on the deepest field; rows with the outer gate off carry NA in the inner gate, so the inner pair never fires on them.
 - **Wide vs long** — wave participation gates wave variables in a wide file; in a long file the row's absence is the routing and there is nothing to encode — say so in the README's grain paragraph.

@@ -50,7 +50,7 @@ A source is a document: a file the user gave you, or a web page you found. Peopl
 | `add` | `kind` (`document` · `web`), `title`, `what` (one line: what it holds — from the user's words or the file name until you have read it; refine it with `update`), `path` (the workspace copy, `sources/<original file name>`, for documents), `original` (the user's path to the file, as they gave it), `url` (web), `origin` (`user` · `agent`) | registered. A web source the agent found starts `suggested`; everything else starts `active` |
 | `approve` / `reject` | `by` (a person), `note` | a person's verdict on a suggested web source |
 | `extract` | `dir` (the extract folder, `sources/<id>/extract`), `files` (how many files the manifest lists) | `extract.py` ran on it |
-| `digest` | `path` (its DIGEST.md), `variables` (count, when it defines variables), `verified` (spot-checked locators, e.g. `["Variables row 41", "p.6"]`) | a digest exists and you spot-checked it |
+| `digest` | `path` (its DIGEST.md), `variables` (count, when it defines variables — every field inside a nested value counted by its path, as the inventory lists them), `verified` (spot-checked locators, e.g. `["Variables row 41", "p.6"]`) | a digest exists and you spot-checked it |
 | `update` | any of `title`, `what`, `notes` | parse notes and corrections |
 | `retire` | `note` | no longer used; existing citations stay valid |
 
@@ -96,8 +96,8 @@ A rule is one skip pattern or other conditional fact: a gate (the variables whos
 
 | event | fields |
 |---|---|
-| `add` | `table`, `gates` (variable names), `targets`, `reading` (one plain sentence in the source's codes, e.g. "smk_ever = 2 → cigs_per_day, smk_age = 777"), `evidence` (`documented` · `implied` · `told` · `inferred`), `refs` (references to the evidence), `status`, `waits_for` (variables not yet in a schema), `decision` (why: the person's `rule`/`knowledge` decision for `told`; your `guess` decision for `inferred`, recorded when you encode it), `consent` (for `inferred` only: the `consent` decision a person answered yes, or the decision that set `inferRules` to `yes`) |
-| `set` | `id`, `status` and any `add` field that changed, plus `note` saying why |
+| `add` | `table`, `gates` (variable names — a field inside a nested value by its path, `household[].relation`; a `not-expressible` rule whose condition is no variable, "when the hospital linkage is unavailable", has none), `targets`, `reading` (one plain sentence in the source's codes, e.g. "smk_ever = 2 → cigs_per_day, smk_age = 777"), `evidence` (`documented` · `implied` · `told` · `inferred`), `refs` (references to the evidence), `status`, `waits_for` (variables not yet in a schema), `decision` (why: the person's `rule`/`knowledge` decision for `told`; your `guess` decision for `inferred`, recorded when you encode it), `consent` (for `inferred` only: the `consent` decision a person answered — yes for an encoded rule; later or no for a deferred or declined one — or the decision that set `inferRules`) |
+| `set` | `id`, `status` and any `add` field that changed, plus `note` saying why — the package README prints a `not-expressible` rule's reading and note, so write that note for its reader |
 
 ```json
 {"type": "rule", "event": "add", "table": "baseline", "gates": ["smk_ever"], "targets": ["cigs_day"],
@@ -207,11 +207,13 @@ Edited directly (it is small), then `check` validates it. Fields:
 - Paths in `tables` and `topics` are relative to `schemify/package/schemas/`. `topics` order is the reading order: it fixes each mother's `allOf` order and every page's section order.
 - `mode` is `build` or `review`; `inferRules` is `ask`, `yes`, or `no` (set only from a person's answer); `realData` is `yes`, `elsewhere`, or `notyet`; `profile` is `steward`, `informed`, or `limited` (INTERVIEW.md).
 - `idBase` is a placeholder namespace that nothing fetches; the package README tells publishers to replace it.
+- `conventions.sentinels` lists every special code the package uses, with the decision that settled it — `null` too, when a `convention` decision adopts it (`{"code": null, "meaning": "Missing (blank cell)", "structural": false, "decision": "D012"}`); the package README's table of codes comes from it. `structural` marks the codes that mean "skipped by design" (SCHEMA-STYLE.md, "Sentinels").
 
 ## variables.csv
 
 The inventory: every variable any source defines, written at discovery, so no variable is forgotten silently. Columns, fixed: `variable,table,topic,status,source,note`.
 
+- `variable`: the variable's name — or, for a field inside a variable that holds several values, its path (`address.city`, `household[].age`, `labs.*`; NESTED.md, "Names"). A variable with fields has a row of its own and one per field; a list of values is one row.
 - `status`: `include` (belongs in a schema) · `deferred` (waits on a decision — `note` names it) · `dropped` (deliberately excluded — `note` says why) · `added` (not in any source; a person asked for it — `source` is its D id).
 - `source`: a reference — where the variable is defined (`S01:Variables row 41`).
-- `check` reconciles it with the schemas: an `include` or `added` variable must be a property once its topic is drafted; a `deferred` or `dropped` one must not be. Whether a variable is drafted is never stored — the schemas say it.
+- `check` reconciles it with the schemas, nested fields included: an `include` or `added` variable or field must be in the schema once its topic is drafted; a `deferred` or `dropped` one must not be; every field the schemas hold must have its row. Whether a variable is drafted is never stored — the schemas say it.

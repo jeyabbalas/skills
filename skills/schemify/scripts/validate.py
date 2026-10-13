@@ -21,8 +21,20 @@ workspace, or the package itself when this file is its tools/validate.py.
     toy-data/<table>/valid.json              rows that must all pass
     toy-data/<table>/invalid.json            one seeded violation per row
     toy-data/<table>/invalid-ledger.json     {"violations": [{"row", "column",
-                                              "kind", "value"?, "reason"}]}
+                                              "kind", "value"?, "path"?,
+                                              "reason"}]}
     provenance.json                          what x-provenance cites (optional)
+
+Fields and paths. Every record-level property is a field (a column), and so is
+every field inside a nested value, named by its path as the data dictionary
+writes it: the column as is, then .name (or ["odd name"]), [] for each entry of
+a list, .* for each value of a lookup - household[].age, address.city,
+labs.*. A field's "shape" is "value", "group" (an object with properties),
+"lookup" (an object with an additionalProperties schema), "list" (an array of
+values), "entries" (an array of groups) or "mixed" (typed branches of two or
+more JSON types); special-code branches beside a group or list leave its shape
+as is. A display path puts 1-based positions in the brackets
+(household[2].age); a field never has positions.
 
 Subcommands (each also takes --max-findings N, default 200):
 
@@ -30,65 +42,120 @@ check PKG
     Every schema file parses, meta-validates against draft 2020-12 and names
     it in $schema; $ids share one base and mirror their paths; every $ref
     resolves; the house style (SCHEMA-STYLE.md) and the rule grammar
-    (SKIP-LOGIC.md) hold; every x-provenance reference is well formed and,
-    when provenance.json exists, names a citable source or decision.
+    (SKIP-LOGIC.md) hold, inside nested values too; every x-provenance
+    reference is well formed and, when provenance.json exists, names a
+    citable source or decision.
     -> {"ok", "package", "files", "tables": [{"table", "mother",
-        "categories", "properties", "rules"}], "counts", "findings",
-        "truncated"}
+        "categories", "properties" (columns), "fields" (fields inside
+        nested values), "rules"}], "counts", "findings", "truncated"}
 
 rules PKG [--table T]
-    Every rule (a rule entry of a mother's items.allOf), normalized:
+    Every rule, normalized: a rule entry of a mother's items.allOf (scope
+    null), or of a nested object's own allOf - a group's, or a list's items -
+    whose scope is that object's path (address, household[]):
     {"table", "id", "kind": "skip"|"applicability"|"routing", "domain",
-     "index", "file", "pointer", "comment", "reading", "provenance",
+     "scope", "index" (position in its allOf), "file", "pointer", "comment",
+     "reading", "provenance",
      "when": {"any": [{"all": [TEST, ...]}, ...]},
      "then": {"mode": "all"|"any", "effects": [EFFECT, ...]}}
     TEST   {"variable", "test": "eq"|"ne", "value"}
            {"variable", "test": "in"|"nin", "values"}
+           {"variable", "test": "includes"|"excludes", "value"} - a list of
+            values holds value, or does not ({"contains": {"const": v}},
+            {"not": {"contains": {"const": v}}})
            {"variable", "test": "range", "type", BOUNDS, "excludes"}
+           {"variable", "test": "present"} - a name in a clause's required
+            with no test of its own: the field is in the record or object
     EFFECT {"variable", "effect": "eq"|"ne", "value"}
            {"variable", "effect": "in", "values"}
            {"variable", "effect": "range", "type", BOUNDS, "excludes",
             "also": [code values still allowed, read through $ref]}
+           {"variable", "effect": "empty"|"nonempty"} - a list is empty, or
+            has at least one entry ({"maxItems": 0}, {"minItems": 1});
+            routing rules only
+           {"variable", "effect": "count", "minItems"?, "maxItems"?} - a
+            list holds that many entries ({"maxItems": 1}: a code that stands
+            alone); routing rules only
+           {"variable", "effect": "present"|"absent"} - a name in then's
+            required, or a target whose effect is false
+    A presence test or effect names a field the data may leave out: one its
+    object's required omits (a column, its category's).
+    "variable" is a field's full path: a nested rule's own names under its
+    scope (household[].relation), and a record-level rule's clause on a
+    group's fields - {"required": [f], "properties": {f: test}} as the test,
+    {"properties": {f: effect}} and/or {"required": [f]} as the effect -
+    names group.f (groups only, never a list's entries).
     BOUNDS: whichever of minimum, maximum, exclusiveMinimum and
     exclusiveMaximum the rule states. Entries that do not parse are left out
     and reported in findings, with the codes check gives them.
-    -> {"ok", "rules", "variables": {table: {name: {"topic", "file",
-        "pointer"}}}, "counts", "findings", "truncated"}
+    -> {"ok", "rules", "variables": {table: {path: {"topic", "file",
+        "pointer", "shape", "parent", "title"}}} for every field, columns
+        included, "counts", "findings", "truncated"}
 
 fixtures PKG [--table T]
     For each table with a toy-data folder: every valid.json row passes; each
     invalid.json row fails on exactly the column its ledger case names
     (verdicts: caught, caught-with-extra, missed-wrong-column, missed-passed,
     phantom; failing rows with no case are unledgered); coverage of codes,
-    bounds, special codes and rules is reported as warnings.
+    bounds, special codes, list lengths and rules is reported as warnings.
+    A case's "column" is a column or a field path (household[].age; a
+    concrete key under a lookup, labs.ldl, counts as labs.*; "path", a display
+    path, is accepted and ignored). A finding covers its field and every
+    path enclosing it (household[].age covers household[] and household),
+    so a case is caught when every finding of its row covers its column.
+    Kinds: wrong-type, unknown-level, range-break, invented-sentinel,
+    pattern-break, skip-break, applicability-break, routing-break,
+    missing-key (a field left out of a record, group or entry),
+    undeclared-column (a column or a field nobody declares), duplicate-row,
+    entry-count (too few or too many entries, or a list's contains count),
+    duplicate-entry (a repeated entry of a list).
+    Coverage counts every field with something to show: codes and bounds as
+    always (a list's codes in its entries); a list with its fewest entries
+    allowed and one with two or more; a lookup with a name; a field a
+    decision lets be left out, left out once; every rule fired (a nested
+    rule by some object in its scope) and caught.
     -> {"ok", "tables": {table: {"valid": {"rows", "status", "findings"},
         "invalid": {"rows", "cases", "caught", "verdicts", "unledgered"},
-        "coverage": {"properties": {"covered", "total"}, "rules": {"fired",
-        "unfired", "caught", "uncaught"}}}}, "counts", "findings",
-        "truncated"}
-    verdict: {"case", "row", "column", "kind", "status", "failed_on"?,
-              "rules"?}; a table without toy data is {"skipped": why}
+        "coverage": {"properties": {"covered", "total"} (fields of every
+        depth), "rules": {"fired", "unfired", "caught", "uncaught"}}}},
+        "counts", "findings", "truncated"}
+    verdict: {"case", "row", "column", "kind", "status", "failed_on"? (the
+              failing findings' fields), "rules"?}; a table without toy data
+              is {"skipped": why}
 
 data PKG --file F [--table T] [--format json|csv|tsv] [--max-errors N]
     Validate one data file - a JSON array of row objects, or a CSV or TSV
-    export - row by row; CSV and TSV cells are typed the way QuaC types them.
+    export - row by row; CSV and TSV cells are typed the way QuaC types them
+    (a cell of a group or list column holds its value as JSON text).
     The schemify agent never runs this on real data; people may run it on
     their own files.
     -> {"ok", "table", "file", "format", "rows", "errors", "by_column",
-        "by_rule", "findings", "truncated", "columns"}
-    finding: {"row" (0-based record), "column", "keyword", "message",
-              "hint", "rule"?, "allof_index"?, "empty_cell"?} - "column" is
-              null for a finding about a whole row (a repeated row: "row" is
-              the later copy) or the whole file (too few rows: "row" null too)
+        "by_rule", "findings", "truncated", "columns", "fields"}
+    finding: {"row" (0-based record), "column", "field", "path", "keyword",
+              "message", "hint", "rule"?, "allof_index"? (a mother's rule),
+              "rule_scope"? (a nested rule's scope), "empty_cell"?} -
+              "column" is the record-level key, "path" the display path
+              (household[2].age; a missing field's own path; an undeclared
+              field's, one finding each; a list's own path for minItems,
+              maxItems, uniqueItems and contains), "field" the path without
+              positions (household[].age; labs.* for any key of a lookup);
+              all three are equal for a column and null for a finding about a
+              whole row (a repeated row: "row" is the later copy) or the whole
+              file (too few rows: "row" null too)
     columns: {name: {"title", "topic", "allowed"}} for every declared
              property, in table order; "allowed" says what the column takes
+    fields: {path: {"title", "topic", "column", "allowed", "shape"}} for
+            every field inside a nested value
 
 summary PKG [--out FILE]
     check + rules + fixtures (when every schema parses, meta-validates and
     resolves) + a provenance census, with a plain-English headline.
     -> {"ok", "headline", "package", "counts", "check", "rules": {"count",
-        "by_kind", "by_table"}, "fixtures", "provenance": {"properties",
-        "traced", "rules", "by_origin", "needs_review"}, "topics"}
+        "by_kind", "by_table"}, "fixtures", "provenance": {"properties"
+        (every field, nested ones included), "traced", "rules", "by_origin",
+        "needs_review"}, "topics": {"<table>/<topic>": {"file", "properties",
+        "fields", "rules_targeting", "errors", "warnings", "provenance_ok",
+        "coverage"}}}
     --out FILE writes the full report there - every finding and verdict, and
     "rules": {"count", "by_kind", "by_table", "items" (every rule, as rules
     prints it), "variables"} - and prints only {"ok", "headline", "package",
@@ -97,8 +164,8 @@ summary PKG [--out FILE]
 A finding of check, rules, fixtures and summary:
     {"severity": "error"|"warning"|"info", "code", "message", "hint",
      "file" (relative to PKG/schemas), "pointer", "table", "topic",
-     "variable", "rule"} - keys that do not apply are left out. ok is false
-    when any finding is an error.
+     "variable" (a field's path), "rule"} - keys that do not apply are left
+    out. ok is false when any finding is an error.
 
 Output is exactly one JSON object on stdout; diagnostics go to stderr. Every
 findings list is capped (--max-findings, or --max-errors for data); counts
@@ -171,18 +238,36 @@ DISCOURAGED = {
     "examples": "examples live in the toy data",
     "deprecated": "a data contract does not document a writer",
     "readOnly": "a data contract does not document a writer",
-    "multipleOf": "it invites precision the source never stated",
-    "minLength": "it invites precision the source never stated",
-    "maxLength": "it invites precision the source never stated",
+    "multipleOf": "it invites precision the source never stated, and a decimal step is "
+                  "unreliable in validators (72.3 is not a float multiple of 0.1)",
+    "minLength": "it invites precision the source never stated; keep it only when a source "
+                 "states the limit, cited on x-provenance's minLength facet",
+    "maxLength": "it invites precision the source never stated; keep it only when a source "
+                 "states the limit, cited on x-provenance's maxLength facet",
     "$anchor": "relative paths plus #/$defs/... are the whole addressing scheme",
     "$dynamicRef": "relative paths plus #/$defs/... are the whole addressing scheme",
+    "prefixItems": "positions with meanings are not what dictionaries describe; give each "
+                   "value its own named field in a group",
+    "unevaluatedItems": "a list states what its entries hold in items",
+    "patternProperties": "keys matched by pattern are not what dictionaries describe; a "
+                         "lookup states its names with propertyNames",
+    "minProperties": "counts of properties are not what dictionaries describe",
+    "maxProperties": "counts of properties are not what dictionaries describe",
+    "contains": "it constrains a list as a whole: use it on a list (cited on x-provenance's "
+                "contains facet) or as a rule's test",
+    "minContains": "it constrains a list as a whole: use it on a list beside contains",
+    "maxContains": "it constrains a list as a whole: use it on a list beside contains",
 }
+CONTAINS_KEYS = ("contains", "minContains", "maxContains")
+LENGTH_KEYS = ("minLength", "maxLength")
 FORBIDDEN = ("else", "dependentRequired", "dependentSchemas")
 CATEGORY_FORBIDDEN = ("if", "then", "else", "allOf", "anyOf", "oneOf", "not",
                       "dependentSchemas", "dependentRequired", "additionalProperties",
                       "unevaluatedProperties")
 FACETS = frozenset(("default", "title", "description", "type", "values", "sentinels",
-                    "minimum", "maximum", "pattern", "unit", "universe", "derivation"))
+                    "minimum", "maximum", "pattern", "unit", "universe", "derivation",
+                    "required", "minItems", "maxItems", "uniqueItems", "propertyNames",
+                    "contains", "minLength", "maxLength"))
 REFERENCE_RE = re.compile(r"S[0-9]{2,}(?::[^\n|]+)?|D[0-9]{3,}")
 SOURCE_CITABLE = ("active", "approved", "retired")
 RULE_KEYS = ("$comment", "x-provenance", "if", "then")
@@ -193,14 +278,31 @@ BOUNDS = ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum")
 KIND_WORDS = {"skip": "Skip pattern", "applicability": "Applicability", "routing": "routing"}
 LEDGER_KINDS = ("wrong-type", "unknown-level", "range-break", "invented-sentinel",
                 "pattern-break", "skip-break", "applicability-break", "routing-break",
-                "missing-key", "undeclared-column", "duplicate-row")
+                "missing-key", "undeclared-column", "duplicate-row", "entry-count",
+                "duplicate-entry")
 DUPLICATE_COLUMN = "*duplicate*"
 ROW_COVER = "*row*"
 RULE_CODES = frozenset(("rule-shape", "rule-comment", "rule-unguarded", "rule-dangling",
                         "rule-undeclared-code", "trigger-undeclared-level",
                         "range-trigger-sentinel", "skip-shape", "applicability-shape",
-                        "missing-twin", "duplicate-rule", "allof-order", "allof-entry"))
+                        "missing-twin", "duplicate-rule", "allof-order", "allof-entry",
+                        "rule-in-shared-shape"))
 BLOCKING_CODES = frozenset(("parse-error", "meta-invalid", "unresolved-ref"))
+
+# Nested values. A path names a Field the way the data dictionary (jsdd's
+# formatVariablePath) does: the record-level key as is, then .name or
+# ["name"], [] for a list's entries, .* for a lookup's values. The class is
+# JavaScript's \s, so a name is plain here exactly when it is plain on the
+# website (schemify.py holds the same pattern).
+NAME_CHARS = r'[^.\[\]"*\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]'
+PLAIN_NAME = re.compile(r'(?!/)' + NAME_CHARS + '+')
+PATH_STEP = re.compile(r'\.\*|\[\]|\[[0-9]+\]|\["(?:[^"\\]|\\.)*"\]|\.' + NAME_CHARS + '+')
+MAX_DEPTH = 6                   # fields at most six levels below their column
+FIELD_LIMIT = 10000             # fields inside nested values per table; schemify.py stops there too
+SHAPE_KEYS = frozenset(("type", "properties", "items", "prefixItems", "additionalProperties",
+                        "anyOf", "oneOf", "allOf", "const", "enum", "not", "if"))
+DECISION_RE = re.compile(r"D[0-9]{3,}")
+GATHER_LIMIT = 32
 
 # jsdd's sentinel guess (json-schema-data-dictionary analyze.ts), and the
 # likely-missingness words and negative codes it misses (SCHEMA-STYLE.md).
@@ -359,6 +461,11 @@ def joined(values, last="and"):
     return shown[0] if len(shown) == 1 else "{} {} {}".format(", ".join(shown[:-1]), last, shown[-1])
 
 
+def joined_plain(names, last="and"):
+    names = [str(name) for name in names]
+    return names[0] if len(names) == 1 else "{} {} {}".format(", ".join(names[:-1]), last, names[-1])
+
+
 def plural(count, word, many=None):
     return "{} {}".format(count, word if count == 1 else (many or word + "s"))
 
@@ -425,6 +532,57 @@ def safe_join(base, ref):
         return urldefrag(urljoin(base, ref))[0]
     except ValueError:
         return base
+
+
+def join_path(parent, name):
+    """The path of a field named name inside parent (None: a record-level
+    key, kept as is) - jsdd's formatVariablePath."""
+    if parent is None:
+        return name
+    return parent + ("." + name if PLAIN_NAME.fullmatch(name)
+                     else "[" + json.dumps(name, ensure_ascii=False) + "]")
+
+
+def path_ancestors(column, field):
+    """column, every path that encloses field, and field itself
+    (household[].age -> household, household[], household[].age)."""
+    out = {column}
+    if not isinstance(field, str) or not field.startswith(column):
+        return out
+    here, at = column, len(column)
+    while at < len(field):
+        step = PATH_STEP.match(field, at)
+        if step is None:
+            break
+        here += step.group(0)
+        at = step.end()
+        out.add(here)
+    out.add(field)
+    return out
+
+
+def cites_decision(provenance, facet):
+    """Whether x-provenance cites a decision (D...) on facet."""
+    refs = provenance.get(facet) if isinstance(provenance, dict) else None
+    refs = [refs] if isinstance(refs, str) else refs if isinstance(refs, list) else []
+    return any(isinstance(ref, str) and DECISION_RE.fullmatch(ref) for ref in refs)
+
+
+def json_kinds(node):
+    """The JSON types a schema node holds, from its type or else its object
+    or array keywords (integer counts as number; null is a special code, not
+    a shape)."""
+    if not isinstance(node, dict):
+        return set()
+    kind = node.get("type")
+    kinds = ([kind] if isinstance(kind, str) else
+             [k for k in kind if isinstance(k, str)] if isinstance(kind, list) else [])
+    if not kinds:
+        if "properties" in node or "additionalProperties" in node:
+            kinds = ["object"]
+        elif "items" in node or "prefixItems" in node:
+            kinds = ["array"]
+    return {"number" if k == "integer" else k for k in kinds if k != "null"}
 
 
 # ------------------------------------------------------------------ JSON in
@@ -872,8 +1030,18 @@ def describe_typed(node):
         return text
     names = type_names(node)
     if "string" in names or "pattern" in node:
-        return ("text matching {}".format(node["pattern"]) if nonempty_str(node.get("pattern"))
+        text = ("text matching {}".format(node["pattern"]) if nonempty_str(node.get("pattern"))
                 else "text")
+        shortest, longest = node.get("minLength"), node.get("maxLength")
+        shortest = int(shortest) if is_integral(shortest) else None
+        longest = int(longest) if is_integral(longest) else None
+        if shortest is not None and longest is not None:
+            text += " of {} to {} characters".format(shortest, longest)
+        elif longest is not None:
+            text += " of at most {}".format(plural(longest, "character"))
+        elif shortest is not None:
+            text += " of at least {}".format(plural(shortest, "character"))
+        return text
     if "boolean" in names:
         return "true or false"
     return "a value of type {}".format(" or ".join(names)) if names else "a value"
@@ -919,20 +1087,24 @@ def required_values(profile):
     return None
 
 
-def json_types(pkg, node, resolver, depth=0, seen=frozenset()):
+def json_types(pkg, node, resolver, depth=0, seen=frozenset(), memo=None):
     """The JSON types a value can have and still pass node, as QuaC derives
     them (value-spec.ts): anyOf/oneOf unite, $ref/allOf/type/const/enum
-    intersect; None means unconstrained."""
+    intersect; None means unconstrained. A definition reached by many paths
+    is read once per depth (memo)."""
     if isinstance(node, bool):
         return None if node else set()
     if not isinstance(node, dict) or depth > 12 or id(node) in seen:
         return None
+    memo = {} if memo is None else memo
+    if (id(node), depth) in memo:
+        return memo[(id(node), depth)]
     seen = seen | {id(node)}
     contributions = []
     if isinstance(node.get("$ref"), str):
         resolved, _ = pkg.lookup_from(resolver, node["$ref"])
         contributions.append(None if resolved is None else json_types(
-            pkg, resolved.contents, resolved.resolver, depth + 1, seen))
+            pkg, resolved.contents, resolved.resolver, depth + 1, seen, memo))
     kind = node.get("type")
     if isinstance(kind, (str, list)):
         names = kind if isinstance(kind, list) else [kind]
@@ -946,21 +1118,20 @@ def json_types(pkg, node, resolver, depth=0, seen=frozenset()):
         if isinstance(node.get(keyword), list):
             union, unconstrained = set(), False
             for branch in node[keyword]:
-                found = json_types(pkg, branch, resolver, depth + 1, seen)
+                found = json_types(pkg, branch, resolver, depth + 1, seen, memo)
                 if found is None:
                     unconstrained = True
                 else:
                     union |= found
             contributions.append(None if unconstrained else union)
     if isinstance(node.get("allOf"), list):
-        contributions.extend(json_types(pkg, branch, resolver, depth + 1, seen)
+        contributions.extend(json_types(pkg, branch, resolver, depth + 1, seen, memo)
                              for branch in node["allOf"])
     constrained = [c for c in contributions if c is not None]
-    if not constrained:
-        return None
-    result = set(constrained[0])
+    result = set(constrained[0]) if constrained else None
     for other in constrained[1:]:
         result = intersect_types(result, other)
+    memo[(id(node), depth)] = result
     return result
 
 
@@ -1015,24 +1186,56 @@ def read_text_cell(text, types):
 # ----------------------------------------------------------------- tables
 
 
-class Prop(object):
-    """One row property, read from its own category file."""
+class ShapeInfo(object):
+    """What a schema node holds: shape "value", "group", "lookup", "list",
+    "entries" or "mixed", and the resolved nodes that say so."""
 
-    def __init__(self, an, table, name, rel, topic, schema):
+    def __init__(self, node, rel):
+        self.shape = "value"
+        self.node, self.rel = node, rel      # the shape-bearing node, $refs followed
+        self.obj = self.obj_rel = None       # group: its object node
+        self.arr = self.arr_rel = None       # list, entries: the array node
+        self.items = None                    # ... and its items, as written
+        self.items_info = None               # ... and what the items hold
+        self.lookup = self.lookup_rel = None  # lookup: its object node
+        self.values = None                   # ... and its additionalProperties schema
+        self.branches = []                   # every typed branch (two or more kinds: mixed)
+
+
+class Field(object):
+    """One variable: a record-level property (depth 0, a column), or a field
+    inside a nested value, named by its path (household[].age)."""
+
+    def __init__(self, an, table, path, rel, pointer, topic, schema, name=None, parent=None,
+                 depth=0, top=None):
         self.an = an
         self.table = table
-        self.name = name
+        self.path = path
+        self.name = path if name is None else name
+        self.parent = parent
+        self.depth = depth
+        self.top = path if top is None else top
         self.file = rel
+        self.pointer = pointer
         self.topic = topic
         self.schema = schema
-        self.pointer = "/properties/" + esc(name)
         self.uri = an.pkg.uri[rel]
+        self.shape = "value"
+        self.info = None
+        self.scope = None          # the object holding it: None for the record, else a path
+        self.optional = False      # may be left out of its object (a cited decision says so)
+        self.omittable = False     # its object's required leaves it out, cited or not
         self._validator = None
         self._profile = None
+        self._item_profile = MISSING
         self._types = MISSING
 
+    def title(self):
+        title = self.schema.get("title") if isinstance(self.schema, dict) else None
+        return title if nonempty_str(title) else None
+
     def admits(self, value):
-        """True/False: does the property's own schema accept value; None when
+        """True/False: does the field's own schema accept value; None when
         that cannot be told (an unresolvable schema)."""
         if self._validator is None:
             target = "{}#{}".format(self.uri, quote(self.pointer, safe="/~"))
@@ -1043,11 +1246,59 @@ class Prop(object):
         except Exception:
             return None
 
+    def admits_item(self, value):
+        """Does one entry of this list accept value (None: cannot tell)."""
+        items = self.info.items if self.info is not None else None
+        return self.an.node_admits(items, value) if items is not None else None
+
     def profile(self):
         if self._profile is None:
             self._profile = value_profile(self.an.pkg, self.schema,
                                           self.an.pkg.resolver(self.uri))
         return self._profile
+
+    def item_profile(self):
+        """The profile of one entry of a list of values, or None."""
+        if self._item_profile is MISSING:
+            info = self.info
+            self._item_profile = None
+            if self.shape == "list" and info is not None and info.items is not None:
+                self._item_profile = value_profile(self.an.pkg, info.items,
+                                                   self.an.pkg.resolver(self.an.pkg.uri[info.arr_rel]))
+        return self._item_profile
+
+    def codes(self):
+        """The codes the field declares: a list's are its entries'."""
+        profile = self.item_profile() if self.shape == "list" else self.profile()
+        return [code.value for code in profile["codes"]] if profile else []
+
+    def declared_codes(self):
+        """Every code a value:<code> facet may cite: a list's entries' codes and
+        the codes beside the list itself (a special code or null in its place)."""
+        if self.shape != "list":
+            return self.codes()
+        return self.codes() + [code.value for code in self.profile()["codes"]]
+
+    def required_values(self):
+        profile = self.item_profile() if self.shape == "list" else self.profile()
+        return required_values(profile) if profile else None
+
+    def allowed_text(self):
+        """What the field takes, in words (the data dictionary's terms)."""
+        if self.info is None or self.shape == "value" or (self.shape == "mixed" and not any(
+                branch.shape != "value" for branch in self.info.branches)):
+            return describe_allowed(self.profile())
+        text = self.an.container_text(self.info)
+        codes = dedupe_values([code.value for code in self.profile()["codes"]])
+        if codes:
+            named = {literal_key(code.value): code for code in self.profile()["codes"]}
+            listed = ", ".join(code_text(named[literal_key(value)]) for value in codes[:10])
+            text += ", or " + ("one of " if len(codes) > 1 else "") + listed
+        return text
+
+    def item_allowed_text(self):
+        profile = self.item_profile()
+        return describe_allowed(profile) if profile else None
 
     def column_types(self):
         if self._types is MISSING:
@@ -1065,27 +1316,40 @@ class TableModel(object):
         self.categories = []
         self.unresolved_categories = []
         self.category_entries = set()
-        self.props = {}
+        self.props = {}            # record-level Fields, by column
+        self.fields = {}           # every Field, by path, in schema order
         self.rule_entries = []
+        self.nested_entries = []   # (scope, file, object pointer, index, node, uses, topic)
         self.rules = []
         self.broken = None
 
 
 class RuleEntry(object):
-    """One rule entry of a mother's items.allOf, parsed against the grammar."""
+    """One rule entry - of a mother's items.allOf (scope None), or of a
+    nested object's allOf (scope: that object's path) - parsed against the
+    grammar."""
 
-    def __init__(self, model, index, node):
+    def __init__(self, model, index, node, scope=None, rel=None, container=None, topic=None):
         self.table = model.name
-        self.file = model.mother
+        self.scope = scope
+        self.file = model.mother if rel is None else rel
         self.index = index
-        self.pointer = "/items/allOf/{}".format(index)
+        self.container = "/items" if container is None else container
+        self.pointer = "{}/allOf/{}".format(self.container, index)
         self.node = node
+        self.topic = topic
         self.id = self.kind = self.domain = self.comment = self.reading = None
         self.provenance = None
         self.when = self.then = self.mode = None
         self.gates = []
         self.targets = []
+        self.reach = []            # (group path, pointer, "test"|"effect")
+        self.top_vars = set()      # variables named at the record level
         self.grammar_ok = True
+
+    @property
+    def key(self):
+        return (self.file, self.pointer)
 
     def label(self):
         if self.id is None:
@@ -1095,36 +1359,60 @@ class RuleEntry(object):
         return "{} ({})".format(self.id, KIND_WORDS.get(self.kind, "rule"))
 
     def half(self):
+        if self.id is None and self.scope is not None:
+            return "{} allOf/{}:{}".format(self.scope, self.index, self.kind or "rule")
         return "{}:{}".format(self.id or "allOf/{}".format(self.index), self.kind or "rule")
+
+    def where_label(self):
+        return "the record" if self.scope is None else self.scope
 
     def public(self):
         return {"table": self.table, "id": self.id, "kind": self.kind, "domain": self.domain,
-                "index": self.index, "file": self.file, "pointer": self.pointer,
-                "comment": self.comment, "reading": self.reading,
+                "scope": self.scope, "index": self.index, "file": self.file,
+                "pointer": self.pointer, "comment": self.comment, "reading": self.reading,
                 "provenance": self.provenance, "when": self.when, "then": self.then}
+
+
+def rule_field(model, rule, path):
+    """The Field a rule's variable names: record-level names among the
+    table's columns, every other path among the nested fields."""
+    if path in rule.top_vars:
+        return model.props.get(path)
+    field = model.fields.get(path)
+    return field if field is not None and field.depth > 0 else None
 
 
 # ---------------------------------------------------------------- analysis
 
 
 TEST_HINT = ('A test is {"const": v}, {"enum": [v1, v2, ...]}, {"not": {"const": v}}, '
-             '{"not": {"enum": [...]}}, or {"type": "integer"|"number", "minimum", "maximum", '
+             '{"not": {"enum": [...]}}, {"contains": {"const": v}} or {"not": {"contains": '
+             '{"const": v}}} on a list, {"type": "integer"|"number", "minimum", "maximum", '
              '"exclusiveMinimum", "exclusiveMaximum", "not": {"enum": [sentinels]}} with at '
-             'least one bound (SKIP-LOGIC.md, The canonical form).')
-EFFECT_HINT = ('An effect is {"const": c}, {"not": {"const": c}}, {"enum": [...]}, or '
-               '{"anyOf": [{"type", bounds}, sentinel consts or $refs to them]} - no other '
-               'keyword, no nested if, and a $ref only to a sentinel definition '
+             'least one bound, or - on a group - a clause on its fields; a gate in required with '
+             'no test tests that a field the data may leave out is present (SKIP-LOGIC.md, The '
+             'canonical form).')
+EFFECT_HINT = ('An effect is {"const": c}, {"not": {"const": c}}, {"enum": [...]}, '
+               '{"anyOf": [{"type", bounds}, sentinel consts or $refs to them]}, {"maxItems": n} '
+               'and/or {"minItems": n} on a list, false (a field the data may leave out is left out), '
+               'or - on a group - {"properties": {field: effect}} and/or {"required": [fields]} '
+               '- no other keyword, no nested if, and a $ref only to a sentinel definition '
                '(SKIP-LOGIC.md, The canonical form).')
 CLAUSE_HINT = ('Write the if as {"required": [gates], "properties": {gate: test}} - several '
-               'gates in one clause all must hold - or {"anyOf": [clause, clause, ...]} for '
+               'gates in one clause all must hold; a gate in required with no test is present, '
+               'for a field the data may leave out - or {"anyOf": [clause, clause, ...]} for '
                '"any of these" (SKIP-LOGIC.md, The canonical form).')
-THEN_HINT = ('Write the then as {"properties": {target: effect, ...}}, or {"anyOf": '
-             '[{"required": [t], "properties": {t: effect}}, ...]} for "at least one of these"; '
-             'the reverse direction or a second condition is its own rule.')
+THEN_HINT = ('Write the then as {"properties": {target: effect, ...}}, {"required": [targets '
+             'that must be present]} or both, or {"anyOf": [{"required": [t], "properties": '
+             '{t: effect}} or {"required": [t]}, ...]} for "at least one of these"; the reverse '
+             'direction or a second condition is its own rule.')
+REACH_HINT = ("Fields nest at most six levels below a column, so nothing deeper can be named: "
+              "test or constrain the group's own fields (SKIP-LOGIC.md, The canonical form).")
 PROVENANCE_HINT = ('x-provenance maps facets (default, title, description, type, values, '
                    'value:<code>, sentinels, minimum, maximum, pattern, unit, universe, '
-                   'derivation) to a reference - S01, S01:<locator> or D014 - or a list of '
-                   'them (LEDGER-FORMAT.md, References).')
+                   'derivation; on nested values required, minItems, maxItems, uniqueItems, '
+                   'propertyNames, contains; minLength, maxLength) to a reference - S01, '
+                   'S01:<locator> or D014 - or a list of them (LEDGER-FORMAT.md, References).')
 
 
 class Analysis(object):
@@ -1149,8 +1437,13 @@ class Analysis(object):
         self.def_by_id = {}
         self.prov_ok = {}
         self.prov_refs = []
+        self.field_sites = {}      # file -> {pointer: Field}
+        self.containers = {}       # id(node) -> nested object, lookup or list node, and its uses
+        self.list_nodes = set()    # ids of list and entries array nodes
         self._seen = set()
         self._meta = None
+        self._validators = {}
+        self._shapes = {}          # (id(node), file, depth) -> ShapeInfo, however many paths
 
     # -- plumbing
 
@@ -1179,8 +1472,24 @@ class Analysis(object):
                 where["variable"] = unesc(pointer.split("/")[2])
         elif rel in self.mother_table:
             where["table"] = self.mother_table[rel]
+        field = self.field_at(rel, pointer)
+        if field is not None:
+            where["variable"], where["topic"] = field.path, field.topic
+            where.setdefault("table", field.table)
         where.update(extra)
         return where
+
+    def field_at(self, rel, pointer):
+        """The deepest Field whose node holds pointer in file rel, or None."""
+        sites = self.field_sites.get(rel)
+        if not sites or not pointer:
+            return None
+        tokens = pointer.split("/")
+        for k in range(len(tokens), 1, -1):
+            field = sites.get("/".join(tokens[:k]))
+            if field is not None:
+                return field
+        return None
 
     def locate(self, item):
         """Add table, topic and variable to a finding made before the tables
@@ -1191,8 +1500,14 @@ class Analysis(object):
             where = self.where(rel, item.get("pointer"))
             extra = {key: where[key] for key in ("table", "topic", "variable")
                      if where.get(key) is not None}
+        elif rel and item.get("pointer") and "rule" not in item:
+            # Attributed before the fields were known: a column, never a nested field.
+            field = self.field_at(rel, item["pointer"])
+            if field is not None and field.depth > 0 and item.get("variable") in (None, field.top):
+                extra = {"variable": field.path, "topic": field.topic}
         model = self.tables.get(item.get("table") or extra.get("table"))
-        prop = model.props.get(item.get("variable") or extra.get("variable")) if model else None
+        variable = extra.get("variable") or item.get("variable")
+        prop = model.fields.get(variable) if model and isinstance(variable, str) else None
         if prop is not None and "topic" not in item and "topic" not in extra:
             extra["topic"] = prop.topic
         if not extra:
@@ -1202,17 +1517,50 @@ class Analysis(object):
         rest.update(extra)
         return finding(item["severity"], item["code"], item["message"], item["hint"], **rest)
 
+    def node_admits(self, node, value):
+        """Does the schema node (anywhere in the package) accept value; None
+        when that cannot be told."""
+        key = id(node)
+        if key not in self._validators:
+            site = self.pkg.node_at.get(key) if isinstance(node, dict) else None
+            self._validators[key] = None if site is None else Draft202012Validator(
+                {"$ref": "{}#{}".format(self.pkg.uri[site[0]], quote(site[1], safe="/~"))},
+                registry=self.pkg.registry)
+        validator = self._validators[key]
+        if validator is None:
+            return None
+        try:
+            return bool(validator.is_valid(value))
+        except Exception:
+            return None
+
     def run(self):
         self.lint_meta()
         self.lint_ids()
         self.walk_refs()
         self.build_tables()
+        self.read_nested_rules()
+        self.mark_unreached_rules()
         for rel, (table, topic) in sorted(self.category_table.items()):
             self.lint_category(rel, table, topic)
+        self.lint_fields()
         self.lint_defs()
         for model in self.tables.values():
             for index, node in model.rule_entries:
                 self.parse_rule(model, index, node)
+            for scope, rel, container, index, node, uses, topic in model.nested_entries:
+                rule = self.parse_rule(model, index, node, scope, rel, container, topic)
+                if len(uses) > 1:
+                    self.add("error", "rule-in-shared-shape",
+                             "{} is in a shape used at {}, so its scope is not one place.".format(
+                                 cap_first(rule.label()), joined_plain(
+                                     ["{} ({})".format(s, m.name) if m is not model else s
+                                      for m, s, _ in uses])),
+                             "Write the shape inline in each use, or keep the rule out: a rule "
+                             "among one object's fields lives in exactly one object "
+                             "(SKIP-LOGIC.md, Rules inside nested values).",
+                             file=rel, pointer=rule.pointer, table=model.name, topic=topic,
+                             rule=rule.id)
             self.check_rule_ids(model)
         self.lint_provenance()
         self.scan_keywords()
@@ -1491,6 +1839,37 @@ class Analysis(object):
                          "$comment, x-provenance, if and then; fold anything else into a "
                          "category file.", **where)
 
+    def read_nested_rules(self):
+        """The rules among one group's or entry's own fields: every entry of
+        a nested object's allOf (SKIP-LOGIC.md, Rules inside nested values)."""
+        for box in self.containers.values():
+            if box["kind"] != "object" or not isinstance(box["node"].get("allOf"), list):
+                continue
+            model, scope, field = box["uses"][0]
+            for k, entry in enumerate(box["node"]["allOf"]):
+                if is_rule_entry(entry):
+                    self.rule_nodes.add(id(entry))
+                    model.nested_entries.append((scope, box["rel"], box["pointer"], k, entry,
+                                                 box["uses"], field.topic))
+                    continue
+                self.add("error", "allof-entry",
+                         "{}: allOf[{}] is not a rule.".format(scope, k),
+                         "A nested value's allOf holds only the rules among its own fields, each "
+                         "with $comment, x-provenance, if and then (SKIP-LOGIC.md, Rules inside "
+                         "nested values); fold anything else into the object itself.",
+                         **self.where(box["rel"], "{}/allOf/{}".format(box["pointer"], k)))
+
+    def mark_unreached_rules(self):
+        """A rule in the allOf of a nested object the field walk never reached
+        (a category the mother does not reference yet, a shape too deep) sits
+        where rules belong: not a conditional outside the mother, and checked
+        once the walk reaches it."""
+        for doc in self.pkg.docs.values():
+            for node, here in iter_schema(doc, "", self.rule_nodes):
+                entries = node.get("allOf")
+                if here and isinstance(node.get("properties"), dict) and isinstance(entries, list):
+                    self.rule_nodes.update(id(entry) for entry in entries if is_rule_entry(entry))
+
     def collect_properties(self, model):
         for rel in model.categories:
             doc = self.pkg.docs.get(rel)
@@ -1498,13 +1877,256 @@ class Analysis(object):
             if not isinstance(props, dict):
                 continue
             topic = PurePosixPath(rel).stem
+            required = doc.get("required") if isinstance(doc.get("required"), list) else []
             for name, schema in props.items():
                 if name in model.props:
                     continue
-                prop = Prop(self, model.name, name, rel, topic, schema)
+                prop = Field(self, model.name, name, rel, "/properties/" + esc(name), topic,
+                             schema)
+                prop.omittable = name not in required
+                prop.optional = prop.omittable and cites_decision(
+                    schema.get("x-provenance") if isinstance(schema, dict) else None, "required")
                 model.props[name] = prop
+                model.fields.setdefault(name, prop)
+                self.field_sites.setdefault(rel, {}).setdefault(prop.pointer, prop)
                 if isinstance(schema, dict):
                     self.prop_by_id[id(schema)] = prop
+                self.expand(model, prop, frozenset())
+
+    # -- nested values
+
+    def deref(self, node, rel):
+        """(node, file) of the schema a $ref names, when node is a $ref with
+        only annotations beside it; followed up to REF_HOPS times."""
+        for _ in range(REF_HOPS):
+            if not (isinstance(node, dict) and isinstance(node.get("$ref"), str)) or any(
+                    key in node for key in SHAPE_KEYS):
+                break
+            resolved, _ = self.pkg.lookup(self.pkg.uri[rel], node["$ref"])
+            target = resolved.contents if resolved is not None else None
+            site = self.pkg.node_at.get(id(target)) if isinstance(target, dict) else None
+            if site is None:
+                break
+            node, rel = target, site[0]
+        return node, rel
+
+    def typed_branches(self, node, rel):
+        """The branches that decide a value's shape: an anyOf's (or oneOf's)
+        branches other than special codes (a const, or a $ref to one), each
+        followed through $ref; otherwise the node itself."""
+        for key in ("anyOf", "oneOf"):
+            if isinstance(node.get(key), list):
+                out = []
+                for branch in node[key]:
+                    target, where = self.deref(branch, rel)
+                    if isinstance(target, dict) and "const" not in target:
+                        out.append((target, where))
+                return out
+        return [(node, rel)]
+
+    def shape_of(self, node, rel, depth=0):
+        """ShapeInfo of a schema node: typed branches of two or more JSON
+        types make it mixed; otherwise its first typed branch decides."""
+        node, rel = self.deref(node, rel)
+        info = ShapeInfo(node, rel)
+        if not isinstance(node, dict) or depth > MAX_DEPTH + 2:
+            return info
+        if (id(node), rel, depth) in self._shapes:
+            return self._shapes[(id(node), rel, depth)]
+        self._shapes[(id(node), rel, depth)] = info
+        branches = self.typed_branches(node, rel)
+        info.branches = [self.shape_alone(ShapeInfo(b, r), b, r, depth) for b, r in branches]
+        kinds = set().union(*(json_kinds(b) for b, _ in branches)) if branches else set()
+        if len(kinds) >= 2:
+            info.shape = "mixed"
+        elif info.branches:
+            first = info.branches[0]
+            info.shape = first.shape
+            info.obj, info.obj_rel = first.obj, first.obj_rel
+            info.arr, info.arr_rel = first.arr, first.arr_rel
+            info.items, info.items_info = first.items, first.items_info
+            info.lookup, info.lookup_rel, info.values = first.lookup, first.lookup_rel, first.values
+        return info
+
+    def shape_alone(self, info, node, rel, depth):
+        kinds = json_kinds(node)
+        if "object" in kinds:
+            if isinstance(node.get("properties"), dict):
+                info.shape, info.obj, info.obj_rel = "group", node, rel
+            elif isinstance(node.get("additionalProperties"), dict):
+                info.shape, info.lookup, info.lookup_rel = "lookup", node, rel
+                info.values = node["additionalProperties"]
+        elif "array" in kinds:
+            info.shape, info.arr, info.arr_rel = "list", node, rel
+            if isinstance(node.get("items"), dict):
+                info.items = node["items"]
+                info.items_info = self.shape_of(info.items, rel, depth + 1)
+                if info.items_info.shape == "group":
+                    info.shape = "entries"
+        return info
+
+    @staticmethod
+    def object_nodes(info):
+        """(kind, node) for each node holding a value's fields: a group's or a
+        lookup's object, or each entry's object for a list of entries."""
+        out = []
+        for branch in info.branches or [info]:
+            if branch.shape == "group":
+                out.append(("group", branch.obj))
+            elif branch.shape == "lookup":
+                out.append(("lookup", branch.lookup))
+            elif branch.shape == "entries":
+                inner = branch.items_info
+                out.extend(("entries", sub.obj) for sub in inner.branches or [inner]
+                           if sub.shape == "group")
+        return out
+
+    def children_of(self, info, path):
+        """[(path, name, node, file, pointer, scope, object node)] one level
+        inside a value."""
+        out = []
+        for kind, node in self.object_nodes(info):
+            site = self.pkg.node_at.get(id(node))
+            if site is None:
+                continue
+            rel, here = site
+            if kind == "lookup":
+                out.append((path + ".*", "*", node["additionalProperties"], rel,
+                            here + "/additionalProperties", None, None))
+                continue
+            scope = path + "[]" if kind == "entries" else path
+            for name, child in node["properties"].items():
+                out.append((join_path(scope, name), name, child, rel,
+                            "{}/properties/{}".format(here, esc(name)), scope, node))
+        return out
+
+    def expand(self, model, field, stack):
+        """Record the Fields inside field (depth first, schema order). A field
+        too deep, or whose shape is one it sits in, is kept but not entered."""
+        info = self.shape_of(field.schema, field.file)
+        field.info, field.shape = info, info.shape
+        self.note_containers(model, field, info)
+        kids = self.children_of(info, field.path) if info.shape != "value" else []
+        if not kids:
+            return
+        hint = ("Flatten it: house style nests at most six levels below a column, and a shape "
+                "never holds itself (SCHEMA-STYLE.md, Nested values).")
+        if id(info.node) in stack:
+            self.add("warning", "nesting-too-deep",
+                     "{} holds the shape it sits in, so it nests without end; the fields inside "
+                     "it are not checked.".format(field.path), hint,
+                     dedupe=("nesting-too-deep", model.name, field.path),
+                     **self.where(field.file, field.pointer, variable=field.path,
+                                  topic=field.topic))
+            return
+        if field.depth >= MAX_DEPTH:
+            self.add("warning", "nesting-too-deep",
+                     "{} nests deeper than six levels below its column; the fields inside it are "
+                     "not checked.".format(field.path), hint,
+                     dedupe=("nesting-too-deep", model.name, field.path),
+                     **self.where(field.file, field.pointer, variable=field.path,
+                                  topic=field.topic))
+            return
+        if len(model.fields) - len(model.props) >= FIELD_LIMIT:
+            self.add("warning", "nesting-too-deep",
+                     "{} reached {} fields inside nested values, so the fields inside {} and past "
+                     "it are not checked.".format(model.name, FIELD_LIMIT, field.path),
+                     "A shape used at many paths has fields at each of them, and shapes shared "
+                     "inside shared shapes multiply: flatten them (SCHEMA-STYLE.md, Nested values).",
+                     dedupe=("nesting-too-deep", model.name),
+                     **self.where(field.file, field.pointer, variable=field.path,
+                                  topic=field.topic))
+            return
+        stack = stack | {id(info.node)}
+        for path, name, node, rel, pointer, scope, obj in kids:
+            if path in model.fields:
+                continue
+            child = Field(self, model.name, path, rel, pointer, field.topic, node, name=name,
+                          parent=field.path, depth=field.depth + 1, top=field.top)
+            child.scope = scope
+            if obj is not None:
+                required = obj.get("required") if isinstance(obj.get("required"), list) else []
+                child.omittable = name not in required
+                child.optional = child.omittable and cites_decision(
+                    node.get("x-provenance") if isinstance(node, dict) else None, "required")
+            model.fields[path] = child
+            self.field_sites.setdefault(rel, {}).setdefault(pointer, child)
+            if isinstance(node, dict):
+                self.prop_by_id.setdefault(id(node), child)
+            self.expand(model, child, stack)
+
+    def note_containers(self, model, field, info):
+        """Remember each nested object, lookup and list node, and where it is
+        used, for house style and for the rules among one object's fields."""
+        def note(node, kind, scope):
+            site = self.pkg.node_at.get(id(node))
+            if site is None:
+                return
+            box = self.containers.setdefault(id(node), {
+                "node": node, "rel": site[0], "pointer": site[1], "kind": kind, "uses": []})
+            if not any(m is model and s == scope for m, s, _ in box["uses"]):
+                box["uses"].append((model, scope, field))
+
+        for branch in info.branches or [info]:
+            if branch.shape == "group":
+                note(branch.obj, "object", field.path)
+            elif branch.shape == "lookup":
+                note(branch.lookup, "lookup", field.path)
+            elif branch.shape in ("list", "entries"):
+                self.list_nodes.add(id(branch.arr))
+                note(branch.arr, "list", field.path)
+                if branch.shape == "entries":
+                    inner = branch.items_info
+                    for sub in inner.branches or [inner]:
+                        if sub.shape == "group":
+                            note(sub.obj, "object", field.path + "[]")
+
+    def container_text(self, info, depth=0):
+        """What a nested value takes, in words."""
+        def names(obj):
+            keys = list(obj.get("properties") or {})
+            text = ", ".join(keys[:10])
+            return text + (", … ({} fields in all)".format(len(keys)) if len(keys) > 10 else "")
+
+        def counts(arr):
+            parts = []
+            for key, word in (("minItems", "at least"), ("maxItems", "at most")):
+                if is_integral(arr.get(key)):
+                    parts.append("{} {}".format(word, int(arr[key])))
+            if arr.get("uniqueItems") is True:
+                parts.append("each at most once")
+            if isinstance(arr.get("contains"), dict):
+                one, many = match_words(arr["contains"])
+                need, low = contains_need(arr)
+                parts.append("{} {}".format(need, one if low == 1 and need.startswith(
+                    ("exactly", "at least")) else many))
+            return " ({})".format(", ".join(parts)) if parts else ""
+
+        def value_text(node, rel):
+            inner = self.shape_of(node, rel, depth + 1)
+            if inner.shape != "value" and depth < MAX_DEPTH:
+                return self.container_text(inner, depth + 1)
+            return describe_allowed(value_profile(self.pkg, node, self.pkg.resolver(
+                self.pkg.uri[rel]))) or "a value"
+
+        if info.shape == "group":
+            return "a group of fields: " + names(info.obj)
+        if info.shape == "entries":
+            return "a list of entries, each with " + names(info.items_info.obj) + counts(info.arr)
+        if info.shape == "list":
+            item = (value_text(info.items, info.arr_rel) if isinstance(info.items, dict)
+                    else "a value")
+            return "a list of values, each " + item + counts(info.arr)
+        if info.shape == "lookup":
+            names_node, _ = self.deref(info.lookup.get("propertyNames"), info.lookup_rel)
+            pattern = names_node.get("pattern") if isinstance(names_node, dict) else None
+            lead = "names matching {}".format(pattern) if nonempty_str(pattern) else "any names"
+            return "{}, each {}".format(lead, value_text(info.values, info.lookup_rel))
+        if info.shape == "mixed" and info.branches and depth < MAX_DEPTH:
+            return " or ".join(self.container_text(branch, depth + 1) if branch.shape != "value"
+                               else describe_typed(branch.node) for branch in info.branches)
+        return describe_allowed(value_profile(self.pkg, info.node, self.pkg.resolver(
+            self.pkg.uri[info.rel]))) or "a value"
 
     # -- categories, properties, definitions
 
@@ -1537,7 +2159,9 @@ class Analysis(object):
                 shape("it carries {} at its top level.".format(key), hint, "/" + esc(key))
         if props:
             required = doc.get("required") if isinstance(doc.get("required"), list) else []
-            missing = [name for name in props if name not in required]
+            missing = [name for name in props if name not in required and not cites_decision(
+                props[name].get("x-provenance") if isinstance(props[name], dict) else None,
+                "required")]
             if missing:
                 self.add("error", "required-incomplete",
                          "{}'s required omits {}.".format(rel, ", ".join(missing)),
@@ -1561,6 +2185,124 @@ class Analysis(object):
                          "every fact traces to a source or a decision.", **where)
             if isinstance(schema, dict):
                 self.lint_value_schema(rel, pointer, schema, name)
+
+    def lint_fields(self):
+        """House style inside nested values: every field has a title and
+        x-provenance and its codes are linted; every group and entry is
+        closed and complete; lists and lookups are well formed. Each node is
+        linted once, however many paths use it."""
+        done = set()
+        for model in self.tables.values():
+            for field in model.fields.values():
+                node = field.schema
+                if field.depth > 0 and id(node) not in done:
+                    done.add(id(node))
+                    where = self.where(field.file, field.pointer)
+                    if not isinstance(node, dict) or not nonempty_str(node.get("title")):
+                        self.add("error", "missing-title", "{} has no title.".format(field.path),
+                                 "Give every field inside a nested value a title: the label the "
+                                 "data dictionary shows.", **where)
+                    if not isinstance(node, dict) or "x-provenance" not in node:
+                        self.add("error", "missing-provenance",
+                                 "{} has no x-provenance.".format(field.path),
+                                 'Add "x-provenance": {"default": "S01:<where the source defines '
+                                 'it>"}: every fact traces to a source or a decision.', **where)
+                    if isinstance(node, dict):
+                        self.lint_value_schema(field.file, field.pointer, node, field.path)
+                info = field.info
+                if field.shape == "list" and isinstance(info.items, dict) and id(info.items) not in done:
+                    done.add(id(info.items))
+                    site = self.pkg.node_at.get(id(info.items))
+                    if site is not None:
+                        self.lint_value_schema(site[0], site[1], info.items, field.path)
+        for box in self.containers.values():
+            if box["kind"] == "object":
+                self.lint_object(box)
+            elif box["kind"] == "lookup":
+                self.lint_lookup(box)
+            else:
+                self.lint_list(box)
+
+    def box_where(self, box, sub=""):
+        """Where a container's finding is: its node, attributed to the
+        variable that holds it (even when the node sits in $defs)."""
+        field = box["uses"][0][2]
+        return self.where(box["rel"], box["pointer"] + sub, variable=field.path, topic=field.topic,
+                          table=field.table)
+
+    def lint_object(self, box):
+        node = box["node"]
+        scope = box["uses"][0][1]
+        where = lambda sub="": self.box_where(box, sub)
+        if node.get("type") != "object":
+            self.add("error", "nested-shape",
+                     '{} has properties but is not "type": "object".'.format(scope),
+                     'Add "type": "object" - without it a value that is not an object passes '
+                     'unchecked - with required and "additionalProperties": false '
+                     '(SCHEMA-STYLE.md, Nested values).', **where("/type"))
+        props = node["properties"]
+        required = node.get("required") if isinstance(node.get("required"), list) else []
+        missing = [name for name in props if name not in required and not cites_decision(
+            props[name].get("x-provenance") if isinstance(props[name], dict) else None,
+            "required")]
+        if missing:
+            self.add("error", "required-incomplete",
+                     "{}: required omits {}.".format(scope, ", ".join(missing)),
+                     "List every field in required, in properties order - missingness is a code "
+                     "in the cell, never an absent field - unless a person decided the data may "
+                     'leave it out: then cite that decision on the field\'s own x-provenance, '
+                     '"required": "D0NN".', **where("/required"))
+        if node.get("additionalProperties") is not False:
+            self.add("error", "nested-open",
+                     '{} does not close its fields: "additionalProperties": false is '
+                     'missing.'.format(scope),
+                     "Add it beside properties: the mother's unevaluatedProperties closes the "
+                     "record, not the values inside it, so an undeclared field inside passes "
+                     "unnoticed.", **where())
+
+    def lint_lookup(self, box):
+        node, rel = box["node"], box["rel"]
+        scope = box["uses"][0][1]
+        if node.get("type") != "object":
+            self.add("error", "nested-shape",
+                     '{} is a lookup (an additionalProperties schema) but is not "type": '
+                     '"object".'.format(scope),
+                     'Add "type": "object": without it a value that is not an object passes '
+                     'unchecked (SCHEMA-STYLE.md, Nested values).', **self.box_where(box, "/type"))
+        names, _ = self.deref(node.get("propertyNames"), rel)
+        if not (isinstance(names, dict) and nonempty_str(names.get("pattern"))):
+            self.add("warning", "lookup-names",
+                     "{} is a lookup with no propertyNames pattern.".format(scope),
+                     'Add "propertyNames": {"pattern": "^...$"} stating the names it takes; a '
+                     "lookup whose names are a fixed, known set is a group whose fields may be "
+                     "left out (SCHEMA-STYLE.md, Nested values).", **self.box_where(box))
+
+    def lint_list(self, box):
+        node, rel = box["node"], box["rel"]
+        scope = box["uses"][0][1]
+        shape_hint = ('A list is "type": "array" with what each entry holds in items '
+                      '(SCHEMA-STYLE.md, Nested values).')
+        if node.get("type") != "array":
+            self.add("error", "nested-shape", '{} is a list but is not "type": "array".'.format(scope),
+                     shape_hint, **self.box_where(box, "/type"))
+        items = node.get("items")
+        if not isinstance(items, dict):
+            self.add("error", "nested-shape",
+                     "{} is a list with no items schema saying what each entry holds.".format(scope),
+                     shape_hint, **self.box_where(box))
+            return
+        if self.shape_of(items, rel).shape in ("list", "entries"):
+            self.add("warning", "list-of-lists", "{} is a list of lists.".format(scope),
+                     "Lists of lists are not house style: they usually mean the source's own "
+                     "table - ask how the data is delivered (SCHEMA-STYLE.md, Nested values).",
+                     **self.box_where(box, "/items"))
+        annotated = [key for key in ("title", "description", "x-provenance") if key in items]
+        if annotated:
+            self.add("warning", "items-annotation",
+                     "{}'s items carries {}.".format(scope, " and ".join(annotated)),
+                     "Say it on the list: the data dictionary appends an items title to the "
+                     "list's description, and the list's x-provenance covers its entries.",
+                     **self.box_where(box, "/items"))
 
     def lint_value_schema(self, rel, pointer, node, owner):
         """Code lists, measures and their special codes, on one property or
@@ -1695,8 +2437,8 @@ class Analysis(object):
 
     # -- rules
 
-    def parse_rule(self, model, index, node):
-        rule = RuleEntry(model, index, node)
+    def parse_rule(self, model, index, node, scope=None, rel=None, container=None, topic=None):
+        rule = RuleEntry(model, index, node, scope, rel, container, topic)
         comment = node.get("$comment")
         match = RULE_COMMENT_RE.fullmatch(comment) if isinstance(comment, str) else None
         if isinstance(comment, str):
@@ -1711,8 +2453,8 @@ class Analysis(object):
 
         def bad(code, message, hint, sub="", variable=None):
             rule.grammar_ok = False
-            self.add("error", code, message, hint, file=model.mother, pointer=rule.pointer + sub,
-                     table=model.name, variable=variable, rule=rule.id)
+            self.add("error", code, message, hint, file=rule.file, pointer=rule.pointer + sub,
+                     table=model.name, topic=rule.topic, variable=variable, rule=rule.id)
 
         name = rule.label()
         missing = [key for key in RULE_KEYS if key not in node]
@@ -1731,14 +2473,15 @@ class Analysis(object):
                 'Begin it "Skip pattern R001: ", "Applicability R001: " or "<Domain> routing '
                 'R001: ", then the plain reading on one line (SKIP-LOGIC.md).', "/$comment")
         if "if" in node:
-            rule.when = self.parse_if(rule, node["if"], bad)
+            rule.when = self.parse_if(rule, model, node["if"], bad)
         if "then" in node:
             rule.then = self.parse_then(rule, model, node["then"], bad)
         provenance = node.get("x-provenance")
         rule.provenance = provenance if isinstance(provenance, dict) else None
         self.check_rule_meaning(rule, model)
+        return rule
 
-    def parse_if(self, rule, node, bad):
+    def parse_if(self, rule, model, node, bad):
         name = cap_first(rule.label())
         if not isinstance(node, dict):
             bad("rule-shape", "{}'s if is not an object.".format(name), CLAUSE_HINT, "/if")
@@ -1749,19 +2492,38 @@ class Analysis(object):
                 bad("rule-shape", "{}'s if is not one clause or {{\"anyOf\": [two or more clauses]}}."
                     .format(name), CLAUSE_HINT, "/if")
                 return None
-            parsed = [self.parse_clause(rule, clause, "/if/anyOf/{}".format(k), bad)
-                      for k, clause in enumerate(clauses)]
+            parsed = [self.parse_clause(rule, model, clause, "/if/anyOf/{}".format(k), bad,
+                                        rule.scope) for k, clause in enumerate(clauses)]
             return None if any(c is None for c in parsed) else {"any": parsed}
-        clause = self.parse_clause(rule, node, "/if", bad)
+        clause = self.parse_clause(rule, model, node, "/if", bad, rule.scope)
         return None if clause is None else {"any": [clause]}
 
-    def parse_clause(self, rule, node, sub, bad):
+    def parse_clause(self, rule, model, node, sub, bad, prefix, depth=0):
+        """One clause's tests, each on a full path; a test on a group may be a
+        clause on the group's own fields. A name in required with no test of
+        its own tests that the field is present: only a field the data may
+        leave out (its object's required omits it) takes that test."""
         name = cap_first(rule.label())
         if not isinstance(node, dict):
             bad("rule-shape", "{}'s clause at {} is not an object.".format(name, sub), CLAUSE_HINT, sub)
             return None
+        if depth > MAX_DEPTH:
+            bad("rule-shape", "{}'s clause at {} reaches more than six levels into groups.".format(
+                name, sub), REACH_HINT, sub)
+            return None
         keys = set(node)
-        if keys != {"required", "properties"}:
+        if keys == {"required"} and isinstance(node["required"], list) and node["required"] and all(
+                isinstance(gate, str) for gate in node["required"]):
+            always = [join_path(prefix, gate) for gate in node["required"]
+                      if self.presence_field(model, prefix, gate) is None]
+            if always:
+                bad("rule-shape", "{}'s clause at {} only requires {}; a name in required with no "
+                    "test tests that the field is present, and {} not a field its object's "
+                    "required leaves out.".format(name, sub, ", ".join(always), "that is"
+                                                  if len(always) == 1 else "those are"),
+                    CLAUSE_HINT, sub)
+                return None
+        elif keys != {"required", "properties"}:
             nested = sorted(keys & {"if", "then", "else", "allOf", "anyOf", "oneOf", "not"})
             message = "{}'s clause at {} has {}; a clause is exactly {{\"required\", \"properties\"}}."\
                 .format(name, sub, ", ".join(sorted(keys)) or "nothing")
@@ -1769,19 +2531,21 @@ class Analysis(object):
                 message += " No {} inside if.".format(", ".join(nested))
             bad("rule-shape", message, CLAUSE_HINT, sub)
             return None
-        required, props = node["required"], node["properties"]
+        required, props = node["required"], node.get("properties", {})
         if not isinstance(required, list) or not required or not all(
                 isinstance(item, str) for item in required):
             bad("rule-shape", "{}'s clause at {}: required must list the gate names.".format(
                 name, sub), CLAUSE_HINT, sub + "/required")
             return None
-        if not isinstance(props, dict) or not props:
+        if not isinstance(props, dict) or (not props and "properties" in node):
             bad("rule-shape", "{}'s clause at {}: properties must map each gate to its test."
                 .format(name, sub), CLAUSE_HINT, sub + "/properties")
             return None
         ok = True
-        if set(required) != set(props):
-            untested = [n for n in required if n not in props]
+        present = [n for n in dict.fromkeys(required)
+                   if n not in props and self.presence_field(model, prefix, n) is not None]
+        if set(required) != set(props) | set(present):
+            untested = [n for n in required if n not in props and n not in present]
             unrequired = [n for n in props if n not in required]
             parts = []
             if unrequired:
@@ -1792,20 +2556,51 @@ class Analysis(object):
                     ", ".join(untested), "it" if len(untested) == 1 else "them"))
             bad("rule-unguarded", "{}'s clause at {} {}.".format(name, sub, " and ".join(parts)),
                 "List exactly the tested gates in required: without it a row lacking a gate "
-                "satisfies the if vacuously and the rule fires on it.", sub)
+                "satisfies the if vacuously and the rule fires on it. A name in required with "
+                "no test tests that the field is present, which only a field its object's "
+                "required leaves out can be (SKIP-LOGIC.md, Fields left out).", sub)
             ok = False
         tests = []
         for gate, test in props.items():
             pointer = "{}/properties/{}".format(sub, esc(gate))
-            parsed = self.parse_test(rule, gate, test, pointer, bad)
+            var = join_path(prefix, gate)
+            if prefix is None:
+                rule.top_vars.add(var)
+            if is_clause(test):
+                rule.reach.append((var, pointer, "test"))
+                inner = self.parse_clause(rule, model, test, pointer, bad, var, depth + 1)
+                if inner is None:
+                    ok = False
+                else:
+                    tests.extend(inner["all"])
+                continue
+            parsed = self.parse_test(rule, var, test, pointer, bad)
             if parsed is None:
                 ok = False
                 continue
-            item = {"variable": gate}
+            item = {"variable": var}
             item.update(parsed)
             tests.append(item)
-            rule.gates.append((gate, parsed, pointer))
+            rule.gates.append((var, parsed, pointer))
+        for gate in present:
+            var = join_path(prefix, gate)
+            if prefix is None:
+                rule.top_vars.add(var)
+            tests.append({"variable": var, "test": "present"})
+            rule.gates.append((var, {"test": "present"}, "{}/required/{}".format(
+                sub, required.index(gate))))
         return {"all": tests} if ok else None
+
+    @staticmethod
+    def presence_field(model, prefix, name):
+        """The Field name (under prefix) names when the data may leave it out
+        of its object - the only kind of field a presence test or effect is
+        about - else None."""
+        if not isinstance(name, str):
+            return None
+        field = (model.props.get(name) if prefix is None
+                 else model.fields.get(join_path(prefix, name)))
+        return field if field is not None and field.omittable else None
 
     def parse_test(self, rule, gate, test, pointer, bad):
         name = cap_first(rule.label())
@@ -1820,6 +2615,8 @@ class Analysis(object):
                     name, gate), 'Use {"const": v} for one value; enum is for two or more.',
                     pointer, gate)
                 return None
+            if keys == {"contains"} and is_const_only(test["contains"]):
+                return {"test": "includes", "value": test["contains"]["const"]}
             if keys == {"not"}:
                 inner = test["not"]
                 if isinstance(inner, dict) and set(inner) == {"const"}:
@@ -1827,6 +2624,9 @@ class Analysis(object):
                 if (isinstance(inner, dict) and set(inner) == {"enum"}
                         and isinstance(inner["enum"], list) and inner["enum"]):
                     return {"test": "nin", "values": list(inner["enum"])}
+                if (isinstance(inner, dict) and set(inner) == {"contains"}
+                        and is_const_only(inner["contains"])):
+                    return {"test": "excludes", "value": inner["contains"]["const"]}
             elif "type" in keys:
                 found = self.parse_range(rule, gate, test, pointer, bad, "test")
                 if found is None:
@@ -1878,31 +2678,29 @@ class Analysis(object):
             bad("rule-shape", "{}'s then is not an object.".format(name), THEN_HINT, "/then")
             return None
         keys = set(node)
-        effects, ok = [], True
-        if keys == {"properties"} and isinstance(node["properties"], dict) and node["properties"]:
+        if keys and keys <= {"required", "properties"}:
             rule.mode = "all"
-            for target, effect in node["properties"].items():
-                pointer = "/then/properties/" + esc(target)
-                parsed = self.parse_effect(rule, model, target, effect, pointer, bad)
-                if parsed is None:
-                    ok = False
-                    continue
-                item = {"variable": target}
-                item.update(parsed)
-                effects.append(item)
-                rule.targets.append((target, parsed, pointer))
+            effects, ok = self.parse_object_effects(rule, model, node, "/then", bad, rule.scope)
             return {"mode": "all", "effects": effects} if ok else None
         if keys == {"anyOf"} and isinstance(node["anyOf"], list) and len(node["anyOf"]) >= 2:
             rule.mode = "any"
+            effects, ok = [], True
             for k, alt in enumerate(node["anyOf"]):
                 sub = "/then/anyOf/{}".format(k)
+                if (isinstance(alt, dict) and set(alt) == {"required"}
+                        and isinstance(alt["required"], list) and len(alt["required"]) == 1
+                        and isinstance(alt["required"][0], str)):
+                    found, alt_ok = self.parse_object_effects(rule, model, alt, sub, bad, rule.scope)
+                    effects.extend(found)
+                    ok = ok and alt_ok
+                    continue
                 if not (isinstance(alt, dict) and set(alt) == {"required", "properties"}
                         and isinstance(alt["required"], list) and len(alt["required"]) == 1
                         and isinstance(alt["required"][0], str)
                         and isinstance(alt["properties"], dict) and len(alt["properties"]) == 1):
                     bad("rule-shape", "{}'s then.anyOf[{}] is not {{\"required\": [t], "
-                        "\"properties\": {{t: effect}}}} for one target t.".format(name, k),
-                        THEN_HINT, sub)
+                        "\"properties\": {{t: effect}}}} or {{\"required\": [t]}} for one target t."
+                        .format(name, k), THEN_HINT, sub)
                     ok = False
                     continue
                 target = next(iter(alt["properties"]))
@@ -1910,35 +2708,115 @@ class Analysis(object):
                     bad("rule-unguarded", "{}'s then.anyOf[{}] requires {} but constrains {}."
                         .format(name, k, alt["required"][0], target),
                         "Require the same target the alternative constrains, or a row lacking it "
-                        "satisfies the alternative vacuously.", sub, target)
+                        "satisfies the alternative vacuously.", sub, join_path(rule.scope, target))
                     ok = False
                     continue
-                pointer = "{}/properties/{}".format(sub, esc(target))
-                parsed = self.parse_effect(rule, model, target, alt["properties"][target],
-                                           pointer, bad)
-                if parsed is None:
+                found, alt_ok = self.parse_effects(rule, model, alt["properties"],
+                                                   sub + "/properties", bad, rule.scope)
+                if not alt_ok:
                     ok = False
                     continue
-                item = {"variable": target}
-                item.update(parsed)
-                effects.append(item)
-                rule.targets.append((target, parsed, pointer))
+                if len(found) != 1:
+                    bad("rule-shape", "{}'s then.anyOf[{}] constrains {} fields; each alternative "
+                        "constrains one.".format(name, k, len(found)), THEN_HINT, sub)
+                    ok = False
+                    continue
+                if found[0]["effect"] == "absent":
+                    bad("rule-shape", "{}'s then.anyOf[{}] requires {} and leaves it out, so it "
+                        "never holds.".format(name, k, found[0]["variable"]), THEN_HINT, sub,
+                        found[0]["variable"])
+                    ok = False
+                    continue
+                effects.extend(found)
             return {"mode": "any", "effects": effects} if ok else None
         nested = sorted(keys & {"if", "then", "else", "allOf", "oneOf", "not", "$ref"})
-        if keys == {"properties"}:
-            message = "{}'s then.properties names no target.".format(name)
-        elif keys == {"anyOf"}:
+        if keys == {"anyOf"}:
             message = "{}'s then.anyOf needs two or more alternatives.".format(name)
         else:
-            message = "{}'s then has {}; a then is {{\"properties\": {{...}}}} or {{\"anyOf\": " \
-                      "[two or more alternatives]}}.".format(name, ", ".join(sorted(keys)) or "nothing")
+            message = "{}'s then has {}; a then is {{\"properties\": {{...}}}}, {{\"required\": " \
+                      "[...]}} or both, or {{\"anyOf\": [two or more alternatives]}}.".format(
+                          name, ", ".join(sorted(keys)) or "nothing")
         if nested:
             message += " No {} inside then.".format(", ".join(nested))
         bad("rule-shape", message, THEN_HINT, "/then")
         return None
 
+    def parse_object_effects(self, rule, model, node, base, bad, prefix, depth=0):
+        """(effects, ok) for a then, an "at least one" alternative, or an effect
+        reaching into a group: {"properties": {target: effect, ...}} and/or
+        {"required": [targets]} - each name in required must be present."""
+        name = cap_first(rule.label())
+        place = ("then" if base == "/then" else "then.anyOf[{}]".format(base.rsplit("/", 1)[1])
+                 if base.startswith("/then/anyOf/") else "effect at " + base)
+        effects, ok = [], True
+        props = node.get("properties")
+        if "properties" in node:
+            if not isinstance(props, dict) or not props:
+                bad("rule-shape", "{}'s {}.properties names no target.".format(name, place),
+                    THEN_HINT, base + "/properties")
+                ok = False
+            else:
+                found, props_ok = self.parse_effects(rule, model, props, base + "/properties",
+                                                     bad, prefix, depth)
+                effects.extend(found)
+                ok = ok and props_ok
+        if "required" in node:
+            required = node["required"]
+            if (not isinstance(required, list) or not required
+                    or not all(isinstance(target, str) for target in required)
+                    or len(set(required)) != len(required)):
+                bad("rule-shape", "{}'s {}.required must list each target that must be present, "
+                    "once.".format(name, place), THEN_HINT, base + "/required")
+                return effects, False
+            for k, target in enumerate(required):
+                pointer = "{}/required/{}".format(base, k)
+                var = join_path(prefix, target)
+                if isinstance(props, dict) and props.get(target) is False:
+                    bad("rule-shape", "{} both requires {} and leaves it out, so it never holds."
+                        .format(name, var), THEN_HINT, pointer, var)
+                    ok = False
+                    continue
+                if prefix is None:
+                    rule.top_vars.add(var)
+                effects.append({"variable": var, "effect": "present"})
+                rule.targets.append((var, {"effect": "present"}, pointer))
+        return effects, ok
+
+    def parse_effects(self, rule, model, props, base, bad, prefix, depth=0):
+        """(effects on full paths, ok) for a then's properties; an effect on a
+        group may be {"properties": {field: effect}}, {"required": [field]} or
+        both, on the group's fields."""
+        effects, ok = [], True
+        if depth > MAX_DEPTH:
+            bad("rule-shape", "{}'s effect at {} reaches more than six levels into groups.".format(
+                cap_first(rule.label()), base), REACH_HINT, base)
+            return effects, False
+        for target, effect in props.items():
+            pointer = "{}/{}".format(base, esc(target))
+            var = join_path(prefix, target)
+            if prefix is None:
+                rule.top_vars.add(var)
+            if isinstance(effect, dict) and effect and set(effect) <= {"properties", "required"}:
+                rule.reach.append((var, pointer, "effect"))
+                inner, inner_ok = self.parse_object_effects(rule, model, effect, pointer, bad, var,
+                                                            depth + 1)
+                effects.extend(inner)
+                ok = ok and inner_ok
+                continue
+            parsed = self.parse_effect(rule, model, var, effect, pointer, bad)
+            if parsed is None:
+                ok = False
+                continue
+            item = {"variable": var}
+            item.update(parsed)
+            effects.append(item)
+            rule.targets.append((var, parsed, pointer))
+        return effects, ok
+
     def parse_effect(self, rule, model, target, effect, pointer, bad):
         name = cap_first(rule.label())
+        if effect is False:
+            return {"effect": "absent"}
         if isinstance(effect, dict):
             keys = set(effect)
             if keys == {"const"}:
@@ -1949,6 +2827,21 @@ class Analysis(object):
                 return {"effect": "in", "values": list(effect["enum"])}
             if keys == {"anyOf"} and isinstance(effect["anyOf"], list) and effect["anyOf"]:
                 return self.parse_narrowing(rule, model, target, effect["anyOf"], pointer, bad)
+            if keys and keys <= {"minItems", "maxItems"} and all(
+                    is_integral(effect[key]) and effect[key] >= 0 for key in keys):
+                low, high = effect.get("minItems"), effect.get("maxItems")
+                if keys == {"maxItems"} and high == 0:
+                    return {"effect": "empty"}
+                if keys == {"minItems"} and low == 1:
+                    return {"effect": "nonempty"}
+                if low == 0 or (low is not None and high is not None and low > high):
+                    bad("rule-shape", "{}'s effect on {} ({}) {}.".format(
+                        name, target, show(effect), "says nothing: every list has at least 0 "
+                        "entries" if low == 0 else "never holds"), EFFECT_HINT, pointer, target)
+                    return None
+                out = {"effect": "count"}
+                out.update({key: int(effect[key]) for key in ("minItems", "maxItems") if key in effect})
+                return out
         bad("rule-shape", "{}'s effect on {} ({}) is not a rule effect.".format(
             name, target, show(effect)), EFFECT_HINT, pointer, target)
         return None
@@ -1971,7 +2864,7 @@ class Analysis(object):
                 also.append(branch["const"])
                 continue
             if isinstance(branch, dict) and set(branch) == {"$ref"} and isinstance(branch["$ref"], str):
-                resolved, _ = self.pkg.lookup(model.uri, branch["$ref"])
+                resolved, _ = self.pkg.lookup(self.pkg.uri[rule.file], branch["$ref"])
                 if resolved is None:
                     rule.grammar_ok = False  # unresolved-ref already says why
                     ok = False
@@ -1994,27 +2887,83 @@ class Analysis(object):
         return out
 
     def check_rule_meaning(self, rule, model):
-        props = model.props
         stand_down = bool(model.unresolved_categories)
         name = cap_first(rule.label())
-        where = {"file": model.mother, "table": model.name, "rule": rule.id}
+        where = {"file": rule.file, "table": model.name, "rule": rule.id, "topic": rule.topic}
+        home = ("no category of {} declares".format(model.name) if rule.scope is None
+                else "{} does not hold".format(rule.scope))
+        blocked = []
+
+        def under(path):
+            return any(path.startswith(stop + ".") or path.startswith(stop + "[")
+                       for stop in blocked)
+
+        def where_to_add(path):
+            return ("add the property to its category file" if path in rule.top_vars
+                    else "add the field to its object's properties")
+
+        for group, sub, what in rule.reach:
+            if under(group):
+                continue
+            field = rule_field(model, rule, group)
+            if field is None:
+                blocked.append(group)
+                if not stand_down:
+                    self.add("error", "rule-dangling",
+                             "{} {} the fields of {}, which {}.".format(
+                                 name, "tests" if what == "test" else "constrains", group, home),
+                             "Fix the name, or {} - until then the rule {}.".format(
+                                 where_to_add(group), "never fires" if what == "test"
+                                 else "constrains nothing"),
+                             pointer=rule.pointer + sub, variable=group, **where)
+                continue
+            if field.shape != "group":
+                blocked.append(group)
+                rule.grammar_ok = False
+                kind = {"list": "a list", "entries": "a list of entries", "lookup": "a lookup",
+                        "mixed": "a mixed value"}.get(field.shape, "a single value")
+                self.add("error", "rule-shape",
+                         "{} reaches into {}, which is {}, not a group.".format(name, group, kind),
+                         "A rule reaches only into a group's fields; a rule about each entry of a "
+                         "list lives in that list's items.allOf (SKIP-LOGIC.md, Rules inside "
+                         "nested values)." if field.shape in ("list", "entries")
+                         else (TEST_HINT if what == "test" else EFFECT_HINT),
+                         pointer=rule.pointer + sub, variable=group, **where)
         for gate, test, sub in rule.gates:
+            if under(gate):
+                continue
             pointer = rule.pointer + sub
-            prop = props.get(gate)
+            prop = rule_field(model, rule, gate)
             if prop is None:
                 if not stand_down:
                     self.add("error", "rule-dangling",
-                             "{} tests {}, which no category of {} declares.".format(
-                                 name, gate, model.name),
-                             "Fix the name, or add the property to its category file - until "
-                             "then the rule never fires.", pointer=pointer, variable=gate, **where)
+                             "{} tests {}, which {}.".format(name, gate, home),
+                             "Fix the name, or {} - until then the rule never fires.".format(
+                                 where_to_add(gate)), pointer=pointer, variable=gate, **where)
+                continue
+            if test["test"] in ("includes", "excludes"):
+                if prop.shape != "list":
+                    rule.grammar_ok = False
+                    self.add("error", "rule-shape",
+                             "{} tests whether {} includes {}, but {} is not a list of values."
+                             .format(name, gate, show(test["value"]), gate), TEST_HINT,
+                             pointer=pointer, variable=gate, **where)
+                elif prop.admits_item(test["value"]) is False:
+                    allowed = prop.item_allowed_text()
+                    self.add("warning", "trigger-undeclared-level",
+                             "{} triggers on {} including {}, which {} does not declare.".format(
+                                 name, gate, show(test["value"]), gate),
+                             "Trigger on a code {} declares{}, or declare the code in its "
+                             "category file: a trigger on an undeclared value never fires."
+                             .format(gate, " ({})".format(clip(allowed, 160)) if allowed else ""),
+                             pointer=pointer, variable=gate, **where)
                 continue
             values = [test["value"]] if "value" in test else list(test.get("values", []))
             if test["test"] == "range":
                 values = []
             for value in dedupe_values(values):
                 if prop.admits(value) is False:
-                    allowed = describe_allowed(prop.profile())
+                    allowed = prop.allowed_text()
                     self.add("warning", "trigger-undeclared-level",
                              "{} triggers on {} = {}, which {} does not declare.".format(
                                  name, gate, show(value), gate),
@@ -2036,25 +2985,54 @@ class Analysis(object):
                                  ", ".join(show(v) for v in loose), joined(loose, "or")),
                              pointer=pointer, variable=gate, **where)
         for target, effect, sub in rule.targets:
+            if under(target):
+                continue
             pointer = rule.pointer + sub
-            prop = props.get(target)
+            prop = rule_field(model, rule, target)
             if prop is None:
                 if not stand_down:
                     self.add("error", "rule-dangling",
-                             "{} constrains {}, which no category of {} declares.".format(
-                                 name, target, model.name),
-                             "Fix the name, or add the property to its category file - until "
-                             "then the rule can let an undeclared column through.",
+                             "{} constrains {}, which {}.".format(name, target, home),
+                             "Fix the name, or {} - until then the rule can let an undeclared "
+                             "column through.".format(where_to_add(target)),
                              pointer=pointer, variable=target, **where)
                 continue
             kind = effect["effect"]
+            if kind in ("present", "absent") and not prop.omittable:
+                rule.grammar_ok = False
+                if kind == "present":
+                    self.add("error", "rule-shape",
+                             "{} requires {} to be present, which it always is: its object's "
+                             "required lists it.".format(name, target),
+                             "A presence effect is for a field the data may leave out (its "
+                             "object's required omits it, citing a person's decision). For a field "
+                             'always present, forbid the structural code instead: {"not": '
+                             '{"const": c}} (SKIP-LOGIC.md, Fields left out).',
+                             pointer=pointer, variable=target, **where)
+                else:
+                    self.add("error", "rule-shape",
+                             "{} leaves {} out, but its object's required lists it, so every "
+                             "value the rule applies to fails.".format(name, target),
+                             'Pin the structural code instead ({"const": c}); or, when the data '
+                             "does leave the field out, drop it from required and cite the "
+                             "person's decision on its required facet (SKIP-LOGIC.md, Fields "
+                             "left out).", pointer=pointer, variable=target, **where)
+                continue
+            if kind in ("empty", "nonempty", "count") and prop.shape not in ("list", "entries"):
+                rule.grammar_ok = False
+                self.add("error", "rule-shape",
+                         "{} makes {} {}, but {} is not a list.".format(
+                             name, target, "an empty list" if kind == "empty"
+                             else "a list with at least one entry" if kind == "nonempty"
+                             else "a list of so many entries", target),
+                         EFFECT_HINT, pointer=pointer, variable=target, **where)
             pinned = ([effect["value"]] if kind == "eq" else effect["values"] if kind == "in"
                       else effect["also"] if kind == "range" else [])
             undeclared = set()
             for value in dedupe_values(pinned):
                 if prop.admits(value) is False:
                     undeclared.add(literal_key(value))
-                    allowed = describe_allowed(prop.profile())
+                    allowed = prop.allowed_text()
                     self.add("error", "rule-undeclared-code",
                              "{} pins {} to {}, which {} does not declare.".format(
                                  name, target, show(value), target),
@@ -2063,14 +3041,15 @@ class Analysis(object):
                                              if allowed else ""),
                              pointer=pointer, variable=target, **where)
             if rule.kind == "skip":
-                if kind != "eq":
+                if kind not in ("eq", "absent"):
                     self.add("error", "skip-shape",
                              "{} is a Skip pattern, but its effect on {} is not a const pin."
                              .format(name, target),
                              "A Skip pattern pins the structural code: {\"const\": c}, with c "
-                             "marked \"x-value-kind\": \"sentinel\". Any other effect is a "
-                             "'<Domain> routing' rule.", pointer=pointer, variable=target, **where)
-                elif literal_key(effect["value"]) not in undeclared:
+                             "marked \"x-value-kind\": \"sentinel\" - or, for a field the "
+                             "data leaves out when it was not asked, false. Any other effect is "
+                             "a '<Domain> routing' rule.", pointer=pointer, variable=target, **where)
+                elif kind == "eq" and literal_key(effect["value"]) not in undeclared:
                     kinds = [code.kind for code in prop.profile()["codes"]
                              if literal_key(code.value) == literal_key(effect["value"])]
                     if "sentinel" not in kinds:
@@ -2081,13 +3060,14 @@ class Analysis(object):
                                  "sentinel (on its branch or shared definition), or, if the pin "
                                  "is a real value, label the rule '<Domain> routing'.",
                                  pointer=pointer, variable=target, **where)
-            elif rule.kind == "applicability" and kind != "ne":
+            elif rule.kind == "applicability" and kind not in ("ne", "present"):
                 self.add("error", "applicability-shape",
                          "{} is an Applicability half, but its effect on {} is not "
                          "{{\"not\": {{\"const\": c}}}}.".format(name, target),
-                         "The applicability half only forbids the structural code; a then that "
-                         "demands a value outlaws honest missingness (SKIP-LOGIC.md, Skip pairs).",
-                         pointer=pointer, variable=target, **where)
+                         "The applicability half only forbids the structural code - or, for a "
+                         "field the data leaves out only when it was not asked, requires it; a "
+                         "then that demands a value outlaws honest missingness (SKIP-LOGIC.md, "
+                         "Skip pairs).", pointer=pointer, variable=target, **where)
 
     def check_rule_ids(self, model):
         first = {}
@@ -2101,8 +3081,8 @@ class Analysis(object):
                              rule.id, KIND_WORDS.get(rule.kind, "rule"), model.name,
                              first[key].pointer, rule.pointer),
                          "Give each rule its own id; a skip/applicability pair shares one id, one "
-                         "entry per half.", file=model.mother, pointer=rule.pointer,
-                         table=model.name, rule=rule.id)
+                         "entry per half.", file=rule.file, pointer=rule.pointer,
+                         table=model.name, topic=rule.topic, rule=rule.id)
             else:
                 first[key] = rule
         halves = {}
@@ -2112,12 +3092,25 @@ class Analysis(object):
             for have, lack in (("skip", "applicability"), ("applicability", "skip")):
                 if have in kinds and lack not in kinds:
                     self.add("warning", "missing-twin",
-                             "{} has a {} half but no {} half in {}.".format(
-                                 rule_id, KIND_WORDS[have], KIND_WORDS[lack], model.name),
+                             "{} has {} {} half but no {} half in {}.".format(
+                                 rule_id, "an" if have == "applicability" else "a",
+                                 KIND_WORDS[have], KIND_WORDS[lack], model.name),
                              "Add the twin with the same id, so the rule holds both ways (it "
                              "rides the same x-provenance); a one-directional pin is '<Domain> "
-                             "routing'.", file=model.mother, pointer=kinds[have].pointer,
-                             table=model.name, rule=rule_id)
+                             "routing', and a presence effect on a variable whose pair is "
+                             "coded joins that pair's applicability half (SKIP-LOGIC.md, Fields "
+                             "left out).", file=kinds[have].file, pointer=kinds[have].pointer,
+                             table=model.name, topic=kinds[have].topic, rule=rule_id)
+            if ("skip" in kinds and "applicability" in kinds
+                    and kinds["skip"].scope != kinds["applicability"].scope):
+                half = kinds["applicability"]
+                self.add("error", "duplicate-rule",
+                         "{}'s Skip pattern half is in {} but its Applicability half is in {}."
+                         .format(rule_id, kinds["skip"].where_label(), half.where_label()),
+                         "A pair's two halves state one routing fact in one place: put both in "
+                         "the mother's items.allOf, or both in the same object's allOf - or give "
+                         "one of them its own id.", file=half.file, pointer=half.pointer,
+                         table=model.name, topic=half.topic, rule=rule_id)
 
     # -- x-provenance
 
@@ -2128,8 +3121,8 @@ class Analysis(object):
                     continue
                 prop = self.prop_by_id.get(id(node))
                 if prop is not None and prop.file == rel:
-                    codes = lambda prop=prop: [c.value for c in prop.profile()["codes"]]
-                    owner = prop.name
+                    codes = prop.declared_codes
+                    owner = prop.path
                 elif id(node) in self.def_by_id:
                     codes = lambda node=node, rel=rel: [c.value for c in value_profile(
                         self.pkg, node, self.pkg.resolver(self.pkg.uri[rel]))["codes"]]
@@ -2143,9 +3136,9 @@ class Analysis(object):
         for model in self.tables.values():
             for rule in model.rules:
                 if "x-provenance" in rule.node:
-                    self.lint_provenance_site(model.mother, rule.pointer, rule.node["x-provenance"],
+                    self.lint_provenance_site(rule.file, rule.pointer, rule.node["x-provenance"],
                                               lambda rule=rule, model=model: rule_codes(rule, model),
-                                              rule.label())
+                                              rule.label(), rule)
         if not self.prov.present:
             self.add("info", "provenance-unchecked",
                      "provenance.json is missing, so x-provenance references were checked for "
@@ -2153,14 +3146,13 @@ class Analysis(object):
                      "`schemify.py build` writes provenance.json; rerun after it to check that every "
                      "reference names a citable source or decision.", file="../provenance.json")
 
-    def lint_provenance_site(self, rel, pointer, value, codes, owner):
+    def lint_provenance_site(self, rel, pointer, value, codes, owner, rule=None):
         at = pointer + "/x-provenance"
         where = self.where(rel, at)
-        if self.mother_table.get(rel) and pointer.startswith("/items/allOf/"):
-            rule = next((r for m in self.tables.values() for r in m.rules
-                         if m.mother == rel and r.pointer == pointer), None)
-            if rule is not None:
-                where["rule"] = rule.id
+        if rule is not None:
+            where["rule"] = rule.id
+            if rule.topic is not None:
+                where["topic"] = rule.topic
         ok = True
 
         def shape(message, sub=""):
@@ -2273,7 +3265,9 @@ class Analysis(object):
                                      "{}: x-value-kind is {}.".format(rel, show(value)),
                                      'x-value-kind is "sentinel" (no substantive answer) or "value" '
                                      "(a real answer).", **where)
-                    if key in DISCOURAGED:
+                    if key in DISCOURAGED and not (
+                            (key in CONTAINS_KEYS and id(node) in self.list_nodes)
+                            or (key in LENGTH_KEYS and self.length_cited(rel, here, node, key))):
                         self.add("warning", "discouraged-keyword",
                                  "{}: {} at {}.".format(rel, key, here or "/"),
                                  "Drop {}: {} (SCHEMA-STYLE.md, Keywords never used).".format(
@@ -2295,10 +3289,48 @@ class Analysis(object):
                                  **where)
                     if key == "if":
                         self.add("error", "conditional-outside-mother",
-                                 "{} has an if at {}; conditionals live only in the mother's "
-                                 "items.allOf.".format(rel, here or "/"),
+                                 "{} has an if at {}; conditionals live in the mother's "
+                                 "items.allOf, or among one group's or entry's fields in that "
+                                 "object's allOf (SKIP-LOGIC.md).".format(rel, here or "/"),
                                  "Move it into the mother as a rule entry with $comment, "
-                                 "x-provenance, if and then (SKIP-LOGIC.md).", **where)
+                                 "x-provenance, if and then - or, for a rule among one group's "
+                                 "or entry's own fields, into that object's allOf "
+                                 "(SKIP-LOGIC.md).", **where)
+
+    def length_cited(self, rel, here, node, key):
+        """Whether x-provenance cites minLength/maxLength (key) on the node
+        that carries it, the field it belongs to, or its $defs entry."""
+        if isinstance(node.get("x-provenance"), dict) and key in node["x-provenance"]:
+            return True
+        field = self.field_at(rel, here)
+        if field is not None and isinstance(field.schema, dict) and isinstance(
+                field.schema.get("x-provenance"), dict) and key in field.schema["x-provenance"]:
+            return True
+        parts = here.split("/")
+        if len(parts) >= 3 and parts[1] == "$defs":
+            defs = self.pkg.docs.get(rel, {}).get("$defs")
+            entry = defs.get(unesc(parts[2])) if isinstance(defs, dict) else None
+            provenance = entry.get("x-provenance") if isinstance(entry, dict) else None
+            return isinstance(provenance, dict) and key in provenance
+        return False
+
+
+def is_const_only(node):
+    return isinstance(node, dict) and set(node) == {"const"}
+
+
+def is_clause(node):
+    """Whether a rule's test on a group is a clause on the group's own fields:
+    {"required": [...], "properties": {...}}, or {"required": [...]} alone."""
+    return isinstance(node, dict) and "required" in node and set(node) <= {"required", "properties"}
+
+
+def is_rule_entry(entry):
+    """Whether an allOf entry is meant as a rule: it has if, then or else, or a
+    $comment that begins with a rule label."""
+    comment = entry.get("$comment") if isinstance(entry, dict) else None
+    return isinstance(entry, dict) and (any(key in entry for key in ("if", "then", "else")) or (
+        isinstance(comment, str) and RULE_PREFIX_RE.match(comment) is not None))
 
 
 def defines_code(node):
@@ -2312,9 +3344,9 @@ def defines_code(node):
 def rule_codes(rule, model):
     values = []
     for name, part, _ in rule.gates + rule.targets:
-        prop = model.props.get(name)
+        prop = rule_field(model, rule, name)
         if prop is not None:
-            values.extend(code.value for code in prop.profile()["codes"])
+            values.extend(prop.declared_codes())
         values.extend([part["value"]] if "value" in part else part.get("values", []))
         values.extend(part.get("also", []))
     return values
@@ -2370,6 +3402,24 @@ def select_tables(an, table):
 # -------------------------------------------------------------- row checks
 
 
+# Where a finding sits: its column, its display path (household[2].age), its
+# field (household[].age), and - for a missing or undeclared field - the
+# object holding it, as (display path, field) and the key.
+Site = namedtuple("Site", "column path field holder key")
+NO_SITE = Site(None, None, None, None, None)
+
+
+class RowFinding(dict):
+    """One finding about a row - the dict that is printed - plus the rule
+    entry it comes from (rule_obj), which the toy-data verdicts read."""
+
+    __slots__ = ("rule_obj",)
+
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        self.rule_obj = None
+
+
 class RowChecker(object):
     """Validates rows one at a time against a table's items, and turns
     jsonschema's errors into findings a person can act on."""
@@ -2379,11 +3429,13 @@ class RowChecker(object):
         self.model = model
         self.declared = set(model.props)
         self.validator, self.direct = self.build_validator()
-        self.rules = {rule.index: rule for rule in model.rules}
+        self.rules = {rule.index: rule for rule in model.rules if rule.scope is None}
+        self.nested = {id(rule.node): rule for rule in model.rules if rule.scope is not None}
         root = model.doc
         self.min_items = root.get("minItems") if is_integral(root.get("minItems")) else None
         self.unique = root.get("uniqueItems") is True
         self._allowed = {}
+        self._absent_seen = {}
 
     def build_validator(self):
         """A validator for one row, and whether undeclared columns are found
@@ -2412,7 +3464,8 @@ class RowChecker(object):
     def check_rows(self, rows, empties=frozenset()):
         out = []
         if self.min_items is not None and len(rows) < self.min_items:
-            out.append({"row": None, "column": None, "keyword": "minItems",
+            out.append({"row": None, "column": None, "field": None, "path": None,
+                        "keyword": "minItems",
                         "message": "The file has {}; the table needs at least {}.".format(
                             plural(len(rows), "row"), self.min_items),
                         "hint": "Add rows: an empty or short file fails this table."})
@@ -2423,7 +3476,8 @@ class RowChecker(object):
                 key = canonical_json(row)
                 first = seen.setdefault(key, i)
                 if first != i:
-                    out.append({"row": i, "column": None, "keyword": "uniqueItems",
+                    out.append({"row": i, "column": None, "field": None, "path": None,
+                                "keyword": "uniqueItems",
                                 "message": "Row {} repeats row {} exactly.".format(i, first),
                                 "hint": "The table does not allow two identical rows; remove the "
                                         "repeat."})
@@ -2432,10 +3486,11 @@ class RowChecker(object):
 
     def check_row(self, row, i, empties=frozenset()):
         bad_cells = nonfinite_cells(row)
+        self._absent_seen = {}
         try:
             errors = list(self.validator.iter_errors(row))
         except Exception as exc:  # a schema the validator cannot run: reported, never raised
-            return [{"row": i, "column": None, "keyword": "error",
+            return [{"row": i, "column": None, "field": None, "path": None, "keyword": "error",
                      "message": clip("The validator could not check this row ({}: {}).".format(
                          type(exc).__name__, exc)),
                      "hint": "Run `validate.py check` and fix the schema errors it reports."}]
@@ -2443,59 +3498,232 @@ class RowChecker(object):
         for error in errors:
             out.extend(self.describe(error, row, i, empties))
         if self.direct and isinstance(row, dict):
-            out.extend({"row": i, "column": key, "keyword": "unevaluatedProperties",
+            out.extend({"row": i, "column": key, "field": key, "path": key,
+                        "keyword": "unevaluatedProperties",
                         "message": clip("{} is not a column of this table.".format(key)),
                         "hint": clip(UNDECLARED_HINT.format(key))}
                        for key in row if key not in self.declared)
         if bad_cells:
             out = [item for item in out if item["column"] not in bad_cells]
-            for column, token in bad_cells.items():
-                out.append({"row": i, "column": column, "keyword": "non-finite",
+            for column, (token, steps) in bad_cells.items():
+                path, field = self.place([column] + steps) if column is not None else (None, None)
+                out.append({"row": i, "column": column, "field": field, "path": path,
+                            "keyword": "non-finite",
                             "message": "{} holds {}, which is not a number JSON can hold.".format(
-                                column if column is not None else "The row", token),
+                                path if path is not None else "The row", token),
                             "hint": "JSON has no NaN or Infinity; write the field's missing-value "
                                     "code, or a real number."})
         return out
 
     def describe(self, error, row, i, empties):
-        path = list(error.absolute_path)
+        if (error.validator in ("anyOf", "oneOf") and error.context
+                and isinstance(error.instance, (list, dict))):
+            inner = self.branch_errors(error)
+            if inner:
+                out = []
+                for sub in inner:
+                    out.extend(self.describe(sub, row, i, empties))
+                return out
+        tokens = list(error.absolute_path)
         rule = self.attribute(error)
-        if path:
-            columns = [path[0] if isinstance(path[0], str) else None]
-        elif error.validator == "required":
-            columns = [self.required_name(error, row)]
-        elif error.validator == "unevaluatedProperties":
-            if not isinstance(row, dict):
-                return []
-            # Every column of a failing category is reported as unevaluated too;
-            # only the ones no category declares are real.
-            columns = [key for key in row if key not in self.declared and repr(key) in error.message]
-            if not columns:
-                return []
-        else:
-            columns = [None]
+        sites = (self.absent_sites(error, rule, tokens, row) if is_false_error(error)
+                 else self.sites(error, tokens, row))
+        scope_path = (self.scope_display(tokens, rule.scope)
+                      if rule is not None and rule.scope is not None and tokens else None)
         out = []
-        for column in columns:
-            empty = column is not None and (i, column) in empties
-            item = {"row": i, "column": column, "keyword": error.validator,
-                    "message": clip(self.message(error, column, rule, empty)),
-                    "hint": clip(self.hint(error, column, rule, empty))}
+        for site in sites:
+            empty = (site.column is not None and site.path == site.column
+                     and (i, site.column) in empties)
+            item = RowFinding()
+            item["row"] = i
+            item["column"] = site.column
+            item["field"] = site.field
+            item["path"] = site.path
+            item["keyword"] = "false" if is_false_error(error) else error.validator
+            item["message"] = clip(self.message(error, site, rule, empty))
+            item["hint"] = clip(self.hint(error, site, rule, empty, scope_path))
             if rule is not None:
                 if rule.id:
                     item["rule"] = rule.id
-                item["allof_index"] = rule.index
+                if rule.scope is None:
+                    item["allof_index"] = rule.index
+                else:
+                    item["rule_scope"] = rule.scope
+                item.rule_obj = rule
             if empty:
                 item["empty_cell"] = True
             out.append(item)
         return out
+
+    def sites(self, error, tokens, row):
+        keyword = error.validator
+        if not tokens:
+            if keyword == "required":
+                name = self.required_name(error, row)
+                return [Site(name, name, name, None, name)]
+            if keyword == "unevaluatedProperties":
+                if not isinstance(row, dict):
+                    return []
+                # Every column of a failing category is reported as unevaluated too;
+                # only the ones no category declares are real.
+                return [Site(key, key, key, None, key) for key in row
+                        if key not in self.declared and repr(key) in error.message]
+            return [NO_SITE]
+        column = tokens[0] if isinstance(tokens[0], str) else None
+        if column is None:
+            return [NO_SITE]
+        path, field = self.place(tokens)
+        if keyword == "required":
+            name = self.required_name(error, error.instance)
+            if name is None:
+                return [Site(column, path, field, None, None)]
+            return [Site(column, join_path(path, name), self.step(field, name), (path, field),
+                         name)]
+        if keyword in ("additionalProperties", "unevaluatedProperties") and isinstance(
+                error.instance, dict):
+            extras = self.extra_keys(error)
+            if extras:
+                return [Site(column, join_path(path, key), self.step(field, key), (path, field),
+                             key) for key in extras]
+            if keyword == "unevaluatedProperties":
+                return []
+        return [Site(column, path, field, None, None)]
+
+    def absent_sites(self, error, rule, tokens, row):
+        """Where a {"t": false} effect found t present. jsonschema names neither
+        the field nor the keyword - the error sits on the object, the value
+        is t's - so the name comes from the rule's then: the k-th such error
+        on one object is its k-th present name, in the then's order."""
+        names = false_names(error, rule, row)
+        seen = (tuple(tokens), tuple(error.absolute_schema_path))
+        k = self._absent_seen.get(seen, 0)
+        self._absent_seen[seen] = k + 1
+        name = names[min(k, len(names) - 1)] if names else None
+        if not tokens:
+            return [Site(name, name, name, None, name)] if name is not None else [NO_SITE]
+        column = tokens[0] if isinstance(tokens[0], str) else None
+        if column is None:
+            return [NO_SITE]
+        path, field = self.place(tokens)
+        if name is None:
+            return [Site(column, path, field, None, None)]
+        return [Site(column, join_path(path, name), self.step(field, name), (path, field), name)]
+
+    def place(self, tokens):
+        """(display path, field) of an instance path: positions count from 1
+        in the display and become [] in the field; a lookup's names become .*."""
+        path = field = tokens[0]
+        for token in tokens[1:]:
+            if isinstance(token, int):
+                path += "[{}]".format(token + 1)
+                field += "[]"
+            else:
+                path = join_path(path, str(token))
+                field = self.step(field, str(token))
+        return path, field
+
+    def step(self, field, key):
+        return field_step(self.model.fields, field, key)
+
+    def scope_display(self, tokens, scope):
+        """The display path of the object a nested rule applies to."""
+        path = field = tokens[0]
+        if field == scope:
+            return path
+        for token in tokens[1:]:
+            if isinstance(token, int):
+                path += "[{}]".format(token + 1)
+                field += "[]"
+            else:
+                path = join_path(path, str(token))
+                field = self.step(field, str(token))
+            if field == scope:
+                return path
+        return scope
+
+    def branch_errors(self, error):
+        """The errors of the one branch of a failing anyOf/oneOf that takes a
+        value of this kind (the list branch, for a list), or None."""
+        branches = error.validator_value if isinstance(error.validator_value, list) else []
+        want = "array" if isinstance(error.instance, list) else "object"
+        matching = []
+        for k, branch in enumerate(branches):
+            site = self.an.pkg.node_at.get(id(branch)) if isinstance(branch, dict) else None
+            target = self.an.deref(branch, site[0])[0] if site is not None else branch
+            if want in json_kinds(target):
+                matching.append(k)
+        if len(matching) != 1:
+            return None
+        return [sub for sub in error.context
+                if sub.relative_schema_path and sub.relative_schema_path[0] == matching[0]] or None
+
+    @staticmethod
+    def extra_keys(error):
+        schema = error.schema if isinstance(error.schema, dict) else {}
+        props = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+        if error.validator == "unevaluatedProperties":
+            return [key for key in error.instance if key not in props and repr(key) in error.message]
+        patterns = (schema.get("patternProperties")
+                    if isinstance(schema.get("patternProperties"), dict) else {})
+        return [key for key in error.instance if key not in props
+                and not any(search_quietly(pattern, key) for pattern in patterns)]
 
     def attribute(self, error):
         path = list(error.absolute_schema_path)
         while path and path[0] in ("$ref", "items"):
             path.pop(0)
         if len(path) >= 2 and path[0] == "allOf" and isinstance(path[1], int):
-            return self.rules.get(path[1])
-        return None
+            rule = self.rules.get(path[1])
+            if rule is not None:
+                return rule
+        return self.nested_rule(error) if self.nested else None
+
+    def nested_rule(self, error):
+        """The rule entry of a nested object's allOf that the failing keyword
+        sits in, found by walking the schema path from the table's items
+        (jsonschema leaves $ref out of the path, so references are followed
+        wherever the next step is not the node's own keyword)."""
+        pkg = self.an.pkg
+        node, rel, found = self.validator.schema, self.model.mother, None
+        tokens = list(error.absolute_schema_path)
+        i = 0
+        while i < len(tokens) and isinstance(node, dict):
+            token = tokens[i]
+            hops = 0
+            while (isinstance(token, str) and token not in node
+                   and isinstance(node.get("$ref"), str) and hops < REF_HOPS):
+                resolved, _ = pkg.lookup(pkg.uri.get(rel, self.model.uri), node["$ref"])
+                target = resolved.contents if resolved is not None else None
+                site = pkg.node_at.get(id(target)) if isinstance(target, dict) else None
+                if site is None:
+                    return found
+                node, rel = target, site[0]
+                hops += 1
+            if not isinstance(token, str) or token not in node:
+                break
+            value = node[token]
+            i += 1
+            if token in SUB_MAP and isinstance(value, dict):
+                if i >= len(tokens):
+                    break
+                node = value.get(tokens[i])
+                i += 1
+            elif isinstance(value, list):
+                if i >= len(tokens) or not isinstance(tokens[i], int) or not (
+                        0 <= tokens[i] < len(value)):
+                    break
+                node = value[tokens[i]]
+                i += 1
+            elif isinstance(value, dict):
+                node = value
+            else:
+                break
+            if isinstance(node, dict):
+                site = pkg.node_at.get(id(node))
+                if site is not None:
+                    rel = site[0]
+                found = self.nested.get(id(node), found)
+        return found
 
     @staticmethod
     def required_name(error, row):
@@ -2507,26 +3735,49 @@ class RowChecker(object):
                 return name
         return absent[0] if absent else None
 
-    def allowed(self, column):
-        if column not in self._allowed:
-            prop = self.model.props.get(column)
-            self._allowed[column] = describe_allowed(prop.profile()) if prop is not None else None
-        return self._allowed[column]
+    def allowed(self, field):
+        if field not in self._allowed:
+            target = self.model.fields.get(field) if isinstance(field, str) else None
+            text = None
+            if target is not None:
+                text = target.allowed_text()
+            elif isinstance(field, str) and field.endswith("[]"):
+                owner = self.model.fields.get(field[:-2])
+                if owner is not None and owner.shape == "list":
+                    text = owner.item_allowed_text()
+            self._allowed[field] = text
+        return self._allowed[field]
 
-    def message(self, error, column, rule, empty):
+    def message(self, error, site, rule, empty):
         keyword, value = error.validator, error.instance
-        subject = column if column is not None else "The row"
+        subject = site.path if site.path is not None else "The row"
+        if is_false_error(error):
+            if site.key is None:
+                return "{} holds a field that is not allowed here.".format(subject)
+            if rule is None:
+                return "{} is present, but it may not be here.".format(subject)
+            return "{} is present, but {} leaves it out here.".format(subject, rule.label())
         if keyword == "required":
-            return ("The {} cell is empty.".format(column) if empty
-                    else "{} is missing.".format(column))
+            return ("The {} cell is empty.".format(site.column) if empty
+                    else "{} is missing.".format(site.path))
+        if keyword in ("additionalProperties", "unevaluatedProperties") and site.holder is not None:
+            return "{} is not a field of {}.".format(site.path, owner_name(site.holder[1]))
         if keyword == "unevaluatedProperties":
-            return "{} is not a column of this table.".format(column)
-        if keyword in ("anyOf", "oneOf") and column is None and rule is not None and rule.mode == "any":
+            return "{} is not a column of this table.".format(site.column)
+        if keyword in ("anyOf", "oneOf") and rule is not None and rule.mode == "any" and (
+                site.column is None or (rule.scope is not None and site.field == rule.scope)):
             names = ", ".join(name for name, _, _ in rule.targets)
-            return "{} needs at least one of {} to hold; none does.".format(
-                cap_first(rule.label()), names)
+            if site.column is None:
+                return "{} needs at least one of {} to hold; none does.".format(
+                    cap_first(rule.label()), names)
+            return "{} needs at least one of {} to hold in {}; none does.".format(
+                cap_first(rule.label()), names, site.path)
+        if "propertyNames" in error.absolute_schema_path and isinstance(value, str):
+            return "{} has the name {}, which {}.".format(
+                subject, show(value), "does not match {}".format(error.validator_value)
+                if keyword == "pattern" else "is not an allowed name")
         if keyword == "type":
-            if column is None:
+            if site.column is None:
                 return "The row is {}, not an object.".format(show(value))
             expected = error.validator_value
             expected = " or ".join(expected) if isinstance(expected, list) else expected
@@ -2552,32 +3803,133 @@ class RowChecker(object):
         if keyword == "pattern":
             return "{} is {}, which does not match {}.".format(subject, show(value),
                                                                error.validator_value)
+        if keyword in ("minItems", "maxItems") and isinstance(value, list):
+            return count_message(subject, keyword, len(value), error.validator_value)
+        if keyword == "uniqueItems" and isinstance(value, list):
+            return repeat_message(subject, value)
+        if keyword in CONTAINS_KEYS and isinstance(value, list):
+            return self.contains_message(error, subject)
+        if keyword in LENGTH_KEYS and isinstance(value, str) and is_integral(error.validator_value):
+            return length_message(subject, keyword, len(value), int(error.validator_value))
+        if keyword in ("minProperties", "maxProperties") and isinstance(value, dict) and is_integral(
+                error.validator_value):
+            limit = int(error.validator_value)
+            return "{} has {}; {} {} {} {}.".format(
+                subject, plural(len(value), "name"), "at most" if keyword == "maxProperties"
+                else "at least", limit, "is" if limit == 1 else "are",
+                "allowed" if keyword == "maxProperties" else "required")
+        if isinstance(value, (list, dict)):            # never print a whole value's repr
+            try:
+                whole = repr(value) in error.message
+            except Exception:
+                whole = True
+            if whole:
+                return "{} does not meet its {} ({}).".format(subject, keyword,
+                                                             show(error.validator_value))
         return "{}: {}".format(subject, error.message)
 
-    def hint(self, error, column, rule, empty):
+    def contains_message(self, error, subject):
+        schema = error.schema if isinstance(error.schema, dict) else {}
+        target = schema.get("contains")
+        one, many = match_words(target)
+        need, _ = contains_need(schema)
+        high = int(schema["maxContains"]) if is_integral(schema.get("maxContains")) else None
+        if error.validator == "contains":
+            return "{} has no {}; it needs {}.".format(subject, one, need)
+        counts = [self.an.node_admits(target, item) for item in error.instance]
+        count = None if any(c is None for c in counts) else sum(1 for c in counts if c)
+        if error.validator == "maxContains":
+            limit = high if high is not None else error.validator_value
+            if count is None:
+                return "{} has too many {}; at most {} {} allowed.".format(
+                    subject, many, limit, "is" if limit == 1 else "are")
+            return "{} has {} {}; at most {} {} allowed.".format(
+                subject, count, one if count == 1 else many, limit, "is" if limit == 1 else "are")
+        if count is None:
+            return "{} has too few {}; it needs {}.".format(subject, many, need)
+        return "{} has {} {}; it needs {}.".format(subject, count, one if count == 1 else many,
+                                                   need)
+
+    def hint(self, error, site, rule, empty, scope_path=None):
         keyword = error.validator
+        if rule is not None and (keyword == "required" or is_false_error(error)):
+            return self.rule_hint(rule, scope_path)
         if keyword == "required":
-            prop = self.model.props.get(column)
-            codes = special_codes(prop.profile()) if prop is not None else []
-            lead = ("The cell is empty, but every row needs {}.".format(column) if empty
-                    else "Every row needs {}.".format(column))
+            if site.holder is not None:
+                field = self.model.fields.get(site.field)
+                codes = special_codes(field.profile()) if field is not None else []
+                lead = "{} needs {}.".format(site.holder[0], site.key)
+                subject = site.field
+            else:
+                prop = self.model.props.get(site.column)
+                codes = special_codes(prop.profile()) if prop is not None else []
+                lead = ("The cell is empty, but every row needs {}.".format(site.column) if empty
+                        else "Every row needs {}.".format(site.column))
+                subject = site.column
             if codes:
                 return "{} When the value is missing, write one of its missing-value codes: {}.".format(
                     lead, ", ".join(code_text(code) for code in codes[:6]))
             return ("{} The data dictionary gives {} no missing-value code, so ask the data "
-                    "steward how a missing value is recorded.".format(lead, column))
+                    "steward how a missing value is recorded.".format(lead, subject))
+        if keyword in ("additionalProperties", "unevaluatedProperties") and site.holder is not None:
+            return ("{} is not in the data dictionary. Remove the field, or ask for it to be added "
+                    "to the schemas.".format(site.field))
         if keyword == "unevaluatedProperties":
-            return UNDECLARED_HINT.format(column)
+            return UNDECLARED_HINT.format(site.column)
         if rule is not None:
-            reading = rule.reading or rule.comment or ""
-            return "{} applies to this row{}".format(
-                cap_first(rule.label()), ": " + reading if reading else ".")
-        if column is None:
+            return self.rule_hint(rule, scope_path)
+        if site.column is None:
             return "Each row is an object of column: value pairs."
-        allowed = self.allowed(column)
+        allowed = self.allowed(site.field)
         if allowed:
-            return "Allowed in {}: {}.".format(column, allowed)
-        return "Check this value against {}'s definition in the data dictionary.".format(column)
+            return "Allowed in {}: {}.".format(site.field, allowed)
+        return "Check this value against {}'s definition in the data dictionary.".format(site.field)
+
+
+    @staticmethod
+    def rule_hint(rule, scope_path=None):
+        reading = rule.reading or rule.comment or ""
+        place = "this row" if rule.scope is None else (scope_path or rule.scope)
+        return "{} applies to {}{}".format(
+            cap_first(rule.label()), place, ": " + reading if reading else ".")
+
+
+def is_false_error(error):
+    """A value a false schema refuses: jsonschema reports it with no keyword."""
+    return error.validator is None and error.schema is False
+
+
+def false_names(error, rule, row):
+    """The names a rule's {"t": false} effects find present in the object a
+    false-schema error sits on, in the then's order: the properties the
+    error's schema path reaches from the rule's then, against the row."""
+    path = list(error.absolute_schema_path)
+    then = rule.node.get("then") if rule is not None else None
+    props = None
+    for start in (k for k, token in enumerate(path) if token == "then"):
+        node = then
+        for token in path[start + 1:]:
+            if isinstance(node, dict) and isinstance(token, str) and token in node:
+                node = node[token]
+            elif isinstance(node, list) and isinstance(token, int) and 0 <= token < len(node):
+                node = node[token]
+            else:
+                node = None
+                break
+        if isinstance(node, dict):
+            props = node
+            break
+    obj = row
+    for token in error.absolute_path:
+        if isinstance(obj, dict) and isinstance(token, str) and token in obj:
+            obj = obj[token]
+        elif isinstance(obj, list) and isinstance(token, int) and 0 <= token < len(obj):
+            obj = obj[token]
+        else:
+            return []
+    if not isinstance(props, dict) or not isinstance(obj, dict):
+        return []
+    return [name for name, sub in props.items() if sub is False and name in obj]
 
 
 UNDECLARED_HINT = ("{} is not in the data dictionary. Remove the column, or ask for it to be added "
@@ -2587,6 +3939,93 @@ CATEGORY_EVALUATORS = ("patternProperties", "additionalProperties", "unevaluated
                        "$dynamicRef")
 PLAIN_ITEMS_KEYS = frozenset(("type", "title", "description", "$comment", "allOf",
                               "unevaluatedProperties"))
+
+
+def owner_name(field):
+    """The variable an object belongs to: visits for visits[]."""
+    return field[:-2] if isinstance(field, str) and field.endswith("[]") else field
+
+
+def search_quietly(pattern, text):
+    try:
+        return re.search(pattern, text) is not None
+    except (re.error, TypeError):
+        return False
+
+
+def count_message(subject, keyword, count, limit):
+    limit = int(limit) if is_integral(limit) else limit
+    have = plural(count, "entry", "entries")
+    if keyword == "maxItems":
+        if limit == 0:
+            return "{} has {}; it must be empty here.".format(subject, have)
+        return "{} has {}; at most {} {} allowed.".format(subject, have, limit,
+                                                         "is" if limit == 1 else "are")
+    return "{} has {}; at least {} {} required.".format(subject, have, limit,
+                                                       "is" if limit == 1 else "are")
+
+
+def repeat_message(subject, items):
+    first = {}
+    for k, item in enumerate(items):
+        key = canonical_json(item)
+        if key in first:
+            return "{0} repeats an entry ({0}[{1}] is the same as {0}[{2}]).".format(
+                subject, k + 1, first[key] + 1)
+        first[key] = k
+    return "{} repeats an entry.".format(subject)
+
+
+def length_message(subject, keyword, length, limit):
+    if keyword == "maxLength":
+        return "{} is {} long; at most {} {} allowed.".format(
+            subject, plural(length, "character"), limit, "is" if limit == 1 else "are")
+    return "{} is {} long; at least {} {} required.".format(
+        subject, plural(length, "character"), limit, "is" if limit == 1 else "are")
+
+
+def contains_need(schema):
+    """("exactly 1" | "at least 2" | "between 1 and 3" | "at most 2", the
+    least) for a list's contains with its minContains and maxContains."""
+    low = int(schema["minContains"]) if is_integral(schema.get("minContains")) else 1
+    high = int(schema["maxContains"]) if is_integral(schema.get("maxContains")) else None
+    if high is not None and high == low:
+        return "exactly {}".format(low), low
+    if high is not None:
+        return ("between {} and {}".format(low, high) if low else "at most {}".format(high)), low
+    return "at least {}".format(low), low
+
+
+def match_words(node):
+    """("entry with relation = "self"", "entries with ...") for a contains
+    schema."""
+    if isinstance(node, dict) and "const" in node and set(node) <= {
+            "const", "title", "x-value-kind", "$comment"}:
+        tail = " equal to {}".format(show(node["const"]))
+        return "entry" + tail, "entries" + tail
+    if isinstance(node, dict) and set(node) == {"enum"} and isinstance(node["enum"], list):
+        tail = " equal to one of {}".format(show_list(node["enum"]))
+        return "entry" + tail, "entries" + tail
+    props = node.get("properties") if isinstance(node, dict) else None
+    if isinstance(props, dict) and props:
+        parts = [condition_words(name, test) for name, test in props.items()]
+        if all(parts):
+            tail = " with " + " and ".join(parts)
+            return "entry" + tail, "entries" + tail
+    if is_typed(node) and json_kinds(node) <= {"number", "string", "boolean"}:
+        text = describe_typed(node)
+        return "entry that is " + text, "entries that are " + text
+    return "matching entry", "matching entries"
+
+
+def condition_words(name, test):
+    if is_const_only(test):
+        return "{} = {}".format(name, show(test["const"]))
+    if isinstance(test, dict) and set(test) == {"enum"} and isinstance(test["enum"], list):
+        return "{} one of {}".format(name, show_list(test["enum"]))
+    if isinstance(test, dict) and set(test) == {"not"} and is_const_only(test["not"]):
+        return "{} other than {}".format(name, show(test["not"]["const"]))
+    return None
 
 
 def plain_table(an, model):
@@ -2599,11 +4038,11 @@ def plain_table(an, model):
     if (not isinstance(items, dict) or items.get("unevaluatedProperties") is not False
             or not PLAIN_ITEMS_KEYS.issuperset(items) or model.unresolved_categories):
         return False
-    rules = {rule.index: rule for rule in model.rules}
+    rules = {rule.index: rule for rule in model.rules if rule.scope is None}
     for i, _ in enumerate(items.get("allOf") or []):
         rule = rules.get(i)
         if rule is not None:
-            if not rule.grammar_ok or any(name not in model.props
+            if not rule.grammar_ok or any(rule_field(model, rule, name) is None
                                           for name, _, _ in rule.gates + rule.targets):
                 return False
         elif i not in model.category_entries:
@@ -2618,17 +4057,33 @@ def finding_order(item):
 
 
 def nonfinite_cells(row):
+    """{column: (token, steps inside the cell)} for each NaN or Infinity;
+    the column None for a row that is not an object."""
     if isinstance(row, NonFinite):
-        return {None: row.token}
+        return {None: (row.token, [])}
     if not isinstance(row, dict):
-        found = find_nonfinite(row)
-        return {None: found[1]} if found else {}
+        found = find_nonfinite_steps(row)
+        return {None: (found[1], [])} if found else {}
     cells = {}
     for key, value in row.items():
-        found = find_nonfinite(value)
+        found = find_nonfinite_steps(value)
         if found is not None:
-            cells[key] = found[1]
+            cells[key] = (found[1], found[0])
     return cells
+
+
+def find_nonfinite_steps(value):
+    """(keys and positions leading to a NonFinite inside value, token), or None."""
+    stack = [(value, [])]
+    while stack:
+        node, steps = stack.pop()
+        if isinstance(node, NonFinite):
+            return steps, node.token
+        if isinstance(node, dict):
+            stack.extend((item, steps + [key]) for key, item in node.items())
+        elif isinstance(node, list):
+            stack.extend((item, steps + [i]) for i, item in enumerate(node))
+    return None
 
 
 # ---------------------------------------------------------------- data in
@@ -2758,7 +4213,8 @@ def check_report(an, cap=DEFAULT_CAP):
     tables = []
     for name, model in sorted(an.tables.items()):
         tables.append({"table": name, "mother": model.mother, "categories": list(model.categories),
-                       "properties": len(model.props), "rules": len(model.rules)})
+                       "properties": len(model.props), "fields": len(model.fields) - len(model.props),
+                       "rules": len(model.rules)})
     return {"ok": counts["error"] == 0, "package": an.label, "files": len(an.pkg.files),
             "tables": tables, "counts": counts, "findings": shown, "truncated": truncated}
 
@@ -2770,14 +4226,20 @@ def rules_report(an, table=None, cap=DEFAULT_CAP):
     for name in names:
         model = an.tables[name]
         rules.extend(rule.public() for rule in model.rules if rule.grammar_ok)
-        variables[name] = {prop.name: {"topic": prop.topic, "file": prop.file,
-                                       "pointer": prop.pointer}
-                           for prop in model.props.values()}
+        variables[name] = {field.path: {"topic": field.topic, "file": field.file,
+                                        "pointer": field.pointer, "shape": field.shape,
+                                        "parent": field.parent, "title": field.title()}
+                           for field in model.fields.values()}
+    nested = {(box["rel"], box["pointer"] + "/allOf") for box in an.containers.values()
+              if box["kind"] == "object" and isinstance(box["node"].get("allOf"), list)
+              and box["uses"][0][0].name in names}
     findings = by_severity([
         item for item in an.findings
-        if item.get("file") in mothers and (
+        if (item.get("file") in mothers and (
             item["code"] in RULE_CODES or item["code"] == "parse-error"
-            or str(item.get("pointer", "")).startswith("/items/allOf"))])
+            or str(item.get("pointer", "")).startswith("/items/allOf")))
+        or any(item.get("file") == rel and (str(item.get("pointer", "")) + "/").startswith(at + "/")
+               for rel, at in nested)])
     counts = tally(findings)
     shown, truncated = cap_list(findings, cap)
     return {"ok": counts["error"] == 0, "rules": rules, "variables": variables, "counts": counts,
@@ -2865,15 +4327,16 @@ def fixture_table(an, model, folder, cap):
         for item in found:
             rows.setdefault(item["row"], []).append(item)
         for row, items in sorted(rows.items(), key=lambda kv: -1 if kv[0] is None else kv[0]):
-            column = next((item["column"] for item in items if item["column"] in model.props), None)
-            prop = model.props.get(column) if column else None
+            first = next((item for item in items if item["column"] in model.props), None)
+            prop = model.props.get(first["column"]) if first else None
             findings.append(finding(
                 "error", "valid-fails",
                 "valid.json {} fails: {}".format("row {}".format(row) if row is not None
                                                  else "as a whole", items[0]["message"]),
                 "Every valid.json row must pass: fix the row, or the schema if the row is right.",
                 file=base + "valid.json", pointer="/{}".format(row) if row is not None else None,
-                table=model.name, topic=prop.topic if prop else None, variable=column,
+                table=model.name, topic=prop.topic if prop else None,
+                variable=(first.get("field") or first["column"]) if first else None,
                 row=row, findings=items[:10]))
         shown, truncated = cap_list(found, cap)
         out["valid"] = {"rows": len(valid), "status": "fail" if found else "pass",
@@ -2910,7 +4373,7 @@ def judge_invalid(model, checker, rows, cases, base, findings, caught_rules):
         case = case if isinstance(case, dict) else {}
         row, column, kind = case.get("row"), case.get("column"), case.get("kind")
         verdict = {"case": k, "row": row, "column": column, "kind": kind}
-        prop = model.props.get(column) if isinstance(column, str) else None
+        prop = model.fields.get(field_of_column(model, column)) if isinstance(column, str) else None
         here = dict(where, pointer="/{}".format(row) if isinstance(row, int) else None,
                     variable=column if prop else None, topic=prop.topic if prop else None)
         if kind not in LEDGER_KINDS:
@@ -2931,10 +4394,11 @@ def judge_invalid(model, checker, rows, cases, base, findings, caught_rules):
             verdicts.append(verdict)
             continue
         ledgered.add(row)
+        column = field_of_column(model, column)
         items = by_row.get(row, [])
-        covers = [cover_of(item, checker) for item in items]
-        union = set().union(*covers) if covers else set()
-        failed_on = sorted(name if name != ROW_COVER else "(the row)" for name in union)
+        pairs = [cover_pairs(item, checker) for item in items]
+        covers = [set().union(*(cover for _, cover in each)) for each in pairs]
+        failed_on = sorted({name for each in pairs for name, _ in each})
         if not items:
             verdict["status"] = "missed-passed"
             findings.append(finding(
@@ -2942,7 +4406,7 @@ def judge_invalid(model, checker, rows, cases, base, findings, caught_rules):
                 "invalid.json row {} ({} on {}) passes the schemas.".format(row, show(kind), column),
                 "The seeded value is legal, or the rule it should trip is missing: check the value "
                 "against the data dictionary, and the rule against SKIP-LOGIC.md.", row=row, **here))
-        elif column not in union:
+        elif not any(column in cover for cover in covers):
             verdict["status"] = "missed-wrong-column"
             verdict["failed_on"] = failed_on
             findings.append(finding(
@@ -2956,23 +4420,24 @@ def judge_invalid(model, checker, rows, cases, base, findings, caught_rules):
             caught += 1
             rules = sorted({item["rule"] for item, cover in zip(items, covers)
                             if column in cover and item.get("rule")})
-            caught_rules.update(item["allof_index"] for item, cover in zip(items, covers)
-                                if column in cover and "allof_index" in item)
+            caught_rules.update(rule_of(item, checker).key for item, cover in zip(items, covers)
+                                if column in cover and rule_of(item, checker) is not None)
             if rules:
                 verdict["rules"] = rules
         else:
             verdict["status"] = "caught-with-extra"
             verdict["failed_on"] = failed_on
+            extra = sorted({name for each in pairs for name, cover in each if column not in cover})
             findings.append(finding(
                 "error", "caught-with-extra",
                 "invalid.json row {} fails on {} as seeded, but also on {}.".format(
-                    row, column, ", ".join(name for name in failed_on if name != column)),
+                    row, column, ", ".join(extra)),
                 "Change the row so it breaks only {}: one seeded violation per row.".format(column),
                 row=row, **here))
         verdicts.append(verdict)
     unledgered = sorted(row for row in by_row if row not in ledgered)
     for row in unledgered:
-        names = sorted({item["column"] or "(the row)" for item in by_row[row]})
+        names = sorted({item.get("field") or item["column"] or "(the row)" for item in by_row[row]})
         findings.append(finding(
             "error", "unledgered",
             "invalid.json row {} fails ({}) but the ledger has no case for it.".format(
@@ -2983,74 +4448,222 @@ def judge_invalid(model, checker, rows, cases, base, findings, caught_rules):
             "unledgered": unledgered}
 
 
+def field_of_column(model, column):
+    """The Field path a ledger case's column names: a concrete key under a
+    lookup (labs.ldl) is the lookup's labs.*, a position (household[2]) is
+    household[]; anything else is kept as written."""
+    if not isinstance(column, str) or column in model.fields:
+        return column
+    for top in sorted(model.props, key=len, reverse=True):
+        if not column.startswith(top) or len(column) == len(top):
+            continue
+        rest, at, field = column[len(top):], 0, top
+        while at < len(rest):
+            step = PATH_STEP.match(rest, at)
+            if step is None:
+                break
+            text, at = step.group(0), step.end()
+            if text == ".*":
+                field += ".*"
+            elif text == "[]" or text[1:-1].isdigit():
+                field += "[]"
+            elif text.startswith("["):
+                try:
+                    field = field_step(model.fields, field, json.loads(text[1:-1]))
+                except ValueError:
+                    break
+            else:
+                field = field_step(model.fields, field, text[1:])
+        else:
+            return field
+    return column
+
+
+def rule_of(item, checker):
+    """The rule entry a row finding comes from, or None."""
+    rule = getattr(item, "rule_obj", None)
+    if rule is None and item.get("allof_index") is not None:
+        rule = checker.rules.get(item["allof_index"])
+    return rule
+
+
+def cover_pairs(item, checker):
+    """(name, what it counts as failing) for each name a finding fails on: its
+    field, covering its column and every path enclosing it (household[].age
+    covers household); *duplicate* for a repeated row; or, for an 'at least
+    one of' rule, each of its targets."""
+    rule = rule_of(item, checker)
+    if item["column"] is None:
+        if item["keyword"] == "uniqueItems":
+            return [(DUPLICATE_COLUMN, {DUPLICATE_COLUMN})]
+        if rule is not None and rule.mode == "any" and rule.targets:
+            return [(name, target_cover(checker.model, rule, name)) for name, _, _ in rule.targets]
+        return [("(the row)", {ROW_COVER})]
+    field = item.get("field") or item["column"]
+    cover = path_ancestors(item["column"], field)
+    if rule is not None and rule.mode == "any" and rule.scope is not None and field == rule.scope:
+        for name, _, _ in rule.targets:
+            cover |= target_cover(checker.model, rule, name)
+    return [(field, cover)]
+
+
+def target_cover(model, rule, name):
+    field = rule_field(model, rule, name)
+    return path_ancestors(field.top, field.path) if field is not None else {name}
+
+
 def cover_of(item, checker):
-    """The columns a finding counts as failing: its own; *duplicate* for a
-    repeated row; or, for a row-level 'at least one of' rule, its targets."""
-    if item["column"] is not None:
-        return {item["column"]}
-    if item["keyword"] == "uniqueItems":
-        return {DUPLICATE_COLUMN}
-    rule = checker.rules.get(item.get("allof_index"))
-    if rule is not None and rule.mode == "any" and rule.targets:
-        return {name for name, _, _ in rule.targets}
-    return {ROW_COVER}
+    """Every column and path a finding counts as failing."""
+    return set().union(*(cover for _, cover in cover_pairs(item, checker)))
+
+
+def field_step(fields, field, key):
+    """The field a key leads to from field: a named field, or a lookup's .*."""
+    named = join_path(field, key)
+    if named in fields:
+        return named
+    star = field + ".*"
+    return star if star in fields else named
+
+
+def gather_values(model, rows):
+    """What rows show, by field path: the values seen ({path: literal keys},
+    a list's entries under path[]), the lengths of its lists, and the objects
+    at each path (None: the rows themselves)."""
+    seen, lengths, objects = {}, {}, {None: []}
+
+    def walk(value, path, depth):
+        seen.setdefault(path, set()).add(literal_key(value))
+        if depth >= GATHER_LIMIT:
+            return
+        if isinstance(value, list):
+            lengths.setdefault(path, set()).add(len(value))
+            for item in value:
+                walk(item, path + "[]", depth + 1)
+        elif isinstance(value, dict):
+            objects.setdefault(path, []).append(value)
+            for key, item in value.items():
+                walk(item, field_step(model.fields, path, str(key)), depth + 1)
+
+    for row in rows:
+        if isinstance(row, dict):
+            objects[None].append(row)
+            for key, value in row.items():
+                walk(value, key, 0)
+    return seen, lengths, objects
+
+
+def field_gaps(field, seen, lengths, objects):
+    """(has requirements, [(message, hint)]) of what valid rows do not show
+    for one field."""
+    gaps, requires = [], False
+    path = field.path
+    wanted = field.required_values()
+    if wanted is not None:
+        requires = True
+        key = path + "[]" if field.shape == "list" else path
+        missing = [value for value in wanted if literal_key(value) not in seen.get(key, ())]
+        if missing:
+            listed = joined(missing, "or") if len(missing) <= 8 else show_list(missing)
+            if field.shape == "list":
+                gaps.append(("valid.json never shows {} in {}.".format(listed, path),
+                             "Add valid rows whose {} includes {}, so every declared code is "
+                             "seen to pass.".format(path, show_list(missing))))
+            else:
+                gaps.append(("valid.json never shows {} = {}.".format(path, listed),
+                             "Add valid rows using {}, so every declared code (or both bounds and "
+                             "every special code) is seen to pass.".format(show_list(missing))))
+    if field.shape in ("list", "entries") and field.info is not None:
+        arr = field.info.arr
+        fewest = int(arr["minItems"]) if is_integral(arr.get("minItems")) else 0
+        if "contains" in arr:                       # it holds minContains matches (1 unless said)
+            fewest = max(fewest, contains_need(arr)[1])
+        most = int(arr["maxItems"]) if is_integral(arr.get("maxItems")) else None
+        if most is None or fewest <= most:
+            requires = True
+            have = lengths.get(path, set())
+            if fewest not in have:
+                gaps.append(("valid.json never shows {} with {}.".format(
+                    path, plural(fewest, "entry", "entries")),
+                    "Add a valid row whose {} has the fewest entries allowed ({}), so the short "
+                    "end of the list is seen to pass.".format(path, fewest)))
+            if (most is None or most >= 2) and not any(n >= 2 for n in have):
+                gaps.append(("valid.json never shows {} with two or more entries.".format(path),
+                             "Add a valid row whose {} has two or more entries, so a longer list "
+                             "is seen to pass.".format(path)))
+    if field.shape == "lookup":
+        requires = True
+        if not any(obj for obj in objects.get(path, ())):
+            gaps.append(("valid.json never shows a name in {}.".format(path),
+                         "Add a valid row whose {} holds at least one name, so the lookup is seen "
+                         "to pass.".format(path)))
+    if field.optional:
+        requires = True
+        if not any(field.name not in obj for obj in objects.get(field.scope, ())):
+            gaps.append(("valid.json never leaves out {}.".format(path),
+                         "Add a valid row that leaves {} out, so leaving it out - which a decision "
+                         "allows - is seen to pass.".format(path)))
+    return requires, gaps
 
 
 def fixture_coverage(an, model, valid, caught_rules, judged, findings):
-    seen = {}
-    for row in valid:
-        if isinstance(row, dict):
-            for key, value in row.items():
-                seen.setdefault(key, set()).add(literal_key(value))
+    seen, lengths, objects = gather_values(model, valid)
     covered, total, per_prop = 0, 0, {}
-    for name, prop in model.props.items():
-        wanted = required_values(prop.profile())
-        if wanted is None:
+    for path, field in model.fields.items():
+        requires, gaps = field_gaps(field, seen, lengths, objects)
+        if not requires:
             continue
         total += 1
-        missing = [value for value in wanted if literal_key(value) not in seen.get(name, ())]
-        per_prop[name] = not missing
-        if missing:
-            listed = joined(missing, "or") if len(missing) <= 8 else show_list(missing)
-            findings.append(finding(
-                "warning", "coverage-gap",
-                "valid.json never shows {} = {}.".format(name, listed),
-                "Add valid rows using {}, so every declared code (or both bounds and every special "
-                "code) is seen to pass.".format(show_list(missing)),
-                file=prop.file, pointer=prop.pointer, table=model.name, topic=prop.topic,
-                variable=name))
-        else:
+        per_prop[path] = not gaps
+        if not gaps:
             covered += 1
+        for message, hint in gaps:
+            findings.append(finding(
+                "warning", "coverage-gap", message, hint, file=field.file, pointer=field.pointer,
+                table=model.name, topic=field.topic, variable=path))
     fired, unfired, caught, uncaught = [], [], [], []
     for rule in model.rules:
         if not rule.grammar_ok:
             continue
         label = rule.half()
-        test = Draft202012Validator({"$ref": "{}#/items/allOf/{}/if".format(model.uri, rule.index)},
-                                    registry=an.pkg.registry)
+        if rule.scope is None:
+            test = Draft202012Validator(
+                {"$ref": "{}#/items/allOf/{}/if".format(model.uri, rule.index)},
+                registry=an.pkg.registry)
+            instances = valid
+        else:
+            test = Draft202012Validator(
+                {"$ref": "{}#{}".format(an.pkg.uri[rule.file],
+                                        quote(rule.pointer + "/if", safe="/~"))},
+                registry=an.pkg.registry)
+            instances = objects.get(rule.scope, [])
         hit = False
-        for row in valid:
+        for instance in instances:
             try:
-                if test.is_valid(row):
+                if test.is_valid(instance):
                     hit = True
                     break
             except Exception:
                 break
-        where = {"file": model.mother, "pointer": rule.pointer, "table": model.name,
-                 "rule": rule.id}
+        where = {"file": rule.file, "pointer": rule.pointer, "table": model.name,
+                 "rule": rule.id, "topic": rule.topic}
         if hit:
             fired.append(label)
         else:
             unfired.append(label)
-            findings.append(finding(
-                "warning", "coverage-gap",
-                "No valid.json row triggers {}.".format(rule.label()),
-                "Add a valid row the rule applies to, so it is seen working.", **where))
-        if rule.index in caught_rules:
+            if rule.scope is None:
+                message = "No valid.json row triggers {}.".format(rule.label())
+                hint = "Add a valid row the rule applies to, so it is seen working."
+            else:
+                message = "No valid.json value at {} triggers {}.".format(rule.scope, rule.label())
+                hint = ("Add a valid row whose {} satisfies the rule's if, so it is seen "
+                        "working.".format(rule.scope))
+            findings.append(finding("warning", "coverage-gap", message, hint, **where))
+        if rule.key in caught_rules:
             caught.append(label)
         else:
             uncaught.append(label)
-        if judged and rule.index not in caught_rules:
+        if judged and rule.key not in caught_rules:
             findings.append(finding(
                 "warning", "coverage-gap",
                 "No invalid.json row is caught by {}.".format(rule.label()),
@@ -3092,16 +4705,20 @@ def data_report(an, file, table=None, fmt=None, cap=DEFAULT_CAP):
                            and nonempty_str(prop.schema.get("title")) else None,
                            "topic": prop.topic, "allowed": checker.allowed(prop.name)}
                for prop in model.props.values()}
+    fields = {field.path: {"title": field.title(), "topic": field.topic, "column": field.top,
+                           "allowed": checker.allowed(field.path), "shape": field.shape}
+              for field in model.fields.values() if field.depth > 0}
     return {"ok": not findings, "table": name, "file": str(file), "format": fmt,
             "rows": len(rows), "errors": len(findings), "by_column": by_column,
-            "by_rule": by_rule, "findings": shown, "truncated": truncated, "columns": columns}
+            "by_rule": by_rule, "findings": shown, "truncated": truncated, "columns": columns,
+            "fields": fields}
 
 
 def provenance_census(an):
-    props = [prop for model in an.tables.values() for prop in model.props.values()]
+    props = [field for model in an.tables.values() for field in model.fields.values()]
     traced = sum(1 for prop in props if an.prov_ok.get((prop.file, prop.pointer)))
     rules = sum(1 for model in an.tables.values() for rule in model.rules
-                if an.prov_ok.get((model.mother, rule.pointer)))
+                if an.prov_ok.get(rule.key))
     by_origin = dict.fromkeys(("document", "web", "person", "agent", "unknown"), 0)
     review = set()
     for ref in an.prov_refs:
@@ -3243,21 +4860,24 @@ def topic_summary(an, every, fixtures):
             topic = PurePosixPath(rel).stem
             props = [prop for prop in model.props.values() if prop.file == rel]
             names = {prop.name for prop in props}
+            inner = [field for field in model.fields.values()
+                     if field.depth > 0 and field.top in names]
             errors = sum(1 for item in every if item.get("table") == name
                          and item.get("topic") == topic and item["severity"] == "error")
             warnings = sum(1 for item in every if item.get("table") == name
                            and item.get("topic") == topic and item["severity"] == "warning")
             prov_errors = any(item.get("file") == rel and item["code"].startswith("provenance-")
                               and item["severity"] == "error" for item in every)
-            entry = {"file": rel, "properties": len(props),
-                     "rules_targeting": sum(1 for rule in model.rules
-                                            if any(t in names for t, _, _ in rule.targets)),
+            entry = {"file": rel, "properties": len(props), "fields": len(inner),
+                     "rules_targeting": sum(1 for rule in model.rules if any(
+                         getattr(rule_field(model, rule, t), "top", None) in names
+                         for t, _, _ in rule.targets)),
                      "errors": errors, "warnings": warnings,
                      "provenance_ok": not prov_errors and all(
-                         an.prov_ok.get((prop.file, prop.pointer)) for prop in props),
+                         an.prov_ok.get((prop.file, prop.pointer)) for prop in props + inner),
                      "coverage": None}
             if per_prop is not None:
-                counted = [prop.name for prop in props if prop.name in per_prop]
+                counted = [prop.path for prop in props + inner if prop.path in per_prop]
                 entry["coverage"] = {"covered": sum(1 for n in counted if per_prop[n]),
                                      "total": len(counted)}
             topics["{}/{}".format(name, topic)] = entry

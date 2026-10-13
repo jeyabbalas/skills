@@ -12,13 +12,14 @@ Table of contents
 - [Continuous variables](#continuous-variables)
 - [Sentinels](#sentinels)
 - [Strings, identifiers, dates](#strings-identifiers-dates)
+- [Nested values](#nested-values)
 - [Annotations](#annotations)
 - [common/defs.json](#commondefsjson)
 - [Keywords never used](#keywords-never-used)
 
 ## Codes get oneOf, measures get anyOf
 
-The one distinction everything hangs off. A **coded** variable — categories with labels — is a `oneOf` of single-value `const` branches, each branch carrying its own `title`. A **measured** variable — a number with a plausible range — is an `anyOf` of one typed branch plus one branch per special code. Downstream tools read `oneOf` as "these are the levels" and `anyOf` as "a measurement, with special codes". Never blur them.
+The one distinction everything hangs off. A **coded** variable — categories with labels — is a `oneOf` of single-value `const` branches, each branch carrying its own `title`. A **measured** variable — a number with a plausible range — is an `anyOf` of one typed branch plus one branch per special code; a measure with no special code is that typed schema alone (`{"type": "integer", "minimum": 70, "maximum": 250}`). Downstream tools read `oneOf` as "these are the levels" and `anyOf` as "a measurement, with special codes". Never blur them.
 
 ## Every file
 
@@ -79,8 +80,8 @@ One file per topic, holding that topic's properties and nothing else:
 }
 ```
 
-- `required` lists every property, in `properties` order: every column is present in every row; missingness is a code in the cell, never an absent key.
-- Never `additionalProperties` (it would reject the other categories' columns), and never `if`/`then`, `allOf`, `anyOf`, or `dependentSchemas` at the category's top level: rules live in the mother. A rule inside a category makes QuaC report every column of that category as unexpected whenever any one of them fails.
+- `required` lists every property, in `properties` order: every column is present in every row; missingness is a code in the cell, never an absent key — unless a person's `convention` decision says the delivery leaves it out, cited on the property's `required` facet ([Nested values](#nested-values)).
+- Never `additionalProperties` at the category's top level (it would reject the other categories' columns), and never `if`/`then`, `allOf`, `anyOf`, or `dependentSchemas` there: rules live in the mother. A rule at a category's top level makes QuaC report every column of that category as unexpected whenever any one of them fails. Inside a nested value both belong where its fields are ([Nested values](#nested-values)).
 - Every table repeats an identification category with its link keys, even when another table has the same.
 - Repeated shapes (roster slots, `_2` variants) get one local `$defs` entry, `$ref`'d with a sibling `title` and `x-provenance` per use.
 - Arithmetic that should hold but cannot be enforced goes in a top-level `"$comment": "Not enforceable: adult_count + child_count = household_size (D021)."` plus a `not-expressible` rule record.
@@ -101,14 +102,14 @@ One file per topic, holding that topic's properties and nothing else:
 }
 ```
 
-Key order: `title`, `description` (only when it says more than the title), `$comment`, `x-provenance`, other `x-*`, then the value schema. Every property has a `title` and an `x-provenance`; `check` rejects a property missing either.
+Key order: `title`, `description` (only when it says more than the title), `$comment`, `x-provenance`, other `x-*`, then the value schema. Every property — and every field inside a nested value — has a `title` and an `x-provenance`; `check` rejects one missing either.
 
 ## x-provenance
 
 The core tenet, made checkable: every fact in a property or a rule traces to a source or a decision. `x-provenance` is an object from **facet** to a **reference** (or a list of them) in LEDGER-FORMAT.md's grammar — `S01:<locator>` or `D014`.
 
 - `default` covers every facet not listed. Usually the variable's line in the dictionary: `{"default": "S01:Variables row 6"}`.
-- List a facet only when its origin differs from `default`. Facets: `title`, `description`, `type`, `values` (the code list as a whole), `value:<code>` (one code, written as JSON: `value:777`, `value:"01"`), `sentinels` (which special codes the variable accepts, as a set — one code's meaning is its `value:<code>`; without this facet, `check` warns `sentinel-dropped` when the property rejects a special code its `default` row lists), `minimum`, `maximum`, `pattern`, `unit`, `universe`, `derivation`.
+- List a facet only when its origin differs from `default`. Facets: `title`, `description`, `type`, `values` (the code list as a whole — for a list of values, its items' codes), `value:<code>` (one code, written as JSON: `value:777`, `value:"01"`), `sentinels` (which special codes the variable accepts, as a set — one code's meaning is its `value:<code>`; without this facet, `check` warns `sentinel-dropped` when the property rejects a special code its `default` row lists), `minimum`, `maximum`, `pattern`, `minLength`/`maxLength` (text whose length a source states), `unit`, `universe`, `derivation`, `required` (on a field or variable the data may leave out: the decision that allows it), and, on nested values, `minItems`, `maxItems`, `uniqueItems`, `contains` (with its `minContains`/`maxContains`), and `propertyNames`.
 - Two sources agreeing: a list, `"value:777": ["S01:Codes row 41", "S02:p.6"]`. A person's answer that settled a facet is cited alone, even when a source agrees with it — the decision's evidence keeps the source.
 - Every reference must resolve: a source that is not `suggested` or `rejected` (a `retired` one still counts), or a decision that is not cancelled (a superseded one draws a warning: cite its replacement). A guess cites the decision that records it (`"maximum": "D002"`, where D002 was recorded with `event: decide`) — that is how the website and the steward's review queue find it.
 - Rules carry `x-provenance` too, beside their `$comment` (SKIP-LOGIC.md).
@@ -162,7 +163,115 @@ A sentinel is a reserved code meaning "no substantive value here": not applicabl
 
 - Identifiers: a fully anchored `pattern` (`^P[0-9]{4}$`), defined once in `common/defs.json` and `$ref`'d wherever the id appears.
 - Dates and times: strings with an anchored `pattern` for the source's exact format — `^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$` for ISO dates — never `format` (most validators ignore it).
-- Free text: bare `"type": "string"`; its sentinels, if the source defines any, are string branches.
+- Free text: bare `"type": "string"`, plus `maxLength` only when a source states a limit — cite it on the `maxLength` facet even when `default` names the same source, since `check` warns about a length limit without one; its sentinels, if the source defines any, are string branches.
+
+## Nested values
+
+A variable that holds more than one value — a group of fields, a list, a lookup (NESTED.md says how to spot one, ask how it is delivered, and name its fields) — is one property whose schema describes the inside. Every field inside follows this file like a property: `title`, `x-provenance`, codes as `oneOf`, measures as `anyOf`, `x-value-kind` on special codes, key order.
+
+A **group** — named fields, closed:
+
+```json
+"address": {
+  "title": "Home address",
+  "x-provenance": { "default": "S01:§Section B" },
+  "type": "object",
+  "properties": {
+    "city": { "title": "City", "x-provenance": { "default": "S01:¶15" }, "type": "string" },
+    "country": {
+      "title": "Country",
+      "x-provenance": { "default": "S01:¶17" },
+      "oneOf": [
+        { "const": "US", "title": "United States" },
+        { "const": "CA", "title": "Canada" }
+      ]
+    }
+  },
+  "required": ["city", "country"],
+  "additionalProperties": false
+}
+```
+
+A **list of entries** — the entry's fields under `items`, the list's own facts beside it:
+
+```json
+"household": {
+  "title": "Household roster",
+  "description": "Everyone who lives with the participant, the participant first.",
+  "x-provenance": { "default": "S01:§Section C", "maxItems": "S01:¶21" },
+  "type": "array",
+  "minItems": 1,
+  "maxItems": 12,
+  "items": {
+    "type": "object",
+    "properties": {
+      "relation": { "title": "Relation to the participant", "x-provenance": { "default": "S01:¶23" }, "oneOf": [ "…" ] },
+      "age": { "title": "Age (years)", "x-provenance": { "default": "S01:¶24" }, "x-unit": "years", "anyOf": [ "…" ] }
+    },
+    "required": ["relation", "age"],
+    "additionalProperties": false
+  }
+}
+```
+
+A **list of values** — a choose-many question, a list of codes; its codes are the variable's own:
+
+```json
+"symptoms": {
+  "title": "Symptoms in the past week",
+  "x-provenance": { "default": "S01:Variables row 30" },
+  "type": "array",
+  "uniqueItems": true,
+  "items": {
+    "oneOf": [
+      { "const": 1, "title": "Fever" },
+      { "const": 2, "title": "Cough" },
+      { "$ref": "../../common/defs.json#/$defs/refused" }
+    ]
+  }
+}
+```
+
+A **lookup** — values under names that vary between records:
+
+```json
+"labs": {
+  "title": "Laboratory results",
+  "x-provenance": { "default": "S01:§Section E" },
+  "type": "object",
+  "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+  "additionalProperties": { "title": "Result", "x-provenance": { "default": "S01:§Section E" }, "type": "number", "minimum": 0 }
+}
+```
+
+- Every group and every entry is `"type": "object"` with `properties`, `required` listing every field in `properties` order, and `"additionalProperties": false` — the mother's `unevaluatedProperties` closes the record only, so without it an undeclared field inside passes unnoticed. Closing it is house style, not a judgment call: no decision. A field the data leaves out of some entries is allowed only under a `convention` decision a person answered: that field drops out of `required`, and its own `x-provenance` cites the decision on `required` (`"street": {"title": "Street", "x-provenance": {"default": "S01:¶14", "required": "D017"}, …}`). The same holds for a variable a JSON delivery leaves out of some records: it drops out of its category's `required` only with that facet. Rules about when such a field is there take presence tests and effects (SKIP-LOGIC.md, "Fields left out").
+- The label goes on the list, never on `items`: the data dictionary adds an `items` title to the list's description. `items` carries no `x-provenance` either — the list's covers it.
+- `minItems`, `maxItems`, and `uniqueItems` state what a source or a person said ("between 1 and 12 people", "each code at most once"); cite them on their facets. A list of codes takes `uniqueItems: true` — a code chosen twice is a mistake.
+- An entry the list must hold is `contains`, with `minContains`/`maxContains` for how many — "the roster lists the participant exactly once": `"contains": {"required": ["relation"], "properties": {"relation": {"const": "self"}}}, "minContains": 1, "maxContains": 1`; for a list of values, `"contains": {"const": 3}`. Only what a source or a person states; cite it on the `contains` facet.
+- A lookup whose names are a fixed, known set is a group whose fields may be left out — ask which one it is (NESTED.md).
+- Special codes sit on the fields, where the source gives them. A whole value that was not asked takes the form the data delivers (NESTED.md, "What a missing value looks like inside"): an empty list (the rule's effect is `{"maxItems": 0}`), a special code beside the typed branch (`"anyOf": [{"type": "array", …}, {"$ref": "…not_applicable"}]`), or `null` under the blank-cell convention.
+- A **mixed** value — text in some records, a group in others — is an `anyOf` with one branch per shape, each with a `title` naming the form, plus its special codes. Unless a source states both forms, ask first whether the mix is real or a cleaning slip. The property's `x-provenance` covers its branches (a branch whose source differs carries its own); the group branch is closed and complete like any group, and its fields are named like a group's (`notes.interpreter`):
+
+  ```json
+  "notes": {
+    "title": "Visit notes",
+    "x-provenance": { "default": "S01:¶36", "maxLength": "S01:¶36" },
+    "anyOf": [
+      { "type": "string", "title": "Free text", "maxLength": 500 },
+      {
+        "type": "object",
+        "title": "Interpreter needed",
+        "properties": {
+          "interpreter": { "title": "Interpreter's language", "x-provenance": { "default": "S01:¶36" }, "oneOf": [ "…" ] }
+        },
+        "required": ["interpreter"],
+        "additionalProperties": false
+      }
+    ]
+  }
+  ```
+- Rules among one group's or one entry's fields live in that object's own `allOf` (SKIP-LOGIC.md, "Rules inside nested values"); nothing else goes there.
+- Lists of lists, positions with meanings (`prefixItems`), and keys matched by pattern are not house style: they usually mean the source's own table — ask how the data is delivered.
 
 ## Annotations
 
@@ -218,10 +327,11 @@ When in doubt, inline in the category; promotion to `common/` is cheap later.
 
 | Keyword | Why not |
 |---|---|
-| `additionalProperties` | the mother's single `unevaluatedProperties: false` does this; on a category it rejects the other categories |
+| `additionalProperties` on a category or the mother's `items` | the mother's single `unevaluatedProperties: false` does this; on a category it rejects the other categories. Nested groups, entries, and lookups use it ([Nested values](#nested-values)) |
+| `prefixItems`, `unevaluatedItems`, `patternProperties`, `minProperties`, `maxProperties`; `contains`, `minContains`, `maxContains` anywhere but on a list or in a rule's test | positions, patterns, and counts of properties are not what dictionaries describe; what a list must hold is its `contains` ([Nested values](#nested-values)), and "if the list includes" is a rule test (SKIP-LOGIC.md) |
 | `else`, `dependentRequired`, `dependentSchemas` | every rule is a one-directional `if`/`then` in the mother; the reverse direction is its own rule |
 | `format` | not asserted by default validators — a silent no-op; use anchored `pattern` |
 | `default`, `examples`, `deprecated`, `readOnly` | a data contract, not documentation of a writer; examples live in the toy data |
-| `multipleOf`, `minLength`, `maxLength` | invite precision the source never stated |
+| `multipleOf`; `minLength`, `maxLength` a source does not state | precision the source never stated; and a decimal step (0.1) misfires in validators — 72.3 is not a float multiple of 0.1. A length the source states ("up to 500 characters") is kept, cited on its `maxLength`/`minLength` facet |
 | `$anchor`, `$dynamicRef` | relative paths plus `#/$defs/…` are the whole addressing scheme |
 | `"type": "null"` | missingness is a declared code; `null` appears only as a `const` under a recorded convention |

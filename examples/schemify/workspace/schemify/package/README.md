@@ -60,7 +60,7 @@ toy-data/
 ## How the schemas are written
 
 - Each table's mother schema is an array of records; a record is the `allOf` of its topic files, and `unevaluatedProperties: false` rejects any column the topics do not declare.
-- A coded variable is a `oneOf` of `const` branches, each with a `title`; a measured variable is an `anyOf` of one typed branch (with plausibility bounds) plus its special codes.
+- A coded variable is a `oneOf` of `const` branches, each with a `title`; a measured variable is an `anyOf` of one typed branch (with plausibility bounds) plus its special codes, or that typed branch alone when it has none.
 - Every column is required in every record: a missing or not-applicable value is a declared code in the cell, never an absent key. Special codes carry `"x-value-kind": "sentinel"`.
 - `x-provenance` on every property and rule names where each fact came from — a source (`S01:<location>`) or a decision (`D014`); see PROVENANCE.md.
 - The `$id`s use the placeholder namespace `https://schemas.example.org/ashgrove/`, which nothing fetches. Replace it before publishing these schemas anywhere public.
@@ -76,7 +76,7 @@ toy-data/
 
 ## Skip patterns and other conditional logic
 
-Every rule is one entry of its mother schema's `items.allOf`, after the topic references, in one canonical shape: `{"$comment", "x-provenance", "if", "then"}`. The `if` is one clause — or an `anyOf` of clauses — of `required` plus `properties` tests (`const`, `enum`, `not`, or a numeric range); the `then` sets `properties` effects (`const`, `not const`, `enum`, or a narrowed range) or requires at least one of them (`anyOf`). The `$comment` starts with its kind and id — `Skip pattern R001:`, `Applicability R001:` (the same rule read the other way), or `<Domain> routing R007:`. `tools/validate.py rules .` prints every rule in parsed form.
+Every rule is one entry of its mother schema's `items.allOf`, after the topic references, in one canonical shape: `{"$comment", "x-provenance", "if", "then"}`. The `if` is one clause — or an `anyOf` of clauses — of `required` plus `properties` tests (`const`, `enum`, `not`, `contains` on a list, or a numeric range; a name in `required` with no test means the field is present); the `then` sets `properties` effects (`const`, `not const`, `enum`, a narrowed range, a list's size, or `false`: the field is left out), names fields that must be present in `required`, or requires at least one of these (`anyOf`). The `$comment` starts with its kind and id — `Skip pattern R001:`, `Applicability R001:` (the same rule read the other way), or `<Domain> routing R007:`. `tools/validate.py rules .` prints every rule in parsed form.
 
 | Rule | Table | Reading | Evidence | Provenance |
 |---|---|---|---|---|
@@ -96,6 +96,9 @@ Every rule is one entry of its mother schema's `items.allOf`, after the topic re
 Rules JSON Schema cannot express (arithmetic, ordering, cross-row, cross-table). Check them downstream.
 
 - R006 (baseline): participant_id is unique across rows: one record per participant
+
+Each mother schema's own `$comment`, for readers of the schema files:
+
 - baseline: Not enforceable here: participant_id is unique across rows, one record per participant (S01:Variables row 2, D009).
 
 ## Provenance

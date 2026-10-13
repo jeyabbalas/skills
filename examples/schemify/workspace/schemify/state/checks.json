@@ -22,6 +22,7 @@
           "baseline/categories/health.json"
         ],
         "properties": 15,
+        "fields": 0,
         "rules": 10
       }
     ],
@@ -49,6 +50,7 @@
         "id": "R001",
         "kind": "skip",
         "domain": null,
+        "scope": null,
         "index": 4,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/4",
@@ -104,6 +106,7 @@
         "id": "R001",
         "kind": "applicability",
         "domain": null,
+        "scope": null,
         "index": 5,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/5",
@@ -149,6 +152,7 @@
         "id": "R002",
         "kind": "skip",
         "domain": null,
+        "scope": null,
         "index": 6,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/6",
@@ -194,6 +198,7 @@
         "id": "R002",
         "kind": "applicability",
         "domain": null,
+        "scope": null,
         "index": 7,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/7",
@@ -234,6 +239,7 @@
         "id": "R003",
         "kind": "skip",
         "domain": null,
+        "scope": null,
         "index": 8,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/8",
@@ -293,6 +299,7 @@
         "id": "R003",
         "kind": "applicability",
         "domain": null,
+        "scope": null,
         "index": 9,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/9",
@@ -338,6 +345,7 @@
         "id": "R004",
         "kind": "skip",
         "domain": null,
+        "scope": null,
         "index": 10,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/10",
@@ -382,6 +390,7 @@
         "id": "R004",
         "kind": "applicability",
         "domain": null,
+        "scope": null,
         "index": 11,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/11",
@@ -422,6 +431,7 @@
         "id": "R005",
         "kind": "skip",
         "domain": null,
+        "scope": null,
         "index": 12,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/12",
@@ -464,6 +474,7 @@
         "id": "R005",
         "kind": "applicability",
         "domain": null,
+        "scope": null,
         "index": 13,
         "file": "baseline/baseline.schema.json",
         "pointer": "/items/allOf/13",
@@ -510,77 +521,122 @@
         "participant_id": {
           "topic": "about_you",
           "file": "baseline/categories/about_you.json",
-          "pointer": "/properties/participant_id"
+          "pointer": "/properties/participant_id",
+          "shape": "value",
+          "parent": null,
+          "title": "Participant ID"
         },
         "site": {
           "topic": "about_you",
           "file": "baseline/categories/about_you.json",
-          "pointer": "/properties/site"
+          "pointer": "/properties/site",
+          "shape": "value",
+          "parent": null,
+          "title": "Recruitment site"
         },
         "age": {
           "topic": "about_you",
           "file": "baseline/categories/about_you.json",
-          "pointer": "/properties/age"
+          "pointer": "/properties/age",
+          "shape": "value",
+          "parent": null,
+          "title": "Age at interview (years)"
         },
         "sex": {
           "topic": "about_you",
           "file": "baseline/categories/about_you.json",
-          "pointer": "/properties/sex"
+          "pointer": "/properties/sex",
+          "shape": "value",
+          "parent": null,
+          "title": "Sex"
         },
         "smk_ever": {
           "topic": "smoking",
           "file": "baseline/categories/smoking.json",
-          "pointer": "/properties/smk_ever"
+          "pointer": "/properties/smk_ever",
+          "shape": "value",
+          "parent": null,
+          "title": "Smoked at least 100 cigarettes in lifetime"
         },
         "smk_status": {
           "topic": "smoking",
           "file": "baseline/categories/smoking.json",
-          "pointer": "/properties/smk_status"
+          "pointer": "/properties/smk_status",
+          "shape": "value",
+          "parent": null,
+          "title": "Current smoking status"
         },
         "cigs_day": {
           "topic": "smoking",
           "file": "baseline/categories/smoking.json",
-          "pointer": "/properties/cigs_day"
+          "pointer": "/properties/cigs_day",
+          "shape": "value",
+          "parent": null,
+          "title": "Cigarettes per day (current smokers)"
         },
         "smk_age_start": {
           "topic": "smoking",
           "file": "baseline/categories/smoking.json",
-          "pointer": "/properties/smk_age_start"
+          "pointer": "/properties/smk_age_start",
+          "shape": "value",
+          "parent": null,
+          "title": "Age started smoking (years)"
         },
         "menarche_age": {
           "topic": "womens_health",
           "file": "baseline/categories/womens_health.json",
-          "pointer": "/properties/menarche_age"
+          "pointer": "/properties/menarche_age",
+          "shape": "value",
+          "parent": null,
+          "title": "Age at first menstrual period (years)"
         },
         "parity": {
           "topic": "womens_health",
           "file": "baseline/categories/womens_health.json",
-          "pointer": "/properties/parity"
+          "pointer": "/properties/parity",
+          "shape": "value",
+          "parent": null,
+          "title": "Number of live births"
         },
         "age_first_birth": {
           "topic": "womens_health",
           "file": "baseline/categories/womens_health.json",
-          "pointer": "/properties/age_first_birth"
+          "pointer": "/properties/age_first_birth",
+          "shape": "value",
+          "parent": null,
+          "title": "Age at first live birth (years)"
         },
         "breastfed_ever": {
           "topic": "womens_health",
           "file": "baseline/categories/womens_health.json",
-          "pointer": "/properties/breastfed_ever"
+          "pointer": "/properties/breastfed_ever",
+          "shape": "value",
+          "parent": null,
+          "title": "Ever breastfed"
         },
         "bmi": {
           "topic": "health",
           "file": "baseline/categories/health.json",
-          "pointer": "/properties/bmi"
+          "pointer": "/properties/bmi",
+          "shape": "value",
+          "parent": null,
+          "title": "Body mass index (kg/m2)"
         },
         "diabetes_dx": {
           "topic": "health",
           "file": "baseline/categories/health.json",
-          "pointer": "/properties/diabetes_dx"
+          "pointer": "/properties/diabetes_dx",
+          "shape": "value",
+          "parent": null,
+          "title": "Ever told you have diabetes"
         },
         "diabetes_age": {
           "topic": "health",
           "file": "baseline/categories/health.json",
-          "pointer": "/properties/diabetes_age"
+          "pointer": "/properties/diabetes_age",
+          "shape": "value",
+          "parent": null,
+          "title": "Age at diabetes diagnosis (years)"
         }
       }
     }
@@ -1048,6 +1104,7 @@
     "baseline/about_you": {
       "file": "baseline/categories/about_you.json",
       "properties": 4,
+      "fields": 0,
       "rules_targeting": 0,
       "errors": 0,
       "warnings": 0,
@@ -1060,6 +1117,7 @@
     "baseline/smoking": {
       "file": "baseline/categories/smoking.json",
       "properties": 4,
+      "fields": 0,
       "rules_targeting": 4,
       "errors": 0,
       "warnings": 0,
@@ -1072,6 +1130,7 @@
     "baseline/womens_health": {
       "file": "baseline/categories/womens_health.json",
       "properties": 4,
+      "fields": 0,
       "rules_targeting": 4,
       "errors": 0,
       "warnings": 0,
@@ -1084,6 +1143,7 @@
     "baseline/health": {
       "file": "baseline/categories/health.json",
       "properties": 3,
+      "fields": 0,
       "rules_targeting": 2,
       "errors": 0,
       "warnings": 0,
@@ -1095,6 +1155,6 @@
     }
   },
   "ran": true,
-  "at": "2026-10-13T13:11:01Z",
+  "at": "2026-10-13T18:39:03Z",
   "setId": "c547430f04d597a9"
 }

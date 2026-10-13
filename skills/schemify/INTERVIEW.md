@@ -48,7 +48,7 @@ uv run <skill-dir>/scripts/schemify.py record <<'EOF'
                {"id": "elsewhere", "label": "Someone else holds it"},
                {"id": "notyet", "label": "Not yet"}]},
   {"kind": "interview", "question": "How many questions do you want at a time?",
-   "options": [{"id": "5", "label": "About 5 — short sittings"}, {"id": "8", "label": "About 8"}, {"id": "15", "label": "As many as you have"}],
+   "options": [{"id": "5", "label": "About 5 — short sittings"}, {"id": "8", "label": "About 8"}, {"id": "15", "label": "About 15 — long sittings"}],
    "recommended": "8", "why": "Enough to make progress without a long sitting."}
  ]}
 EOF
@@ -76,12 +76,15 @@ The other answers:
 
 ## The plan questions
 
-After the digests, one batch (QUESTIONS.md rules; recommendations from the digests) — posted even while the interview is unanswered, since it blocks your work:
+After the digests, one batch (QUESTIONS.md rules; recommendations from the digests) — posted even while the interview is unanswered, since it blocks your work. Ask every plan question that applies: past the batch size, post the rest at once as a second batch, never in a later round:
 
 - **Grain**, per table — "What is one row?" Recommended: what the identifiers imply ("one row per participant: `participant_id` is unique and nothing repeats per visit").
 - **Tables** — one dataset or several related ones (a participant table, a visit table)? Each distinct grain is its own table.
-- **Missing-value codes** — "Your dictionary uses -666 (not applicable), -777 (refused), -888 (don't know). Is -666 always 'skipped by design'?" and, separately, "In the delivered data, can a cell be empty? What does an empty cell mean?" Recommended: the source's codes, no empty cells. An answer that empty cells occur and mean something needs a `convention` decision (SCHEMA-STYLE.md, "Delivered blanks").
-- **Topics** — the proposed list as a table in `context` (topic · variables · examples · why), options "Use these topics" (recommended) / "Change them" (the person says how in "Something else").
+- **Missing-value codes** — "Your dictionary uses -666 (not applicable), -777 (refused), -888 (don't know). Is -666 always 'skipped by design'?" and, separately, "In the delivered data, can a cell be empty? What does an empty cell mean?" Recommended: the source's codes, no empty cells. An answer that empty cells occur and mean something needs a `convention` decision (SCHEMA-STYLE.md, "Delivered blanks"). For a JSON delivery, also: "Can a variable be left out of a record — which ones?" Recommended: what the sources mark — a dictionary's *Required* column names what is always there. Each answer that lets something be left out is a `convention` decision, cited on those variables' `required` facets (SCHEMA-STYLE.md, "Nested values").
+- **Nested values** — when the digests found variables that hold several values (an address block, a household roster, visits, a choose-many question):
+  - how the delivered file holds each — a list or group inside the record, numbered columns, or a separate table. Ask unless a source says; then cite it, and confirm only what it leaves open. NESTED.md has the question and what each answer means.
+  - for the nested ones, what a missing value looks like inside, unless the sources settle it — one `convention` question each (NESTED.md, "What a missing value looks like inside"): which fields of a group or an entry can be left out, or hold `null`; whether an empty list means "none"; what a whole value holds for someone not asked. Recommend what the sources' wording implies; asking now saves a round per topic later.
+- **Topics** — the proposed list in `context`, laid out as START.md's step 7 says; options "Use these topics" (recommended) / "Change them" (the person says how in "Something else").
 - **Session plan** — "About N sessions of two to four topics; this session: topics A and B." Options: the plan (recommended), "Do as much as possible now", "Smaller steps".
 - Web sources waiting for approval are not questions: the person approves each on the Sources & decisions tab (*Use* / *Do not use*). Say so in the batch's `note` and link it: "Also: two web pages I found need your OK — `<website>#evidence/sources`."
 

@@ -55,6 +55,47 @@
   var toggle = document.getElementById("semantic-toggle");
   var statusEl = document.getElementById("semantic-status");
   try { toggle.checked = localStorage.getItem(key) === "1"; } catch (e) { /* storage blocked */ }
+  // A rule among one group's or entry's fields lives in that object's allOf. With its x-provenance beside if/then, the
+  // library also appends the rule's $comment to the list's or group's own row (its description and note); the rule shows
+  // under skip patterns, so those exact lines go. (The website does the same; there, x-provenance is hidden too.)
+  function nestedRuleComments(schemas) {
+    var out = [];
+    function walk(node, motherItems) {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach(function (n) { walk(n, false); }); return; }
+      if (!motherItems && Array.isArray(node.allOf)) node.allOf.forEach(function (e) {
+        if (e && typeof e === "object" && e["if"] !== undefined && typeof e.$comment === "string" && e.$comment.trim()) out.push(e.$comment.trim());
+      });
+      Object.keys(node).forEach(function (k) { if (k !== "const" && k !== "enum" && k !== "default" && k !== "examples") walk(node[k], false); });
+    }
+    schemas.forEach(function (s) {
+      if (s && typeof s === "object" && !Array.isArray(s)) Object.keys(s).forEach(function (k) { walk(s[k], k === "items"); });
+    });
+    return out;
+  }
+  function dropRuleComments(table, comments) {
+    if (!comments.length) return;
+    var blocks = comments.map(function (c) { return c.split("\n"); });
+    function strip(text) {
+      var lines = text.split("\n");
+      blocks.forEach(function (b) {
+        for (var i = 0; i + b.length <= lines.length; i++) {
+          var hit = true;
+          for (var j = 0; j < b.length && hit; j++) hit = lines[i + j] === b[j];
+          if (hit) { lines.splice(i, b.length); i--; }
+        }
+      });
+      return lines.join("\n");
+    }
+    var rows = (table.rows || []).slice();
+    (table.categories || []).forEach(function (c) { (c.rows || []).forEach(function (r) { if (rows.indexOf(r) < 0) rows.push(r); }); });
+    rows.forEach(function (row) {
+      if (!row || typeof row.Description !== "string") return;
+      row.Description = strip(row.Description);
+      if (typeof row.__comment === "string") { var note = strip(row.__comment); if (note.trim()) row.__comment = note; else delete row.__comment; }
+    });
+  }
+  var ruleComments = nestedRuleComments(docs.map(function (d) { return d.schema; }));
   var views = config.mounts.map(function (m) {
     var sec = el("section", "sf-dict-section");
     if (config.mounts.length > 1) sec.appendChild(el("h2", null, m.title));
@@ -62,6 +103,7 @@
     sec.appendChild(box);
     mounts.appendChild(sec);
     var table = lib.schemaDocumentsToTable(docs, { rootUri: m.rootUri });
+    dropRuleComments(table, ruleComments);
     return { m: m, box: box, table: table };
   });
   function semantic(table) {

@@ -14,10 +14,10 @@ Table of contents
 
 Ask a person when the answer changes the schema and you cannot settle it from the sources:
 
-- **Always ask**: sources that contradict each other, or a person who contradicts a source; whether to include undocumented skip logic you suspect (the `consent` question, SKIP-LOGIC.md); anything that would reject real data a person might consider valid; the plan (grain, tables, missing-value codes, topics).
+- **Always ask**: sources that contradict each other, or a person who contradicts a source; whether to include undocumented skip logic you suspect (the `consent` question, SKIP-LOGIC.md); anything that would reject real data a person might consider valid; the plan (grain, tables, missing-value codes, how nested values are delivered, topics).
 - **Decide and flag** (a `guess`, `review: needed`): plausibility bounds the sources do not state, a normalized label, an identifier pattern inferred from examples, a type. Encode it, cite the decision, and let people review guesses in bulk.
 - **Neither**: anything the sources state plainly. Transcribing is not a decision.
-- **Steward-only**: with a `limited` author, a question needing specialist knowledge — the plan's grain, tables, and missing-value codes among them — gets your provisional decision (`decide` with `"to": "steward"`), applied at once like any decision and flagged for the steward. It is not posted to the author; REVIEW-MODE.md picks it up. The topic list and the session plan are still asked.
+- **Steward-only**: with a `limited` author, a question needing specialist knowledge — the plan's grain, tables, missing-value codes, and how nested values are delivered among them — gets your provisional decision (`decide` with `"to": "steward"`), applied at once like any decision and flagged for the steward. It is not posted to the author; REVIEW-MODE.md picks it up. The topic list and the session plan are still asked. Plan questions posted before the profile arrived (START.md, step 7) stay up: tell the author that *not sure* is a good answer to any of them — it applies your recommendation, flagged for the steward.
 
 ## Anatomy of a question
 

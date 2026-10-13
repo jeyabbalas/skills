@@ -16,8 +16,8 @@ Run the commands; do not recall that they passed:
 - [ ] `status`: every topic confirmed; `next` offers `finish`, and nothing else but questions for a steward who is not the person you work with
 - [ ] The skip-logic audit is done (SKIP-LOGIC.md) — no suspected rule left unasked, no waiting rule whose variables exist
 - [ ] `check` green: no errors, nothing unapplied, the inbox empty
-- [ ] Every open question answered, or deliberately left for the steward (`to: steward`, or flagged for review)
-- [ ] `project.json` → `description` is a paragraph a stranger understands: what the data is, who collected it, when
+- [ ] Every open question answered, or deliberately left for the steward (`to: steward`, or flagged for review); an optional question may stay blank
+- [ ] `project.json` → `description` is a paragraph a stranger understands: what the data is, who collected it, when — as far as the sources and the people you asked say; never guess the rest
 - [ ] A data check offered, if the person has the data (DATA-CHECK.md) — optional, never required; a file they allowed you to check has run on the final schemas
 - [ ] `build` ran last
 ```
@@ -30,7 +30,7 @@ Open `schemify/package/README.md` and read it top to bottom once — it is gener
 
 ## Ending A: hand it to the steward
 
-When a steward is named in `project.json` → `people`, or the person asks for a review:
+When the person asks for a review, or a steward is named in `project.json` → `people` and `schemify.py queue --for steward` holds anything for them. A named steward with an empty queue has nothing to review: take Ending B, and say the steward can still review later (`/schemify review`). The person may also choose to finish now: what waits for the steward stays listed in the README's open items.
 
 1. `schemify.py queue --for steward` — say how much will reach the steward: "About 14 items need their knowledge — roughly 20 minutes."
 2. Record `{"type": "milestone", "event": "reach", "id": "ready-for-review"}` and set `project.json` → `mode` to `review`.

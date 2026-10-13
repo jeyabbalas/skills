@@ -639,13 +639,13 @@ def test_rtf_without_textutil_uses_striprtf(src, monkeypatch, capsys):
 
 def test_json_and_xml(src):
     out = fresh("json")
-    obj = ok(src / "schema.json", "--out", out)
+    obj = ok(src / "schema.json", "--out", out, "--documentation")     # a JSON file may be data: the user said it is not
     check_manifest(obj, src / "schema.json", "json", out)
     assert obj["stats"]["type"] == "object" and obj["stats"]["keys"] == ["name", "variables"]
     pretty = (out / "pretty.json").read_text(encoding="utf-8")
     assert '"label": "Âge"' in pretty and json.loads(pretty)["variables"][0]["name"] == "AGE"
     out = fresh("broken-json")
-    obj = ok(src / "broken.json", "--out", out)
+    obj = ok(src / "broken.json", "--out", out, "--documentation")
     assert [f["path"] for f in obj["files"]] == ["text.md"]
     assert any("not valid JSON" in w for w in obj["warnings"])
     out = fresh("xml")
@@ -822,6 +822,28 @@ def test_delimited_files_need_documentation_flag(src):
         assert not out.exists()
     out = fresh("guard-md")
     ok(src / "notes.md", "--out", out)  # plain text needs no flag
+
+
+def test_json_files_need_documentation_flag(src):
+    # A JSON file is as often a dataset (an array of records, one record per line) as a schema or a
+    # metadata export: refused (exit 2) until the user has said it describes variables, nothing written.
+    (src / "records.jsonl").write_text('{"name": "AGE", "label": "Age"}\n{"name": "SEX", "label": "Sex"}\n',
+                                       encoding="utf-8")
+    (src / "records.ndjson").write_text('{"name": "AGE"}\n', encoding="utf-8")
+    for name in ("schema.json", "records.jsonl", "records.ndjson"):
+        out = fresh("guard-json")
+        obj = failed(2, src / name, "--out", out)
+        assert obj["error"].startswith("A JSON file can be a dataset (an array of records")
+        assert "JSON Schema" in obj["error"] and "REDCap" in obj["error"]
+        assert "--documentation" in obj["hint"] and "describes variables" in obj["hint"]
+        assert not out.exists()
+    out = fresh("jsonl")
+    obj = ok(src / "records.jsonl", "--out", out, "--documentation")    # JSON Lines: extracted as text lines
+    check_manifest(obj, src / "records.jsonl", "jsonl", out)
+    assert [f["path"] for f in obj["files"]] == ["text.md"] and "L<N>" in obj["locators"]
+    assert lines(out / "text.md")[:2] == ['{"name": "AGE", "label": "Age"}', '{"name": "SEX", "label": "Sex"}']
+    assert ok(src / "records.ndjson", "--out", fresh("ndjson"), "--documentation")["kind"] == "jsonl"
+    assert ".jsonl .ndjson" in failed(2, src / "mystery.xyz", "--out", fresh("x"))["hint"]   # listed as supported
 
 
 def test_sheets_of_records_are_not_extracted(src):

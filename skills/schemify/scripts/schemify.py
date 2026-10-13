@@ -18,7 +18,8 @@ Commands -- each prints one JSON object on stdout:
   record    [--file F]  One JSON event or an array of them on stdin; validated,
             assigned ids, appended to state/ledger.jsonl. Nothing is written
             unless every event is valid.
-  show      ID ...  S01, D014, R003, B02, A01, X01, topic:<id>, variable:<name>
+  show      ID ...  S01, D014, R003, B02, A01, X01, topic:<id>, variable:<name>, or
+            variable:<path> for a field inside a nested value (quote it: 'variable:household[].age')
   queue     [--for author|steward] [--topic T] [--limit N]
             What needs a person, ranked; low-stakes guesses grouped for one-click review.
   inbox     list | take ID | import FILE
@@ -62,6 +63,7 @@ import time
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import unquote
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 WS_FORMAT = 2
@@ -151,7 +153,7 @@ def read_json(path: Path, default=None):
         return json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return default
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise Fail(f"{path} is not readable JSON: {exc}", "Fix or restore the file; `check` names what is wrong.")
 
 
@@ -650,14 +652,14 @@ def validate_event(ev: dict, world: World, pending: dict, n: int, creating_hint:
             kind = ev.get("kind")
             if e == "open" and kind in DATA_KINDS:
                 if not ev.get("topic") and not ev.get("targets"):
-                    errs.append(f"{where}: a {kind} question names its 'topic' or its 'targets' (variables)")
+                    errs.append(f"{where}: {article(kind)} question names its 'topic' or its 'targets' (variables)")
                 if kind in PROVISIONAL_KINDS and ev.get("input", "choice") != "text" and not ev.get("provisional"):
-                    errs.append(f"{where}: a {kind} question says which option the schemas encode meanwhile in 'provisional' "
+                    errs.append(f"{where}: {article(kind)} question says which option the schemas encode meanwhile in 'provisional' "
                                 f"(the safest one when no source settles it; for a rule, no rule)")
                 if kind in EVIDENCE_KINDS and not ev.get("evidence"):
-                    errs.append(f"{where}: a {kind} question quotes its 'evidence' ([{{\"ref\": \"S01:…\", \"quote\": \"…\"}}])")
+                    errs.append(f"{where}: {article(kind)} question quotes its 'evidence' ([{{\"ref\": \"S01:…\", \"quote\": \"…\"}}])")
             if e != "open" and kind in ("knowledge", "feedback") and not (ev.get("text") or "").strip():
-                errs.append(f"{where}: a {kind} decision holds the person's words in 'text'")
+                errs.append(f"{where}: {article(kind)} decision holds the person's words in 'text'")
             if e == "open" and ev.get("kind") not in ("interview", "knowledge", "feedback") and ev.get("input", "choice") != "text":
                 if not ev.get("recommended"):
                     errs.append(f"{where}: every question about the data carries 'recommended' (an option id) and 'why'")
@@ -752,8 +754,14 @@ def validate_event(ev: dict, world: World, pending: dict, n: int, creating_hint:
         cur.update({k: ev[k] for k in RULE_FIELDS if k in ev})
         if cur.get("evidence") == "inferred" and cur.get("status") == "encoded" and not cur.get("consent"):
             errs.append(f"{where}: an inferred rule is encoded only with 'consent' — the D id of a person's yes (SKIP-LOGIC.md)")
-        if cur.get("evidence") in ("told", "inferred") and cur.get("status") not in ("suspected", None) and not cur.get("decision"):
-            errs.append(f"{where}: a {cur.get('evidence')} rule cites its 'decision'")
+        if cur.get("evidence") == "told" and cur.get("status") not in ("suspected", None) and not cur.get("decision"):
+            errs.append(f"{where}: a told rule cites its 'decision': the person's rule or knowledge decision")
+        if cur.get("evidence") == "inferred" and cur.get("status") == "encoded" and not cur.get("decision"):
+            errs.append(f"{where}: an inferred rule is encoded with its 'decision': your guess decision saying why (SKIP-LOGIC.md)")
+        if cur.get("evidence") == "inferred" and cur.get("status") not in ("suspected", "encoded", None) \
+                and not (cur.get("consent") or cur.get("decision")):
+            errs.append(f"{where}: {article(cur.get('status'))} inferred rule cites in 'consent' the decision that put it off: "
+                        "the consent question a person answered, or the preference not to infer rules")
         if cur.get("status") == "waiting" and not cur.get("waits_for"):
             errs.append(f"{where}: a waiting rule names what it waits for in 'waits_for'")
     elif t == "batch":
@@ -813,10 +821,10 @@ def validate_event(ev: dict, world: World, pending: dict, n: int, creating_hint:
             if verdict in ("data-issue", "expected"):
                 dec = world.decisions.get(ev.get("decision") or "")
                 if not ev.get("decision"):
-                    errs.append(f"{where}: a {verdict} verdict cites, in 'decision', the question a person answered "
+                    errs.append(f"{where}: {article(verdict)} verdict cites, in 'decision', the question a person answered "
                                 f"(DATA-CHECK.md, Triage)")
                 elif dec and dec.get("status") and dec["status"] not in ("answered", "confirmed"):
-                    errs.append(f"{where}: a {verdict} verdict needs a person's answer; {ev['decision']} is {dec.get('status')}")
+                    errs.append(f"{where}: {article(verdict)} verdict needs a person's answer; {ev['decision']} is {dec.get('status')}")
         else:
             errs.append(f"{where}: unknown alignment event (add, triage)")
     elif t == "dataset":
@@ -957,7 +965,7 @@ def record_events(ws: Path, raw, by_default: str = "agent") -> dict:
                 if ev["id"] in used[t]:
                     errors.append(f"event {n} ({t}.{e}): id {ev['id']} already exists — omit 'id' to get a new one")
                 elif not ID_RE[t].match(str(ev["id"])):
-                    errors.append(f"event {n} ({t}.{e}): {ev['id']!r} is not a {t} id")
+                    errors.append(f"event {n} ({t}.{e}): {ev['id']!r} is not {article(t)} id")
             else:
                 ev["id"] = next_id(t, used[t])
             used[t].add(ev["id"])
@@ -1016,18 +1024,60 @@ def is_inside(p: Path, root: Path) -> bool:
         return False
 
 
+# Field paths, exactly as the data dictionary (jsdd's formatVariablePath) and QuaC write them: the record-level key
+# as is, then `.name` (or `["odd name"]`), `[]` for every entry of a list, `.*` for every value of a lookup.
+# The class is JavaScript's \s, so a name is plain here exactly when it is plain on the website.
+PLAIN_NAME = re.compile(r'(?!/)[^.\[\]"*\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+')
+FIELD_DEPTH = 6          # nesting levels below a record-level property that become fields (validate.py warns beyond)
+FIELD_LIMIT = 10000      # fields inside nested values per table: a shape shared at many paths stops there, as in validate.py
+REF_HOPS = 8             # $ref hops followed to find the schema that gives a value its shape
+SHAPE_KEYS = {"type", "properties", "items", "prefixItems", "additionalProperties", "anyOf", "oneOf", "allOf", "const",
+              "enum", "not", "if"}
+
+
+def join_path(parent: str | None, name: str) -> str:
+    if parent is None:
+        return name
+    return parent + ("." + name if PLAIN_NAME.fullmatch(name) else "[" + json.dumps(name, ensure_ascii=False) + "]")
+
+
+def ptr_join(base: str, *parts) -> str:
+    """A JSON pointer extended by keys or positions, each escaped (RFC 6901)."""
+    return base + "".join("/" + str(p).replace("~", "~0").replace("/", "~1") for p in parts)
+
+
+def json_kinds(node: dict) -> set:
+    """The JSON types a branch holds (integer counts as number; null is a special code, not a shape)."""
+    t = node.get("type")
+    kinds = [t] if isinstance(t, str) else [x for x in t if isinstance(x, str)] if isinstance(t, list) else []
+    if not kinds:
+        if "properties" in node or "additionalProperties" in node:
+            kinds = ["object"]
+        elif "items" in node or "prefixItems" in node:
+            kinds = ["array"]
+    return {"number" if k == "integer" else k for k in kinds if k != "null"}
+
+
 class Pkg:
     """What the schema files say, read without a validator: enough for coverage,
-    provenance bookkeeping and rule reconciliation even when validate.py cannot run."""
+    provenance bookkeeping and rule reconciliation even when validate.py cannot run.
+
+    Every variable is a field, and so is every field inside a nested value (a group's
+    fields, each list entry's fields, a lookup's values): `properties` maps
+    "<table>.<path>" to {table, topic, file, name, path, parent, depth, shape, top,
+    pointer, schema}, where `file`/`pointer` locate the field's own node (where its
+    title and x-provenance live) and `depth` is 0 for a record-level property."""
 
     def __init__(self, ws: Path, project: dict):
         self.root = schemas_dir(ws)
         self.docs: dict[str, dict] = {}         # relative path -> parsed JSON
         self.broken: dict[str, str] = {}
-        self.properties: dict[str, dict] = {}   # "<table>.<name>" -> {table, topic, file, schema}
-        self.by_name: dict[str, list[str]] = {}
-        self.rules: list[dict] = []             # rule entries found in mothers
+        self.properties: dict[str, dict] = {}   # "<table>.<path>" -> the field
+        self.by_name: dict[str, list[str]] = {}  # path -> keys
+        self.rules: list[dict] = []             # rule entries: the mothers' items.allOf, then those inside nested values
+        self.optional: set[str] = set()         # keys of fields their object's `required` leaves out (a cited decision)
         self.mothers: dict[str, str] = {}
+        self.inner: dict[str, int] = {}         # table -> fields inside nested values so far (FIELD_LIMIT)
         if self.root.is_dir():
             for p in sorted(self.root.rglob("*")):
                 if not p.is_file() or p.suffix.lower() != ".json":
@@ -1035,7 +1085,7 @@ class Pkg:
                 rel = p.relative_to(self.root).as_posix()
                 try:
                     doc = json.loads(p.read_text(encoding="utf-8"))
-                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
                     self.broken[rel] = str(exc)
                     continue
                 self.docs[rel] = doc
@@ -1044,45 +1094,158 @@ class Pkg:
             mother = tb.get("mother")
             if mother in self.docs:
                 self.mothers[tb.get("name")] = mother
+        nested_rules: list[dict] = []
         for rel, doc in self.docs.items():
             tp = topic_of.get(rel)
-            if tp is None or not isinstance(doc, dict):
+            if tp is None or not isinstance(doc, dict) or not isinstance(doc.get("properties"), dict):
                 continue
-            for name, sch in (doc.get("properties") or {}).items():
-                key = f"{tp.get('table')}.{name}"
-                self.properties[key] = {"table": tp.get("table"), "topic": tp.get("id"), "file": rel,
-                                        "name": name, "schema": sch if isinstance(sch, dict) else {}}
-                self.by_name.setdefault(name, []).append(key)
+            req = doc.get("required") if isinstance(doc.get("required"), list) else []
+            for name, sch in doc["properties"].items():
+                self._field(tp.get("table"), tp.get("id"), rel, name, sch, ptr_join("", "properties", name), name, None, 0,
+                            name, (), name not in req, nested_rules)
         for table, rel in self.mothers.items():
-            entries = ((self.docs[rel].get("items") or {}).get("allOf") or []) if isinstance(self.docs[rel], dict) else []
+            items = self.docs[rel].get("items") if isinstance(self.docs[rel], dict) else None
+            entries = items.get("allOf") if isinstance(items, dict) else None
             for i, ent in enumerate(entries if isinstance(entries, list) else []):
-                if not isinstance(ent, dict) or "if" not in ent:
-                    continue
-                m = RULE_COMMENT_RE.match(str(ent.get("$comment") or ""))
-                self.rules.append({"table": table, "index": i, "file": rel, "pointer": f"/items/allOf/{i}",
-                                   "id": m.group(2) if m else None, "prefix": m.group(1) if m else None,
-                                   "comment": ent.get("$comment"), "provenance": ent.get("x-provenance"),
-                                   "names": sorted(names_in(ent.get("if")) | names_in(ent.get("then")))})
+                if isinstance(ent, dict) and "if" in ent:
+                    self.rules.append(rule_entry(table, i, rel, f"/items/allOf/{i}", None, ent))
+        self.rules += nested_rules
+
+    # -- the field model (validate.py's, without a validator)
+    def deref(self, rel: str, ref) -> tuple:
+        """(node, file, pointer) a $ref points at inside the package, or (None, None, None)."""
+        path, _, frag = str(ref).partition("#")
+        frag = unquote(frag)                            # a URI fragment: %20 is a space, as validate.py reads it
+        if not path:
+            target = rel
+        elif "://" in path:
+            target = next((r for r, d in self.docs.items() if isinstance(d, dict) and d.get("$id") == path), None)
+        else:
+            target = posixpath.normpath(posixpath.join(posixpath.dirname(rel), unquote(path)))
+        node = self.docs.get(target) if target else None
+        if frag and not frag.startswith("/"):
+            return None, None, None                     # an anchor: never house style
+        for part in frag.split("/")[1:]:
+            if not isinstance(node, dict):
+                return None, None, None
+            node = node.get(part.replace("~1", "/").replace("~0", "~"))
+        return (node, target, frag) if isinstance(node, (dict, bool)) else (None, None, None)
+
+    def resolve(self, rel: str, node, pointer: str) -> tuple:
+        """Follow a `$ref` that only annotations stand beside, up to 8 hops: the (node, file, pointer) of the schema
+        that gives the value its shape. Titles and x-provenance stay with the node the walk started from."""
+        for _ in range(REF_HOPS):
+            if not isinstance(node, dict) or not isinstance(node.get("$ref"), str) or SHAPE_KEYS & set(node):
+                break
+            target, trel, tptr = self.deref(rel, node["$ref"])
+            if target is None:
+                break
+            node, rel, pointer = target, trel, tptr
+        return node, rel, pointer
+
+    def typed_branches(self, node, rel: str, pointer: str) -> list[tuple]:
+        """The branches that decide a value's shape: an anyOf/oneOf's branches other than special codes (a `const`,
+        or a $ref to one), each followed through $ref; otherwise the node itself."""
+        if not isinstance(node, dict):
+            return []
+        for kw in ("anyOf", "oneOf"):
+            if isinstance(node.get(kw), list):
+                out = []
+                for i, b in enumerate(node[kw]):
+                    rb, brel, bptr = self.resolve(rel, b, ptr_join(pointer, kw, i))
+                    if isinstance(rb, dict) and "const" not in rb:
+                        out.append((rb, brel, bptr))
+                return out
+        return [(node, rel, pointer)]
+
+    def own_shape(self, node: dict, rel: str, pointer: str, hops: int = 0) -> str:
+        kinds = json_kinds(node)
+        if "object" in kinds:
+            if isinstance(node.get("properties"), dict):
+                return "group"
+            return "lookup" if isinstance(node.get("additionalProperties"), dict) else "value"
+        if "array" in kinds:
+            items = node.get("items")
+            if isinstance(items, dict) and hops < REF_HOPS:
+                ri, irel, iptr = self.resolve(rel, items, ptr_join(pointer, "items"))
+                if self.shape_of(ri, irel, iptr, hops + 1)[0] == "group":
+                    return "entries"
+            return "list"
+        return "value"
+
+    def shape_of(self, node, rel: str, pointer: str, hops: int = 0) -> tuple[str, list]:
+        """(shape, typed branches): value, group, lookup, list, entries, or mixed (typed branches of two or more
+        JSON types)."""
+        branches = self.typed_branches(node, rel, pointer)
+        kinds: set = set()
+        for b, _, _ in branches:
+            kinds |= json_kinds(b)
+        if len(kinds) >= 2:
+            return "mixed", branches
+        return (self.own_shape(*branches[0], hops) if branches else "value"), branches
+
+    def objects(self, branches: list, hops: int = 0) -> list[tuple]:
+        """The object nodes holding a value's fields: (kind, node, file, pointer) per group, lookup, or list-of-entries
+        branch (for entries, the entry's object node)."""
+        out = []
+        for b, brel, bptr in branches:
+            kind = self.own_shape(b, brel, bptr, hops)
+            if kind in ("group", "lookup"):
+                out.append((kind, b, brel, bptr))
+            elif kind == "entries":
+                ri, irel, iptr = self.resolve(brel, b["items"], ptr_join(bptr, "items"))
+                for g, grel, gptr in self.typed_branches(ri, irel, iptr):
+                    if self.own_shape(g, grel, gptr, hops + 1) == "group":
+                        out.append(("entries", g, grel, gptr))
+        return out
+
+    def _field(self, table, topic, rel, name, node, pointer, path, parent, depth, top, stack, optional, nested_rules):
+        node = node if isinstance(node, dict) else {}
+        res, rrel, rptr = self.resolve(rel, node, pointer)
+        shape, branches = self.shape_of(res, rrel, rptr)
+        key = f"{table}.{path}"
+        if depth and key not in self.properties:
+            self.inner[table] = self.inner.get(table, 0) + 1
+        self.properties[key] = {"table": table, "topic": topic, "file": rel, "name": name, "path": path, "parent": parent,
+                                "depth": depth, "shape": shape, "top": top, "pointer": pointer, "schema": node}
+        self.by_name.setdefault(path, []).append(key)
+        if optional:
+            self.optional.add(key)
+        if shape == "value" or depth >= FIELD_DEPTH or (rrel, rptr) in stack or self.inner.get(table, 0) >= FIELD_LIMIT:
+            return                      # too deep, a shape that contains itself, or too many fields: validate.py warns
+        stack = stack + ((rrel, rptr),)
+        for kind, obj, orel, optr in self.objects(branches):
+            if kind == "lookup":
+                self._field(table, topic, orel, "*", obj["additionalProperties"], ptr_join(optr, "additionalProperties"),
+                            path + ".*", path, depth + 1, top, stack, False, nested_rules)
+                continue
+            scope = path + "[]" if kind == "entries" else path
+            req = obj.get("required") if isinstance(obj.get("required"), list) else []
+            for cname, csch in obj["properties"].items():
+                self._field(table, topic, orel, cname, csch, ptr_join(optr, "properties", cname), join_path(scope, cname),
+                            path, depth + 1, top, stack, cname not in req, nested_rules)
+            seen = {(r["file"], r["pointer"]) for r in nested_rules}   # a shape used at two paths lists its rules once
+            for i, ent in enumerate(obj.get("allOf") if isinstance(obj.get("allOf"), list) else []):
+                if isinstance(ent, dict) and "if" in ent and (orel, ptr_join(optr, "allOf", i)) not in seen:
+                    nested_rules.append(rule_entry(table, i, orel, ptr_join(optr, "allOf", i), scope, ent, container=optr))
 
     def provenance_refs(self) -> list[tuple[str, str, str]]:
         """(where, facet, ref) for every x-provenance reference in the package."""
         out = []
-
-        def walk(node, where):
-            if isinstance(node, dict):
-                prov = node.get("x-provenance")
-                if isinstance(prov, dict):
-                    for facet, refs in prov.items():
-                        for r in (refs if isinstance(refs, list) else [refs]):
-                            out.append((where, facet, r))
-                for k, v in node.items():
-                    if k not in ("const", "enum", "x-provenance", "examples", "default"):
-                        walk(v, where)
-            elif isinstance(node, list):
-                for v in node:
-                    walk(v, where)
         for rel, doc in self.docs.items():
-            walk(doc, rel)
+            stack = [doc]                                   # depth first, in document order, however deep
+            while stack:
+                node = stack.pop()
+                if isinstance(node, dict):
+                    prov = node.get("x-provenance")
+                    if isinstance(prov, dict):
+                        for facet, refs in prov.items():
+                            for r in (refs if isinstance(refs, list) else [refs]):
+                                out.append((rel, facet, r))
+                    stack += reversed([v for k, v in node.items()
+                                       if k not in ("const", "enum", "x-provenance", "examples", "default")])
+                elif isinstance(node, list):
+                    stack += reversed(node)
         return out
 
     def property_provenance(self, key: str) -> dict:
@@ -1090,19 +1253,42 @@ class Pkg:
         return (p or {}).get("schema", {}).get("x-provenance") or {}
 
 
-def names_in(node) -> set[str]:
+def rule_names(node, scope: str | None = None, depth: int = 0) -> set[str]:
+    """The variables a rule's `if` or `then` names, as paths: the clause's own names (inside a nested value, under
+    its scope — `household[].relation`), and the fields a clause reaching into a group names (`consent.recontact`).
+    A clause nested absurdly deep names nothing below 64 levels (validate.py reports it)."""
     out: set[str] = set()
-    if isinstance(node, dict):
+    if isinstance(node, dict) and depth < 64:
         props = node.get("properties")
+        reach = set()
         if isinstance(props, dict):
-            out |= set(props)
+            for name, test in props.items():
+                inner = rule_names(test, join_path(scope, name), depth + 1) if isinstance(test, dict) and (
+                    isinstance(test.get("properties"), dict) or isinstance(test.get("required"), list)) else set()
+                if inner:
+                    out |= inner
+                    reach.add(name)
+                else:
+                    out.add(join_path(scope, name))
         req = node.get("required")
         if isinstance(req, list):
-            out |= {r for r in req if isinstance(r, str)}
+            out |= {join_path(scope, r) for r in req if isinstance(r, str) and r not in reach}
         for k in ("anyOf", "allOf", "oneOf"):
-            for sub in node.get(k) or []:
-                out |= names_in(sub)
+            for sub in node.get(k) if isinstance(node.get(k), list) else []:
+                out |= rule_names(sub, scope, depth + 1)
     return out
+
+
+def rule_entry(table: str, index: int, rel: str, pointer: str, scope: str | None, ent: dict, container: str | None = None) -> dict:
+    """One encoded rule: an entry of a mother's items.allOf (scope None), or of a nested value's own allOf (scope: the
+    value's path — `household[]` for a list's entries, `address` for a group)."""
+    m = RULE_COMMENT_RE.match(str(ent.get("$comment") or ""))
+    return {"table": table, "index": index, "file": rel, "pointer": pointer, "scope": scope,
+            "id": m.group(2) if m else None, "prefix": m.group(1) if m else None,
+            "comment": ent.get("$comment"), "provenance": ent.get("x-provenance"),
+            "names": sorted(rule_names(ent.get("if"), scope) | rule_names(ent.get("then"), scope)),
+            "targets": sorted(rule_names(ent.get("then"), scope)),
+            **({"container": container} if container is not None else {})}
 
 
 def read_inventory(ws: Path) -> tuple[list[dict], list[str]]:
@@ -1194,7 +1380,8 @@ def topic_statuses(world: World, pkg: Pkg, checks: dict | None) -> list[dict]:
     fixtures = ((checks or {}).get("fixtures") or {}).get("tables") or {}
     for tp in world.project.get("topics", []):
         tid, table, rel = tp.get("id"), tp.get("table"), tp.get("file")
-        props = [k for k, v in pkg.properties.items() if v["topic"] == tid]
+        fields = [k for k, v in pkg.properties.items() if v["topic"] == tid]
+        props = [k for k in fields if pkg.properties[k]["depth"] == 0]        # its variables; the rest are inside them
         info = ctopics.get(f"{table}/{tid}") or ctopics.get(f"{table}/{Path(rel or '').stem}") or {}
         if rel not in pkg.docs or not props:
             status = "planned"
@@ -1204,7 +1391,8 @@ def topic_statuses(world: World, pkg: Pkg, checks: dict | None) -> list[dict]:
             fx = fixtures.get(table) or {}
             fixtures_ok = (fx.get("valid") or {}).get("status") == "pass" and not (fx.get("invalid") or {}).get("unledgered") \
                 and all(v.get("status") == "caught" for v in ((fx.get("invalid") or {}).get("verdicts") or []))
-            if info and not info.get("errors") and fixtures_ok and cov.get("total") and cov.get("covered") == cov.get("total"):
+            covered = isinstance(cov.get("total"), int) and cov.get("covered") == cov["total"]   # 0 of 0: nothing to show
+            if info and not info.get("errors") and fixtures_ok and covered:
                 status = "tested"
         rec = world.topics.get(tid) or {}
         rev, cur = rec.get("review"), doc_hash(pkg.docs.get(rel))
@@ -1220,13 +1408,13 @@ def topic_statuses(world: World, pkg: Pkg, checks: dict | None) -> list[dict]:
             "id": tid, "title": tp.get("title"), "table": table, "file": rel, "status": status, "hash": cur,
             **({"changedSinceApproval": True} if changed else {}),
             "presentedAt": rec.get("presentedAt"), "presentNote": rec.get("presentNote") if rev == "in-review" else None,
-            "variables": len(props),
+            "variables": len(props), "fields": len(fields) - len(props),
             "open": sum(1 for d in decisions if d["status"] in ("open", "asked")),
             "guesses": sum(1 for d in decisions if d.get("needsReview")),
             "errors": info.get("errors", 0), "warnings": info.get("warnings", 0),
             "coverage": info.get("coverage"),
             "rules": sum(1 for r in world.rules.values() if set((r.get("gates") or []) + (r.get("targets") or []))
-                         & {pkg.properties[k]["name"] for k in props}),
+                         & {pkg.properties[k]["path"] for k in fields}),
         })
     return out
 
@@ -1370,7 +1558,7 @@ def next_actions(ws: Path, world: World, pkg: Pkg, topics: list[dict], rules: di
     if unasked:
         add("post-questions", f"{len(unasked)} open question(s) not yet posted", "QUESTIONS.md", ids=unasked[:LIST_CAP])
     waiting = [b for b in world.batches.values() if not b["withdrawn"] and any(
-        world.decisions.get(i, {}).get("status") == "asked" for i in b["items"])]
+        awaiting(world.decisions.get(i)) for i in b["items"])]
     in_review = [t for t in topics if t["status"] == "in-review"]
     # Questions waiting on a steward who is someone else may stay open through the finish (FINISH.md,
     # Ending A); questions waiting on the person you work with come first.
@@ -1450,9 +1638,78 @@ def doc_hash(doc) -> str | None:
     return hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
 
 
+DIGITS = re.compile(r"[0-9]+")
+
+
+def pointer_field(pointer) -> str | None:
+    """Dictionary path of the value a failing keyword sits on, from QuaC's location pointer in a category or mother
+    file (`/properties/household/items/properties/age/maximum` → `household[].age`); None when the value is a
+    record-level column or the pointer does not say (a keyword inside common/defs.json). QuaC's own `path` is null
+    whenever the keyword sits behind a $ref; the pointer always says where it is. The website's twin is identical."""
+    toks = [t.replace("~1", "/").replace("~0", "~") for t in str(pointer or "").split("/")[1:]]
+    i, path, nested = 0, None, False
+    if toks[:2] == ["items", "allOf"] and len(toks) > 2:      # a mother: /items/allOf/N/(then|if)/…
+        i = 3
+        if i < len(toks) and toks[i] in ("then", "if"):
+            i += 1
+        else:
+            return None
+    while i < len(toks):
+        t = toks[i]
+        if t == "properties" and i + 1 < len(toks):
+            nested = nested or path is not None
+            path = join_path(path, toks[i + 1])
+            i += 2
+        elif t == "items" and path is not None:
+            path, nested = path + "[]", True
+            i += 1
+        elif t == "additionalProperties" and path is not None and i + 1 < len(toks) and toks[i + 1] != "$ref":
+            path, nested = path + ".*", True
+            i += 1
+        elif t in ("anyOf", "oneOf", "allOf") and i + 1 < len(toks) and DIGITS.fullmatch(toks[i + 1]):
+            i += 2
+            if t == "allOf" and i < len(toks) and toks[i] in ("then", "if"):
+                i += 1
+        else:
+            break                                               # a keyword: the value ends here
+    return path if nested else None
+
+
 def check_key(c: dict) -> str:
-    loc = c.get("location") or {}
-    return f"{c.get('ruleId')}|{c.get('keyword')}|{loc.get('file')}|{loc.get('pointer')}|{c.get('path') or ''}"
+    """A failing QuaC check's identity, for `triage`: stable across QuaC versions that do or do not fill `path`
+    for a nested value (its field comes from the pointer); a record-level check's key is its column-free form."""
+    loc = c.get("location") if isinstance(c.get("location"), dict) else {}
+    field = pointer_field(loc.get("pointer"))
+    return f"{c.get('ruleId')}|{c.get('keyword')}|{loc.get('file')}|{loc.get('pointer')}|" + \
+        (field if field is not None else (c.get("path") or ""))
+
+
+def check_field(c: dict) -> str | None:
+    """The field a failing QuaC check is about: its nested path, else QuaC's path, else its column."""
+    loc = c.get("location") if isinstance(c.get("location"), dict) else {}
+    return pointer_field(loc.get("pointer")) or c.get("path") or c.get("variable")
+
+
+def nested_rules_index(pkg: Pkg, table: str | None) -> dict:
+    """(file, pointer) → rule id, for the rules inside nested values of a table."""
+    return {(r["file"], r["pointer"]): r.get("id") for r in pkg.rules if r.get("scope") is not None and r["table"] == table}
+
+
+NESTED_RULE_STEP = re.compile(r"/allOf/[0-9]+(?=/(?:then|if)(?:/|$))")
+
+
+def nested_rule_at(index: dict, loc) -> str | None:
+    """The rule inside a nested value that a failing keyword sits in: the rule whose (file, pointer) is the pointer up
+    to and including its `allOf/<k>` (QuaC names such a failure only by its column)."""
+    loc = loc if isinstance(loc, dict) else {}
+    pointer = loc.get("pointer")
+    if not index or not isinstance(pointer, str):
+        return None
+    for m in NESTED_RULE_STEP.finditer(pointer):
+        rid = index.get((loc.get("file"), pointer[:m.end()]))
+        if rid:
+            return rid
+    return None
 
 
 def inbox_pending(ws: Path) -> list[Path]:
@@ -1510,7 +1767,7 @@ def status_payload(ws: Path, world: World | None = None) -> dict:
             "alignmentRuns": len(world.alignment),
             "datasets": sum(1 for x in world.datasets.values() if not x.get("withdrawn")),
         },
-        "topics": capped([{k: t[k] for k in ("id", "title", "status", "variables", "open", "guesses")} for t in topics]),
+        "topics": capped([{k: t[k] for k in ("id", "title", "status", "variables", "fields", "open", "guesses")} for t in topics]),
         "checks": {k: (checks or {}).get(k) for k in ("ok", "headline", "at")} if checks else None,
         "lastSession": ({"id": last["id"], **(last["end"] or {})} if last else None),
         "next": next_actions(ws, world, pkg, topics, rules, inbox_n),
@@ -1530,7 +1787,7 @@ def show_items(ws: Path, ids: list[str]) -> dict:
             if not tp:
                 out[raw] = {"error": "no such topic in project.json"}
                 continue
-            props = sorted(v["name"] for v in pkg.properties.values() if v["topic"] == tid)
+            props = sorted(v["path"] for v in pkg.properties.values() if v["topic"] == tid)    # fields inside included
             inv_rows, _ = read_inventory(ws)
             out[raw] = {"topic": tp, "review": world.topics.get(tid),
                         "inventory": [{k: r.get(k) for k in INVENTORY_COLUMNS} for r in inv_rows if r.get("topic") == tid][:200],
@@ -1538,13 +1795,11 @@ def show_items(ws: Path, ids: list[str]) -> dict:
                         "decisions": [short_decision(d) for d in world.decisions.values() if d.get("topic") == tid][:LIST_CAP],
                         "rules": [r for r in world.rules.values() if set((r.get("gates") or []) + (r.get("targets") or [])) & set(props)][:LIST_CAP]}
         elif raw.startswith("variable:"):
-            name = raw.split(":", 1)[1]
+            name = raw.split(":", 1)[1]                 # a variable's name, or a field's path (household[].age)
             keys = pkg.by_name.get(name, [])
             inv_rows, _ = read_inventory(ws)
             out[raw] = {"inventory": [{k: r.get(k) for k in INVENTORY_COLUMNS} for r in inv_rows if r.get("variable") == name],
-                        "inSchemas": [{"table": pkg.properties[k]["table"], "topic": pkg.properties[k]["topic"],
-                                       "file": "package/schemas/" + pkg.properties[k]["file"], "pointer": f"/properties/{name}",
-                                       "x-provenance": pkg.property_provenance(k)} for k in keys],
+                        "inSchemas": [schema_place(pkg, k) for k in keys],
                         "decisions": [short_decision(d) for d in world.decisions.values() if name in (d.get("targets") or [])][:LIST_CAP],
                         "rules": [r for r in world.rules.values() if name in (r.get("gates") or []) + (r.get("targets") or [])][:LIST_CAP]}
         elif raw[:1] == "S" and raw in world.sources:
@@ -1553,7 +1808,8 @@ def show_items(ws: Path, ids: list[str]) -> dict:
             out[raw] = world.decisions[raw]
         elif raw[:1] == "R" and raw in world.rules:
             r = dict(world.rules[raw])
-            r["inSchemas"] = [{k: e[k] for k in ("table", "index", "file", "pointer", "prefix", "comment")} for e in pkg.rules if e.get("id") == raw]
+            r["inSchemas"] = [{k: e[k] for k in ("table", "index", "file", "pointer", "scope", "prefix", "comment")}
+                              for e in pkg.rules if e.get("id") == raw]
             out[raw] = r
         elif raw[:1] == "B" and raw in world.batches:
             b = dict(world.batches[raw])
@@ -1574,8 +1830,29 @@ def show_items(ws: Path, ids: list[str]) -> dict:
             x["runs"] = [a["id"] for a in world.alignment.values() if a.get("dataset") == raw]
             out[raw] = x
         else:
-            out[raw] = {"error": "not found", "hint": "ids look like S01, D014, R003, B02, A01, X01, topic:<id>, variable:<name>"}
+            out[raw] = {"error": "not found", "hint": "ids look like S01, D014, R003, B02, A01, X01, topic:<id>, "
+                                                      "variable:<name>, variable:<path> (household[].age)"}
     return {"ok": True, "items": out}
+
+
+def schema_place(pkg: Pkg, key: str) -> dict:
+    """Where a field lives in the schemas, for `show variable:`; a nested field, or a variable holding fields, also
+    says its shape, the variable it sits in, and the fields inside it."""
+    p = pkg.properties[key]
+    out = {"table": p["table"], "topic": p["topic"], "file": "package/schemas/" + p["file"], "pointer": p["pointer"],
+           "x-provenance": pkg.property_provenance(key)}
+    inside = [q["path"] for q in pkg.properties.values() if q["table"] == p["table"] and q["parent"] == p["path"]]
+    if p["shape"] != "value" or p["depth"]:
+        out["shape"] = p["shape"]
+    if p["depth"]:
+        out["parent"] = p["parent"]
+    if inside:
+        out["fields"] = inside
+    rules = [r["id"] for r in pkg.rules if r.get("id") and r["table"] == p["table"] and r.get("scope") is not None and
+             r["scope"] in (p["path"], p["path"] + "[]")]
+    if rules:
+        out["rulesInside"] = sorted(set(rules))
+    return out
 
 
 def alignment_ask_to(world: World, a: dict) -> str:
@@ -1597,55 +1874,86 @@ def findings_table(doc: dict, world: World) -> str | None:
 
 def findings_rule_map(doc: dict, pkg: Pkg, world: World) -> dict:
     """QuaC names a failing conditional by its position in the mother's allOf (schema:cond:<i>:…);
-    map each such ruleId to the rule id that position holds now, to keep with the findings."""
+    map each such ruleId to the rule id that position holds now, to keep with the findings. A failure inside a rule
+    of a nested value carries only its column (schema:prop:<col>:value): it is mapped by its location, under its
+    check key. Positions may move later; the map keeps what they meant for this run."""
     table = findings_table(doc, world)
-    by_index = {(r["table"], r["index"]): r.get("id") for r in pkg.rules}
+    by_index = {(r["table"], r["index"]): r.get("id") for r in pkg.rules if r.get("scope") is None}
+    nested = nested_rules_index(pkg, table)
     out = {}
     for c in doc.get("schemaChecks") or []:
+        if not isinstance(c, dict):
+            continue
         m = re.match(r"^schema:cond:(\d+):", str(c.get("ruleId") or ""))
         if m and table and by_index.get((table, int(m.group(1)))):
             out[c["ruleId"]] = by_index[(table, int(m.group(1)))]
+        elif not m and c.get("severity") in ("error", "warning"):
+            rid = nested_rule_at(nested, c.get("location"))
+            if rid:
+                out[check_key(c)] = rid
     return out
 
 
 def alignment_checks(ws: Path, a: dict, pkg: Pkg, world: World) -> list[dict]:
-    """The failing checks of one QuaC findings file, keyed for `triage`, with topic and rule id."""
+    """The failing checks of one QuaC findings file, keyed for `triage`, with field, topic and rule id."""
     doc = read_json(ws / (a.get("file") or ""), None) if a.get("file") else None
     if not isinstance(doc, dict):
         return []
     table = findings_table(doc, world)
     stored = a.get("ruleMap") or findings_rule_map(doc, pkg, world)    # stored at import: positions may move later
+    nested = nested_rules_index(pkg, table)
     before = earlier_verdicts(ws, world, a["id"])
     out = []
     for c in doc.get("schemaChecks") or []:
         if c.get("severity") not in ("error", "warning"):
             continue
-        rule = stored.get(str(c.get("ruleId") or ""))
+        key, field = check_key(c), check_field(c)
+        rule = stored.get(str(c.get("ruleId") or "")) or stored.get(key) or nested_rule_at(nested, c.get("location"))
         prop = pkg.properties.get(f"{table}.{c.get('variable')}") if table and c.get("variable") else None
-        key = check_key(c)
-        out.append({"key": key, "variable": c.get("variable"), "topic": (prop or {}).get("topic"), "rule": rule,
-                    "requirement": c.get("requirement"), "records": c.get("records"), "percent": c.get("percentOfRecords"),
-                    "level": c.get("level"), "location": c.get("location"), "triage": (a.get("triage") or {}).get(key),
-                    **({"earlier": before[c["variable"]][-6:]} if before.get(c.get("variable")) else {}),
+        own = pkg.properties.get(f"{table}.{field}") if prop is None and table and field else None
+        if own:                                                          # no column named: the field's own variable
+            prop = pkg.properties.get(f"{table}.{own['top']}")
+        out.append({"key": key, "variable": c.get("variable"), "field": field, "topic": (prop or {}).get("topic"),
+                    "rule": rule, "requirement": c.get("requirement"), "records": c.get("records"),
+                    "percent": c.get("percentOfRecords"), "level": c.get("level"), "location": c.get("location"),
+                    "triage": (a.get("triage") or {}).get(key),
+                    **({"earlier": before[field][-6:]} if before.get(field) else {}),
                     **({"notBuiltYet": True} if key in (a.get("planned") or []) else {})})
     out.sort(key=lambda x: -(x.get("records") or 0))
     return out
 
 
 def earlier_verdicts(ws: Path, world: World, until: str) -> dict[str, list[dict]]:
-    """Variable → the verdicts its checks got in runs before `until`: keys change with a schema's shape, variables do not."""
+    """Field → the verdicts its checks got in runs before `until`: keys change with a schema's shape, fields do not.
+    A record-level check's field is its variable."""
     out: dict[str, list[dict]] = {}
     for b in world.alignment.values():
         if b["id"] == until:
             break
         doc = read_json(ws / (b.get("file") or ""), None) if b.get("file") and b.get("triage") else None
-        var_of = {check_key(c): c.get("variable") for c in (doc or {}).get("schemaChecks") or [] if isinstance(c, dict)}
+        field_of = {check_key(c): check_field(c) for c in (doc or {}).get("schemaChecks") or [] if isinstance(c, dict)}
         for key, t in (b.get("triage") or {}).items():
-            if var_of.get(key):
-                out.setdefault(var_of[key], []).append({"run": b["id"], "label": b.get("label"), "dataset": b.get("dataset"),
-                                                        "verdict": t.get("verdict"), "decision": t.get("decision"),
-                                                        "note": (t.get("note") or "")[:200] or None})
+            if field_of.get(key):
+                out.setdefault(field_of[key], []).append({"run": b["id"], "label": b.get("label"),
+                                                          "dataset": b.get("dataset"), "verdict": t.get("verdict"),
+                                                          "decision": t.get("decision"),
+                                                          "note": (t.get("note") or "")[:200] or None})
     return out
+
+
+def article(word) -> str:
+    """The word with its indefinite article: "an inferred", "a told"."""
+    return ("an " if str(word)[:1].lower() in "aeiou" else "a ") + str(word)
+
+
+def optional_question(d) -> bool:
+    """A text question its wording marks "(optional)" (LEDGER-FORMAT.md): left blank, it holds up nothing."""
+    return isinstance(d, dict) and d.get("input") == "text" and str(d.get("question") or "").rstrip().endswith("(optional)")
+
+
+def awaiting(d) -> bool:
+    """Posted, unanswered, and not optional: a person's answer is still due."""
+    return isinstance(d, dict) and d.get("status") == "asked" and not optional_question(d)
 
 
 def short_decision(d: dict) -> dict:
@@ -1700,7 +2008,7 @@ def queue_items(ws: Path, who: str, topic: str | None, limit: int) -> dict:
     for b in world.batches.values():
         if b.get("withdrawn") or b.get("to") not in (who, "any", None):
             continue
-        waiting = [i for i in b.get("items") or [] if world.decisions.get(i, {}).get("status") == "asked"]
+        waiting = [i for i in b.get("items") or [] if awaiting(world.decisions.get(i))]
         if waiting:
             open_batches.append({"id": b["id"], "title": b.get("title"), "unanswered": len(waiting), "postedAt": b.get("at")})
     deferred = [r["id"] for r in world.rules.values() if r.get("status") == "deferred"] if who == "steward" else []
@@ -1759,10 +2067,20 @@ def planned_checks(ws: Path, doc: dict, pkg: Pkg, world: World) -> list[str]:
     if not table:
         return []
     rows, _ = read_inventory(ws)
-    planned = {r.get("variable") for r in rows if r.get("table") == table and r.get("status") in ("include", "added")
-               and f"{table}.{r.get('variable')}" not in pkg.properties}
+    names = {r.get("variable") for r in rows if r.get("table") == table and r.get("status") in ("include", "added")
+             and r.get("variable")}
+    holders = {v for v in names if (pkg.properties.get(f"{table}.{v}") or {}).get("shape") != "value"}   # may hold fields
+    planned = {v for v in names if f"{table}.{v}" not in pkg.properties and not inventory_nested(v, holders)}
     return [check_key(c) for c in doc.get("schemaChecks") or [] if c.get("severity") in ("error", "warning")
             and c.get("variable") in planned and str(c.get("ruleId") or "").endswith(":unexpected")]
+
+
+def inventory_nested(variable: str, names) -> bool:
+    """Whether an inventory row names a field inside another row's variable (`household[].age` beside `household`):
+    QuaC's columns are record-level, so only the variable itself can be a column. `names`: the rows that may hold
+    fields (a dotted column `bp.sys` beside a built one-value `bp` is a column of its own)."""
+    return any(o and variable != o and variable.startswith(o) and variable[len(o):len(o) + 1] in (".", "[")
+               for o in names)
 
 
 def alignment_add_event(ws: Path, world: World, fd: dict, aid: str, by: str, via: str, label: str,
@@ -2099,8 +2417,18 @@ def run_browser_check(ws: Path, world: World, xid: str, ds: dict, timeout: int) 
     """Ask the person's open website to re-check a dataset in QuaC, and wait for its findings without data. The data
     stays in their browser: you send a request and receive findings, as from any submission."""
     label = ds.get("label") or xid
-    if not world.project.get("tables") or not schemas_dir(ws).is_dir():
+    tables = world.project.get("tables") or []
+    if not tables or not schemas_dir(ws).is_dir():
         raise Fail("There are no schemas to check against yet.", "Build and test a topic first (BUILD.md).")
+    table = ds.get("table") or (tables[0].get("name") if len(tables) == 1 else None)
+    mother = next((t.get("mother") for t in tables if t.get("name") == table), None)
+    pkg = Pkg(ws, world.project)
+    if mother and not isinstance(pkg.docs.get(mother), dict):      # QuaC drops such a request without a word
+        why = pkg.broken.get(mother)
+        raise Fail(f"QuaC cannot check {label}: the mother schema of table {table}, package/schemas/{mother}, "
+                   + (f"does not parse ({why[:200]})." if why else "is missing.") + " Nothing was sent to the website.",
+                   "Fix that file (`check` names the problem) and `build`, then run this again; the person need do "
+                   "nothing meanwhile.")
     srv = server_info(ws)
     if not srv:
         raise Fail(f"{label} is checked in the person's browser through the website, which is not being served.",
@@ -2180,7 +2508,7 @@ def accepted_set_hash(root: Path) -> str | None:
         if p.is_file() and p.suffix.lower() == ".json":
             try:
                 doc = strip(json.loads(p.read_text(encoding="utf-8-sig")))
-            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError):
                 doc = p.read_bytes().decode("utf-8", errors="replace")
             entries.append([p.relative_to(root).as_posix(), doc])
     return hashlib.sha256(json.dumps(entries, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
@@ -2319,9 +2647,11 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
     lines += ["| Table | Mother schema | One row is | Topics | Variables |", "|---|---|---|---|---|"]
     for tb in proj.get("tables", []):
         n_topics = sum(1 for t in proj.get("topics", []) if t.get("table") == tb.get("name"))
-        n_vars = sum(1 for v in pkg.properties.values() if v["table"] == tb.get("name"))
+        n_vars = sum(1 for v in pkg.properties.values() if v["table"] == tb.get("name") and v["depth"] == 0)
+        n_inner = sum(1 for v in pkg.properties.values() if v["table"] == tb.get("name") and v["depth"])
+        inner = f" ({n_inner} field{'' if n_inner == 1 else 's'} inside them)" if n_inner else ""
         lines.append(f"| {md_cell(tb.get('title') or tb.get('name'))} (`{tb.get('name')}`) | `schemas/{tb.get('mother')}` | "
-                     f"{md_cell(tb.get('grain'))} | {n_topics} | {n_vars} |")
+                     f"{md_cell(tb.get('grain'))} | {n_topics} | {n_vars}{inner} |")
     needs = [d for d in prov["decisions"].values() if d.get("needsReview")]
     confirmed = sum(1 for t in topics if t["status"] == "confirmed")
     lines += ["", f"Status: {confirmed} of {len(topics)} topics confirmed by a person. "
@@ -2349,9 +2679,8 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
         "- Each table's mother schema is an array of records; a record is the `allOf` of its topic files, and "
         "`unevaluatedProperties: false` rejects any column the topics do not declare.",
         "- A coded variable is a `oneOf` of `const` branches, each with a `title`; a measured variable is an `anyOf` "
-        "of one typed branch (with plausibility bounds) plus its special codes.",
-        "- Every column is required in every record: a missing or not-applicable value is a declared code in the cell, "
-        "never an absent key. Special codes carry `\"x-value-kind\": \"sentinel\"`.",
+        "of one typed branch (with plausibility bounds) plus its special codes, or that typed branch alone when it has none.",
+        *readme_presence(pkg),
         "- `x-provenance` on every property and rule names where each fact came from — a source (`S01:<location>`) "
         "or a decision (`D014`); see PROVENANCE.md.",
         f"- The `$id`s use the placeholder namespace `{idbase}`, which nothing fetches. Replace it before publishing "
@@ -2362,12 +2691,19 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
         for s in sents:
             lines.append(f"| `{json.dumps(s.get('code'))}` | {md_cell(s.get('meaning'))} | {'yes' if s.get('structural') else 'no'} | {md_cell(s.get('decision'))} |")
         lines.append("")
+    inside = any(r.get("scope") is not None for r in pkg.rules)
     lines += ["## Skip patterns and other conditional logic", "",
-              "Every rule is one entry of its mother schema's `items.allOf`, after the topic references, in one canonical "
-              "shape: `{\"$comment\", \"x-provenance\", \"if\", \"then\"}`. The `if` is one clause — or an `anyOf` of "
-              "clauses — of `required` plus `properties` tests (`const`, `enum`, `not`, or a numeric range); the `then` sets "
-              "`properties` effects (`const`, `not const`, `enum`, or a narrowed range) or requires at least one of them "
-              "(`anyOf`). The `$comment` starts with its kind and id — `Skip pattern R001:`, `Applicability R001:` (the "
+              ("Every rule between variables is one entry of its mother schema's `items.allOf`, after the topic "
+               "references; a rule among the fields of one nested value is an entry of that value's own `allOf` (for a "
+               "list of entries, its `items.allOf`), and holds for each entry. Every rule takes one canonical "
+               if inside else
+               "Every rule is one entry of its mother schema's `items.allOf`, after the topic references, in one canonical ")
+              + "shape: `{\"$comment\", \"x-provenance\", \"if\", \"then\"}`. The `if` is one clause — or an `anyOf` of "
+              "clauses — of `required` plus `properties` tests (`const`, `enum`, `not`, `contains` on a list, or a numeric "
+              "range; a name in `required` with no test means the field is present); the `then` sets `properties` effects "
+              "(`const`, `not const`, `enum`, a narrowed range, a list's size, or `false`: the field is left "
+              "out), names fields that must be present in `required`, or requires at least one of these (`anyOf`). The "
+              "`$comment` starts with its kind and id — `Skip pattern R001:`, `Applicability R001:` (the "
               "same rule read the other way), or `<Domain> routing R007:`. `tools/validate.py rules .` prints every rule "
               "in parsed form.", ""]
     encoded = [r for r in pkg.rules if r.get("id")]
@@ -2375,9 +2711,11 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
         lines += ["| Rule | Table | Reading | Evidence | Provenance |", "|---|---|---|---|---|"]
         for r in encoded:
             rec = world.rules.get(r["id"]) or {}
-            prov_txt = ", ".join(f"{k}: {v}" for k, v in (r.get("provenance") or {}).items())
+            cites = r.get("provenance") if isinstance(r.get("provenance"), dict) else {}
+            prov_txt = ", ".join(f"{k}: {v}" for k, v in cites.items())
             flag = " ⚑" if rec.get("evidence") == "inferred" else ""
-            lines.append(f"| {r['id']}{flag} | {r['table']} | {md_cell(r.get('comment'))} | {rec.get('evidence', '?')} | {md_cell(prov_txt)} |")
+            where = r["table"] + (f", within `{r['scope']}`" if r.get("scope") is not None else "")
+            lines.append(f"| {r['id']}{flag} | {md_cell(where)} | {md_cell(r.get('comment'))} | {rec.get('evidence', '?')} | {md_cell(prov_txt)} |")
         lines.append("")
         inferred = [r for r in world.rules.values() if r.get("evidence") == "inferred" and r.get("status") == "encoded"]
         if inferred:
@@ -2386,15 +2724,16 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
     else:
         lines += ["No conditional rules are encoded.", ""]
     noexpr = [r for r in world.rules.values() if r.get("status") == "not-expressible"]
-    roots = [(tb.get("name"), (pkg.docs.get(tb.get("mother")) or {}).get("$comment")) for tb in proj.get("tables", [])]
+    roots = [(tb.get("name"), pkg.docs[tb["mother"]].get("$comment") if isinstance(pkg.docs.get(tb.get("mother")), dict)
+              else None) for tb in proj.get("tables", [])]
     lines += ["## Documented but not enforced", "",
               "Rules JSON Schema cannot express (arithmetic, ordering, cross-row, cross-table). Check them downstream.", ""]
     if noexpr or any(c for _, c in roots):
         for r in noexpr:
             lines.append(f"- {r['id']} ({r.get('table')}): {r.get('reading')}" + (f" — {r['note']}" if r.get("note") else ""))
-        for name, c in roots:
-            if c:
-                lines.append(f"- {name}: {c}")
+        if any(c for _, c in roots):
+            lines += ["", "Each mother schema's own `$comment`, for readers of the schema files:", ""]
+            lines += [f"- {name}: {c}" for name, c in roots if c]
     else:
         lines.append("- None recorded.")
     lines += ["", "## Provenance", "",
@@ -2402,7 +2741,8 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
     for sid, s in prov["sources"].items():
         lines.append(f"| {sid} | {md_cell(s.get('title'))} | {s.get('kind')} | {s.get('status')} |")
     lines += ["", f"{len(prov['decisions'])} decisions are listed in PROVENANCE.md and machine-readably in provenance.json.", ""]
-    open_items = [d for d in world.decisions.values() if d["status"] in ("open", "asked", "unsure")]
+    open_items = [d for d in world.decisions.values() if d["status"] in ("open", "asked", "unsure") and not (
+        d["status"] == "asked" and optional_question(d))]
     deferred = [r for r in world.rules.values() if r.get("status") in ("deferred", "suspected")]
     lines += ["## Open items", ""]
     if not (open_items or needs or deferred):
@@ -2420,6 +2760,37 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
     lines += ["", "---", "", f"Generated {now()[:10]} by [schemify](https://github.com/jeyabbalas/skills) from its "
               "working record. Edit the schemas, not this file — it is regenerated."]
     return "\n".join(lines) + "\n"
+
+
+def readme_presence(pkg: Pkg) -> list[str]:
+    """The README's bullets on what every record holds: present columns (and fields), the ones a cited decision lets
+    the delivery leave out, and — when the package has any — how nested values are written."""
+    fields = list(pkg.properties.values())
+    nested = [f for f in fields if f["depth"]]
+    optional = [pkg.properties[k]["path"] for k in pkg.properties if k in pkg.optional]
+    lookups = any(f["shape"] == "lookup" for f in fields)
+    sentinel = " Special codes carry `\"x-value-kind\": \"sentinel\"`."
+    if not nested and not optional:
+        return ["- Every column is required in every record: a missing or not-applicable value is a declared code in the "
+                "cell, never an absent key." + sentinel]
+    shown = ", ".join(f"`{p}`" for p in optional[:6]) + (f", and {len(optional) - 6} more" if len(optional) > 6 else "")
+    lines = ["- Every column is present in every record" + (", and every field in every group and list entry" if nested else "")
+             + ": a missing or not-applicable value is a declared code in the cell, never an absent key"
+             + (f" — except where the delivery may leave one out ({shown}): each such property says so with a `required` "
+                "facet in its `x-provenance`, citing the decision" if optional else "") + "."
+             + (" A lookup holds only the names a record has." if lookups else "") + sentinel]
+    if nested:
+        example = next((f["path"] for f in nested if "[]" in f["path"]), nested[0]["path"])
+        lines.append(
+            "- A variable can hold more than one value: a group of named fields, a list of entries that each hold the "
+            "same fields, a list of values (the codes of a choose-many question, say), or a lookup of values under names "
+            f"that vary between records. A field inside one is named by its path from the record — here, for example, "
+            f"`{example}` — where `.name` is a field of a group, `[]` every entry of a list, and `.*` every value of a "
+            "lookup. Each field has its own title, codes, and `x-provenance`, like a variable, and a group or an entry "
+            "takes no field it does not declare (`additionalProperties: false`). Rules among one entry's fields live in "
+            "that list's `items.allOf`, rules among one group's fields in the group's own `allOf`, and rules between "
+            "variables in the mother. In the toy data's CSV twins, a nested value is one cell holding JSON text.")
+    return lines
 
 
 def pkg_dir_from(pkg: Pkg) -> Path:
@@ -2452,24 +2823,25 @@ def toy_csv_twins(ws: Path, pkg: Pkg, world: World) -> list[str]:
         order = []
         for tp in world.project.get("topics", []):
             if tp.get("table") == name and tp.get("file") in pkg.docs:
-                order += list((pkg.docs[tp["file"]].get("properties") or {}).keys())
+                props = pkg.docs[tp["file"]].get("properties") if isinstance(pkg.docs[tp["file"]], dict) else None
+                order += list(props) if isinstance(props, dict) else []
         for stem in ("valid", "invalid"):
             src = pkg_dir(ws) / "toy-data" / name / f"{stem}.json"
             rows = read_json(src, None) if src.exists() else None
             if not isinstance(rows, list):
                 continue
+            rows = [r if isinstance(r, dict) else {} for r in rows]         # a row that is not an object: an empty line
             cols = list(order)
             for r in rows:
-                for k in (r or {}):
+                for k in r:
                     if k not in cols:
                         cols.append(k)
             buf = io.StringIO()
             w = csv.writer(buf, lineterminator="\n")
             w.writerow(cols)
             for r in rows:
-                r = r or {}
-                w.writerow(["" if c not in r else (json.dumps(r[c]) if isinstance(r[c], (list, dict, bool)) or r[c] is None
-                                                   else str(r[c])) for c in cols])
+                w.writerow(["" if r.get(c) is None else json.dumps(r[c]) if isinstance(r[c], (list, dict, bool))   # null: an empty
+                            else str(r[c]) for c in cols])                                   # cell, as QuaC reads it
             dst = src.with_suffix(".csv")
             write_text(dst, buf.getvalue())
             written.append(str(dst.relative_to(ws)))
@@ -2498,7 +2870,8 @@ def run_toy_check(ws: Path, table: str, path: Path) -> dict:
             continue
         if "findings" in res:
             return {"errors": res.get("findings") or [], "errorCount": res.get("errors", 0), "truncated": bool(res.get("truncated")),
-                    "columns": res.get("columns") or {}}
+                    "columns": res.get("columns") or {},
+                    **({"fields": res["fields"]} if res.get("fields") else {})}     # nested fields' titles and allowed text
         last = res.get("error") or last
         if "jsonschema" in str(res.get("hint") or "") or "referencing" in str(res.get("hint") or ""):
             continue                            # dependency missing under this interpreter; try the next
@@ -2506,20 +2879,29 @@ def run_toy_check(ws: Path, table: str, path: Path) -> dict:
     return {"checkError": last}
 
 
+def validator_stamp() -> str:
+    """The fingerprint of the validate.py that checks the toy data: results cached under another one are run again."""
+    try:
+        return sha12((SKILL_DIR / "scripts" / "validate.py").read_bytes())
+    except OSError:
+        return ""
+
+
 def toy_data_view(ws: Path, world: World, validate: bool) -> list[dict]:
     """Each toy file for the Data check tab: its rows, every validation error, and the planted mistakes.
-    Results are cached per content hash in state/toy-checks.json, so a build without validation keeps them."""
+    Results are cached per content hash in state/toy-checks.json, so a build without validation keeps them; the hash
+    covers the file, its ledger, the schemas and the validator, so a skill update that changes validate.py re-runs them."""
     cache_path = ws / "state" / "toy-checks.json"
     cache = read_json(cache_path, None) or {}
     fresh, out = {}, []
-    set_id = quac_set_id(schemas_dir(ws)) or ""
+    set_id = (quac_set_id(schemas_dir(ws)) or "") + "|" + validator_stamp()
     for tb in world.project.get("tables", []):
         name = tb.get("name")
         folder = pkg_dir(ws) / "toy-data" / str(name)
         ledger_path = folder / "invalid-ledger.json"
         ledger_raw = ledger_path.read_bytes() if ledger_path.exists() else b""
         ledger = read_json(ledger_path, None) if ledger_raw else None
-        planted = [{k: v.get(k) for k in ("row", "column", "kind", "reason", "value") if k in v}
+        planted = [{k: v.get(k) for k in ("row", "column", "path", "kind", "reason", "value") if k in v}
                    for v in ((ledger or {}).get("violations") or []) if isinstance(v, dict)]
         for stem in ("valid", "invalid"):
             src = folder / f"{stem}.json"
@@ -2597,7 +2979,9 @@ def state_payload(ws: Path, world: World, pkg: Pkg, checks: dict | None, topics:
         "schemas": schemas, "schemasBroken": pkg.broken,
         "sources": list(world.sources.values()), "decisions": decisions,
         "batches": list(world.batches.values()), "rules": list(world.rules.values()),
-        "encodedRules": [{k: r.get(k) for k in ("table", "index", "id", "prefix", "comment", "provenance", "names")} for r in pkg.rules],
+        "fields": field_list(pkg, proj),
+        "encodedRules": [{k: r.get(k) for k in ("table", "index", "id", "prefix", "comment", "provenance", "names", "scope",
+                                                "file", "pointer")} for r in pkg.rules],
         "parsedRules": full_rules or [],
         "alignment": align, "quacSetId": quac_set_id(schemas_dir(ws)),
         "datasets": list(world.datasets.values()),
@@ -2611,6 +2995,22 @@ def state_payload(ws: Path, world: World, pkg: Pkg, checks: dict | None, topics:
         "provenance": prov,
         "inputsHash": inputs_hash(ws),
     }
+
+
+def field_list(pkg: Pkg, proj: dict) -> list[dict]:
+    """Every field for the website, in reading order (topics as project.json lists them, each file top to bottom,
+    a variable before the fields inside it); `file` + `pointer` locate its node in `schemas`."""
+    order = {tp.get("id"): i for i, tp in enumerate(proj.get("topics", [])) if isinstance(tp, dict)}
+    out = []
+    for key in sorted(pkg.properties, key=lambda k: order.get(pkg.properties[k]["topic"], len(order))):
+        f = pkg.properties[key]
+        title = f["schema"].get("title")
+        if not isinstance(title, str):
+            res = pkg.resolve(f["file"], f["schema"], f["pointer"])[0]
+            title = res.get("title") if isinstance(res, dict) and isinstance(res.get("title"), str) else None
+        out.append({"table": f["table"], "topic": f["topic"], "path": f["path"], "name": f["name"], "parent": f["parent"],
+                    "depth": f["depth"], "shape": f["shape"], "file": f["file"], "pointer": f["pointer"], "title": title})
+    return out
 
 
 def write_site(ws: Path, payload: dict) -> list[str]:
@@ -2851,26 +3251,16 @@ def cited_row(ws: Path, world: World, ref: str, cache: dict) -> str | None:
 
 def resolve_ref(pkg: Pkg, rel: str, ref: str):
     """(node, file) a $ref points at inside the package, or (None, None)."""
-    path, _, frag = str(ref).partition("#")
-    if not path:
-        target = rel
-    elif "://" in path:
-        target = next((r for r, d in pkg.docs.items() if isinstance(d, dict) and d.get("$id") == path), None)
-    else:
-        target = posixpath.normpath(posixpath.join(posixpath.dirname(rel), path))
-    node = pkg.docs.get(target) if target else None
-    for part in [x for x in frag.split("/") if x] if frag.startswith("/") else ([] if not frag else [None]):
-        if part is None or not isinstance(node, dict):
-            return None, None
-        node = node.get(part.replace("~1", "/").replace("~0", "~"))
-    return (node, target) if isinstance(node, (dict, bool)) else (None, None)
+    node, target, _ = pkg.deref(rel, ref)
+    return node, target
 
 
 def accepts(pkg: Pkg, rel: str, node, v, depth: int = 0) -> bool:
-    """Whether a number passes a schema node, read without a validator; unsure → True, so a lint warns only on a clear no."""
+    """Whether a number passes a schema node, read without a validator; unsure → True, so a lint warns only on a clear no.
+    A list or an object makes no claim: its codes sit on its fields and items, which are checked as fields."""
     if isinstance(node, bool):
         return node
-    if depth > 12 or not isinstance(node, dict):
+    if depth > 12 or not isinstance(node, dict) or json_kinds(node) & {"array", "object"}:
         return True
     num = lambda x: isinstance(x, (int, float)) and not isinstance(x, bool)
     if "$ref" in node:
@@ -2903,23 +3293,20 @@ def sentinels_dropped(ws: Path, world: World, pkg: Pkg) -> list[tuple[str, str, 
     """Properties whose cited dictionary row lists one of the package's numeric special codes that the property
     rejects — the slip a self-consistent package hides (toy data covers only the codes the schema has)."""
     codes: dict[float, str] = {}
-
-    def walk(node):
+    stack = list(reversed(list(pkg.docs.values())))     # depth first, in document order, however deep
+    while stack:
+        node = stack.pop()
         if isinstance(node, dict):
             c = node.get("const")
             if node.get("x-value-kind") == "sentinel" and isinstance(c, (int, float)) and not isinstance(c, bool):
                 codes.setdefault(c, str(node.get("title") or "special code"))
-            for v in node.values():
-                walk(v)
+            stack += reversed(list(node.values()))
         elif isinstance(node, list):
-            for v in node:
-                walk(v)
-    for doc in pkg.docs.values():
-        walk(doc)
+            stack += reversed(node)
     if not codes:
         return []
     out, cache = [], {}
-    for key, p in sorted(pkg.properties.items()):
+    for key, p in sorted(pkg.properties.items()):       # every field, nested ones too
         prov = p["schema"].get("x-provenance")
         if not isinstance(prov, dict) or "sentinels" in prov:
             continue                                # a facet says where its set of codes came from
@@ -2929,7 +3316,71 @@ def sentinels_dropped(ws: Path, world: World, pkg: Pkg) -> list[tuple[str, str, 
                 lit = str(int(code)) if float(code).is_integer() else str(code)
                 if re.search(r"(?<![\w.\-–—])" + re.escape(lit) + r"(?![\w.])", text) and \
                         not accepts(pkg, p["file"], p["schema"], code):
-                    out.append((p["name"], ref, int(code) if float(code).is_integer() else code, title))
+                    out.append((p["path"], ref, int(code) if float(code).is_integer() else code, title))
+    return out
+
+
+def same_value(a, b) -> bool:
+    """JSON equality: 1 and 1.0 are the same code, true and 1 are not."""
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return a == b
+    return type(a) is type(b) and a == b
+
+
+def node_codes(pkg: Pkg, rel: str, node, hops: int = 0) -> list:
+    """The codes one value schema lists — its const and enum values, through anyOf, oneOf and $ref — never the codes
+    of the fields inside it."""
+    out: list = []
+    if not isinstance(node, dict) or hops > 2 * REF_HOPS:
+        return out
+    if "const" in node:
+        out.append(node["const"])
+    if isinstance(node.get("enum"), list):
+        out += node["enum"]
+    if isinstance(node.get("$ref"), str):
+        target, trel, _ = pkg.deref(rel, node["$ref"])
+        out += node_codes(pkg, trel, target, hops + 1)
+    for kw in ("anyOf", "oneOf"):
+        for b in node.get(kw) if isinstance(node.get(kw), list) else []:
+            out += node_codes(pkg, rel, b, hops + 1)
+    return out
+
+
+def field_codes(pkg: Pkg, f: dict) -> list:
+    """A field's value set as codes: its own, plus its items' for a list of values (a list's codes are its own)."""
+    codes = node_codes(pkg, f["file"], f["schema"])
+    if f["shape"] in ("list", "mixed"):
+        res, rrel, rptr = pkg.resolve(f["file"], f["schema"], f["pointer"])
+        for b, brel, bptr in pkg.typed_branches(res, rrel, rptr):
+            if pkg.own_shape(b, brel, bptr) == "list" and isinstance(b.get("items"), dict):
+                codes += node_codes(pkg, brel, b["items"])
+    return codes
+
+
+def structural_unruled(world: World, pkg: Pkg) -> list[tuple[str, str, object, str]]:
+    """Fields whose codes include a structural code (project.json → conventions.sentinels, `structural`) that no rule
+    sets: not a target of an encoded rule, of a rule record (any status), or of a live `rule` decision (SKIP-LOGIC.md,
+    the skip-logic audit). (path, table, code, meaning) per field."""
+    structural = [(s["code"], s.get("meaning") or "skipped by design") for s in
+                  ((world.project.get("conventions") or {}).get("sentinels") or [])
+                  if isinstance(s, dict) and s.get("structural") and "code" in s]
+    if not structural:
+        return []
+    table_of = {tp.get("id"): tp.get("table") for tp in world.project.get("topics", []) if isinstance(tp, dict)}
+    ruled = {(r.get("table"), t) for r in world.rules.values() for t in r.get("targets") or [] if isinstance(t, str)}
+    ruled |= {(d.get("table") or table_of.get(d.get("topic")), t) for d in world.decisions.values()
+              if d.get("kind") == "rule" and d["status"] != "cancelled" for t in d.get("targets") or [] if isinstance(t, str)}
+    ruled |= {(r["table"], t) for r in pkg.rules for t in r.get("targets") or []}
+    out = []
+    for f in pkg.properties.values():
+        if (f["table"], f["path"]) in ruled or (None, f["path"]) in ruled:
+            continue
+        codes = field_codes(pkg, f)
+        hit = next(((c, m) for c, m in structural if any(same_value(c, x) for x in codes)), None)
+        if hit:
+            out.append((f["path"], f["table"], hit[0], hit[1]))
     return out
 
 
@@ -3001,11 +3452,33 @@ def check(ws: Path, validate: bool = True, strict: bool = False) -> dict:
         if r.get("status") in ("deferred", "dropped") and key in pkg.properties:
             f("error", "coverage-excluded", f"{r['variable']} is {r['status']} in the inventory but present in a schema",
               "Remove it from the schema or change its status.", variable=r["variable"])
+    named: dict = {}                                    # a field inside a nested value belongs to its variable's topic
+    for r in rows:
+        if r.get("variable") and r.get("topic"):
+            named.setdefault(r.get("table"), {})[r["variable"]] = r
+    for table, names in named.items():
+        def holds(i: int, name: str) -> bool:           # a dotted column (nap_minutes.raw) is held by no drafted single value
+            return name[i] in ".[" and name[:i] in names and \
+                (pkg.properties.get(f"{table}.{name[:i]}") or {}).get("shape") != "value"
+        for name, r in names.items():
+            holder = next((name[:i] for i in range(len(name) - 1, 0, -1) if holds(i, name)), None)
+            if holder is not None and names[holder]["topic"] != r["topic"]:
+                f("warning", "inventory-topic-split", f"variables.csv line {r['_line']}: {name} is in topic {r['topic']!r}, but "
+                  f"{holder}, which holds it, is in topic {names[holder]['topic']!r}",
+                  "A nested value's fields are drafted inside its schema, in its own topic's file: give every field its "
+                  "variable's topic (START.md, step 7).", variable=name)
     if rows:
-        for key, p in pkg.properties.items():
+        listed = {r.get("variable"): r for r in rows}
+        for key, p in pkg.properties.items():           # every field: one inside a nested value is inventoried by its path
             if key not in inv_keys:
-                f("error", "coverage-uninventoried", f"{p['name']} is in {p['file']} but not in variables.csv",
-                  "Add its row (status include, or added with the D id of the person's request).", variable=p["name"])
+                other = listed.get(p["path"])
+                if other is not None:
+                    f("error", "coverage-uninventoried", f"{p['path']} is in {p['file']}, but its variables.csv row (line "
+                      f"{other['_line']}) names table {other.get('table')!r}, not {p['table']!r}",
+                      "Fill the row's table and topic from the plan (START.md, step 7).", variable=p["path"])
+                    continue
+                f("error", "coverage-uninventoried", f"{p['path']} is in {p['file']} but not in variables.csv",
+                  "Add its row (status include, or added with the D id of the person's request).", variable=p["path"])
     for where, facet, ref in pkg.provenance_refs():
         if not isinstance(ref, str) or not REF_RE.match(ref):
             continue                                   # validate.py reports the grammar
@@ -3054,6 +3527,11 @@ def check(ws: Path, validate: bool = True, strict: bool = False) -> dict:
         f("warning", "sentinel-dropped", f"{name}: {ref} lists {code} ({title}), which the property does not accept",
           "If you left it out, add it (SCHEMA-STYLE.md, Sentinels); if a decision dropped it, cite that decision "
           "on the property's `sentinels` facet.", variable=name)
+    for path, table, code, meaning in structural_unruled(world, pkg):
+        f("warning", "structural-unruled",
+          f"{path} can hold {json.dumps(code, ensure_ascii=False)} ({meaning}), a structural code, but no rule sets it",
+          "Record the rule that sets it (SKIP-LOGIC.md), or a rule decision saying why none does.",
+          variable=path, table=table)
     for rid in rule_view(world, pkg)["ready"]:
         f("warning", "rule-ready", f"{rid} waits for variables that now exist", "Encode it now (SKIP-LOGIC.md).")
     for rid in suspected_unasked(world):
@@ -3109,7 +3587,12 @@ def tell_user_lines(ws: Path, world: World, url: str | None, disk_note: bool = F
     harness = proj.get("harness") or ""
     inv = invoke_for(proj.get("invoke"), harness)
     where = url or (ws / "index.html").resolve().as_uri()
-    asked = [d for d in world.decisions.values() if d["status"] == "asked"]
+    sent: set = set()                                   # answered or reviewed in a submission not yet taken in
+    for p in inbox_pending(ws):
+        for it in (read_json(p, {}) or {}).get("items") or []:
+            if isinstance(it, dict) and it.get("kind") in ("answer", "topic"):
+                sent.add(it.get("decision") if it.get("kind") == "answer" else ("topic", it.get("topic")))
+    asked = [d for d in world.decisions.values() if awaiting(d) and d["id"] not in sent]
     for_steward = sum(1 for d in asked if d.get("to") == "steward")
     for_you = len(asked) - for_steward
     lines = [f"Your project website: {where}"]
@@ -3123,7 +3606,7 @@ def tell_user_lines(ws: Path, world: World, url: str | None, disk_note: bool = F
         lines.append(f"{for_you} question(s) are waiting for you there.")
     if for_steward:
         lines.append(f"{for_steward} question(s) wait there for the data steward (the website's *Answering as: data steward*).")
-    in_review = [t for t in world.topics.values() if t.get("review") == "in-review"]
+    in_review = [t for tid, t in world.topics.items() if t.get("review") == "in-review" and ("topic", tid) not in sent]
     if in_review:
         lines.append(f"{len(in_review)} topic(s) wait there for your review: on the Dictionary tab, *Looks right* or *Something's wrong*.")
     if harness == "codex":

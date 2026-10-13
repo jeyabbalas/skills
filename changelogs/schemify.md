@@ -2,6 +2,28 @@
 
 Changes to [`schemify`](../skills/schemify/SKILL.md), newest first. What major, minor, and patch mean: [README → Versions](../README.md#versions).
 
+## 2.1.0 — 2026-10-13
+
+- New: nested values. A variable can hold a group of fields (an address), a list of values (diagnosis codes, a "select all that apply" question), a list of entries (one per household member or visit, each with the same fields), or values under names that vary between records (lab results by test). The agent checks each variable's shape as it reads your documents. When they don't say how the delivered file holds a repeated item (inside each record, as numbered columns, or as a file of its own), it asks you. Every field inside gets its own title, codes, and sources. Fields are named by their path, as the data dictionary and QuaC name them: `address.city`, `household[].age`, `labs.*`.
+- New: skip logic among one entry's or one group's fields ("when the relation is *self*, the age is the participant's") is written inside that list or group and is checked like any other rule. Rules can also test whether a list includes a code, require a list to be empty or not empty, and reach into a group's fields from the record. Where the data leaves a field out instead of writing a code, a rule can say whether it is there ("the participant's own line leaves the age out"). A rule can also say how many entries a list holds, so a "none of these" or "not collected" code can stand alone.
+- `check` and the package's `tools/validate.py` hold nested fields to the same standard as columns. Every field is titled and traced to its sources, groups and entries reject fields they do not declare, and list sizes and repeated entries are checked. Toy data must show each field's codes, a list at its fewest allowed entries and one with several, and each rule inside a list firing. A mismatch names its exact place: "household[2].relation is missing."
+- The website's data dictionary gives each nested field its own *Details*. On the Data check tab, a mismatch inside a list is pinned to its record's cell and opens the value inspector at that entry. QuaC findings on nested fields name the field and its rule.
+- A field may be left out of a record, a group, or an entry only when a person's decision says the delivery does that: its `x-provenance` cites the decision on a `required` facet. A length limit a source states for free text (`maxLength`) is now part of the house style.
+- New: `check` warns when a field can hold a structural special code ("not applicable", "skipped") that no rule sets: the code is in the schema, but nothing says when it applies. It also warns when the inventory plans a field inside a nested value in a different topic from its variable.
+- When a data steward is named but nothing waits for them, the agent finishes instead of handing the work over for review; the steward can still review later with `/schemify review`.
+- Safety: `extract.py` refuses a `.json`, `.jsonl`, or `.ndjson` file until you have said it describes variables, since such a file is as often a dataset as a schema. Documentation in JSON Lines is extracted as text.
+- Fixed: on the Data check tab, the list of planted mistakes showed whether each was caught only for the last mistake of each kind.
+- Fixed: after a failed load (offline, a blocked CDN), the interactive table now comes back when the agent next rebuilds, without a page reload.
+- Fixed: the website no longer sends schemas to QuaC when the main schema file does not parse. It says why, and an agent waiting on the check stops instead of timing out.
+- Fixed: the Data check tab showed toy-data results from before a skill update until the toy data or schemas changed; an updated validator now re-checks them.
+- Fixed: when a session starts, the agent no longer says questions or topics are waiting for you when your answers have already arrived.
+- Fixed: a topic with nothing for toy data to cover (only free text, dates, or IDs) can now be marked tested, once its toy data passes.
+- Fixed: an optional question left blank no longer keeps its batch open, which had stopped the agent from finishing. You can still answer it later.
+- Fixed: the website keeps the line breaks in a question's context, so a list of proposed topics reads as a list.
+- Fixed: in the toy data's CSV copies, a missing value written as `null` is now an empty cell, as QuaC reads it; it used to be the text `null`, which failed the check.
+- Fixed: `check`, `build`, `status`, and `show` no longer stop with an internal error on a malformed schema (a rule whose `anyOf` is not a list, a main schema whose `items` is not an object, JSON nested thousands of levels deep); they report it instead.
+- Run `refresh-assets` in each workspace after updating the skill: it re-copies the website and the package's `tools/validate.py`.
+
 ## 2.0.0 — 2026-10-13
 
 - **Breaking:** schemify is rewritten. Work now lives in a `schemify/` workspace (state in an append-only ledger, the deliverable in `schemify/package/`), and the old `json_schema/` layout with PROGRESS.md, DECISIONS.md, SOURCES.md, and ROUTING.csv is retired. To move a 1.x package, run `/schemify` in the folder that holds it: the agent runs the new `migrate.py`, which converts schemas, decisions, rules, the inventory, and toy data into a new workspace and leaves your old folder untouched, then finishes the rest with you. `refresh-assets` alone does not upgrade a 1.x package.

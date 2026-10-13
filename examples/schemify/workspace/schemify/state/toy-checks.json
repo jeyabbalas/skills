@@ -1,5 +1,5 @@
 {
-  "d585694179c0": {
+  "b79fb8473650": {
     "errors": [],
     "errorCount": 0,
     "truncated": false,
@@ -81,11 +81,13 @@
       }
     }
   },
-  "1cdc48356519": {
+  "0fe6815e9f8c": {
     "errors": [
       {
         "row": 0,
         "column": "participant_id",
+        "field": "participant_id",
+        "path": "participant_id",
         "keyword": "pattern",
         "message": "participant_id is \"ACH-12\", which does not match ^ACH-[0-9]{4}$.",
         "hint": "Allowed in participant_id: text matching ^ACH-[0-9]{4}$."
@@ -93,6 +95,8 @@
       {
         "row": 1,
         "column": "participant_id",
+        "field": "participant_id",
+        "path": "participant_id",
         "keyword": "pattern",
         "message": "participant_id is \"ACH0001\", which does not match ^ACH-[0-9]{4}$.",
         "hint": "Allowed in participant_id: text matching ^ACH-[0-9]{4}$."
@@ -100,6 +104,8 @@
       {
         "row": 2,
         "column": "site",
+        "field": "site",
+        "path": "site",
         "keyword": "oneOf",
         "message": "site is 1, which is not an allowed value.",
         "hint": "Allowed in site: one of \"01\" (Northgate), \"02\" (Riverside), \"03\" (Hillcrest)."
@@ -107,6 +113,8 @@
       {
         "row": 3,
         "column": "site",
+        "field": "site",
+        "path": "site",
         "keyword": "oneOf",
         "message": "site is \"04\", which is not an allowed value.",
         "hint": "Allowed in site: one of \"01\" (Northgate), \"02\" (Riverside), \"03\" (Hillcrest)."
@@ -114,6 +122,8 @@
       {
         "row": 4,
         "column": "age",
+        "field": "age",
+        "path": "age",
         "keyword": "anyOf",
         "message": "age is 17, which is not an allowed value.",
         "hint": "Allowed in age: a whole number from 18 to 85, or -9 (Don't know)."
@@ -121,6 +131,8 @@
       {
         "row": 5,
         "column": "age",
+        "field": "age",
+        "path": "age",
         "keyword": "anyOf",
         "message": "age is 52.5, which is not an allowed value.",
         "hint": "Allowed in age: a whole number from 18 to 85, or -9 (Don't know)."
@@ -128,6 +140,8 @@
       {
         "row": 6,
         "column": "sex",
+        "field": "sex",
+        "path": "sex",
         "keyword": "oneOf",
         "message": "sex is 3, which is not an allowed value.",
         "hint": "Allowed in sex: one of 1 (Male), 2 (Female), -7 (Refused)."
@@ -135,6 +149,8 @@
       {
         "row": 7,
         "column": "age",
+        "field": "age",
+        "path": "age",
         "keyword": "anyOf",
         "message": "age is -7, which is not an allowed value.",
         "hint": "Allowed in age: a whole number from 18 to 85, or -9 (Don't know)."
@@ -142,6 +158,8 @@
       {
         "row": 8,
         "column": "age",
+        "field": "age",
+        "path": "age",
         "keyword": "required",
         "message": "age is missing.",
         "hint": "Every row needs age. When the value is missing, write one of its missing-value codes: -9 (Don't know)."
@@ -149,6 +167,8 @@
       {
         "row": 9,
         "column": "shoe_size",
+        "field": "shoe_size",
+        "path": "shoe_size",
         "keyword": "unevaluatedProperties",
         "message": "shoe_size is not a column of this table.",
         "hint": "shoe_size is not in the data dictionary. Remove the column, or ask for it to be added to the schemas."
@@ -156,6 +176,8 @@
       {
         "row": 10,
         "column": "smk_ever",
+        "field": "smk_ever",
+        "path": "smk_ever",
         "keyword": "oneOf",
         "message": "smk_ever is 3, which is not an allowed value.",
         "hint": "Allowed in smk_ever: one of 1 (Yes), 2 (No), -7 (Refused), -9 (Don't know)."
@@ -163,6 +185,8 @@
       {
         "row": 11,
         "column": "smk_status",
+        "field": "smk_status",
+        "path": "smk_status",
         "keyword": "oneOf",
         "message": "smk_status is \"yes\", which is not an allowed value.",
         "hint": "Allowed in smk_status: one of 1 (Current), 2 (Former), -6 (Not applicable), -9 (Don't know)."
@@ -170,6 +194,8 @@
       {
         "row": 12,
         "column": "smk_status",
+        "field": "smk_status",
+        "path": "smk_status",
         "keyword": "oneOf",
         "message": "smk_status is 3, which is not an allowed value.",
         "hint": "Allowed in smk_status: one of 1 (Current), 2 (Former), -6 (Not applicable), -9 (Don't know)."
@@ -177,6 +203,8 @@
       {
         "row": 13,
         "column": "cigs_day",
+        "field": "cigs_day",
+        "path": "cigs_day",
         "keyword": "anyOf",
         "message": "cigs_day is 61, which is not an allowed value.",
         "hint": "Allowed in cigs_day: a whole number from 1 to 60, or one of -6 (Not applicable), -9 (Don't know)."
@@ -184,6 +212,8 @@
       {
         "row": 14,
         "column": "cigs_day",
+        "field": "cigs_day",
+        "path": "cigs_day",
         "keyword": "anyOf",
         "message": "cigs_day is 0, which is not an allowed value.",
         "hint": "Allowed in cigs_day: a whole number from 1 to 60, or one of -6 (Not applicable), -9 (Don't know)."
@@ -191,6 +221,8 @@
       {
         "row": 15,
         "column": "cigs_day",
+        "field": "cigs_day",
+        "path": "cigs_day",
         "keyword": "anyOf",
         "message": "cigs_day is -999, which is not an allowed value.",
         "hint": "Allowed in cigs_day: a whole number from 1 to 60, or one of -6 (Not applicable), -9 (Don't know)."
@@ -198,6 +230,8 @@
       {
         "row": 16,
         "column": "smk_age_start",
+        "field": "smk_age_start",
+        "path": "smk_age_start",
         "keyword": "anyOf",
         "message": "smk_age_start is 9, which is not an allowed value.",
         "hint": "Allowed in smk_age_start: a whole number from 10 to 80, or one of -6 (Not applicable), -9 (Don't know)."
@@ -205,6 +239,8 @@
       {
         "row": 17,
         "column": "cigs_day",
+        "field": "cigs_day",
+        "path": "cigs_day",
         "keyword": "const",
         "message": "cigs_day is 10; -6 is required here.",
         "hint": "R001 (Skip pattern) applies to this row: people who have not smoked 100 cigarettes (smk_ever = 2), or who refused or did not know (-7, -9), skip the smoking questions that follow, so smk_status, cigs_day and smk_age_start are -6. Questionnaire ¶8: 'IF NO, GO TO SECTION C.'; the data steward says re…",
@@ -214,6 +250,8 @@
       {
         "row": 18,
         "column": "smk_age_start",
+        "field": "smk_age_start",
+        "path": "smk_age_start",
         "keyword": "const",
         "message": "smk_age_start is 25; -6 is required here.",
         "hint": "R001 (Skip pattern) applies to this row: people who have not smoked 100 cigarettes (smk_ever = 2), or who refused or did not know (-7, -9), skip the smoking questions that follow, so smk_status, cigs_day and smk_age_start are -6. Questionnaire ¶8: 'IF NO, GO TO SECTION C.'; the data steward says re…",
@@ -223,6 +261,8 @@
       {
         "row": 19,
         "column": "smk_status",
+        "field": "smk_status",
+        "path": "smk_status",
         "keyword": "not",
         "message": "smk_status is -6, which is not allowed here.",
         "hint": "R001 (Applicability) applies to this row: people who have smoked 100 cigarettes (smk_ever = 1) were asked whether they smoke now and when they started, so smk_status and smk_age_start are never -6. Questionnaire ¶8 to ¶11: only 'No' at B1 skips B2 to B4 (refusals and don't-know answers count as No:…",
@@ -232,6 +272,8 @@
       {
         "row": 20,
         "column": "smk_age_start",
+        "field": "smk_age_start",
+        "path": "smk_age_start",
         "keyword": "not",
         "message": "smk_age_start is -6, which is not allowed here.",
         "hint": "R001 (Applicability) applies to this row: people who have smoked 100 cigarettes (smk_ever = 1) were asked whether they smoke now and when they started, so smk_status and smk_age_start are never -6. Questionnaire ¶8 to ¶11: only 'No' at B1 skips B2 to B4 (refusals and don't-know answers count as No:…",
@@ -241,6 +283,8 @@
       {
         "row": 21,
         "column": "cigs_day",
+        "field": "cigs_day",
+        "path": "cigs_day",
         "keyword": "const",
         "message": "cigs_day is 10; -6 is required here.",
         "hint": "R002 (Skip pattern) applies to this row: former smokers (smk_status = 2), and people who did not know (-9) whether they smoke now, were not asked how many cigarettes they smoke, so cigs_day is -6. Questionnaire ¶10: 'IF SMOKES NOW:'; dictionary Variables row 11: 'Current smokers only'; a don't-know…",
@@ -250,6 +294,8 @@
       {
         "row": 22,
         "column": "cigs_day",
+        "field": "cigs_day",
+        "path": "cigs_day",
         "keyword": "not",
         "message": "cigs_day is -6, which is not allowed here.",
         "hint": "R002 (Applicability) applies to this row: current smokers (smk_status = 1) were asked how many cigarettes they smoke, so cigs_day is never -6. The data steward confirms the rule matches the delivered data (D018).",
@@ -259,6 +305,8 @@
       {
         "row": 23,
         "column": "cigs_day",
+        "field": "cigs_day",
+        "path": "cigs_day",
         "keyword": "const",
         "message": "cigs_day is 10; -6 is required here.",
         "hint": "R001 (Skip pattern) applies to this row: people who have not smoked 100 cigarettes (smk_ever = 2), or who refused or did not know (-7, -9), skip the smoking questions that follow, so smk_status, cigs_day and smk_age_start are -6. Questionnaire ¶8: 'IF NO, GO TO SECTION C.'; the data steward says re…",
@@ -268,6 +316,8 @@
       {
         "row": 24,
         "column": "smk_age_start",
+        "field": "smk_age_start",
+        "path": "smk_age_start",
         "keyword": "const",
         "message": "smk_age_start is 25; -6 is required here.",
         "hint": "R001 (Skip pattern) applies to this row: people who have not smoked 100 cigarettes (smk_ever = 2), or who refused or did not know (-7, -9), skip the smoking questions that follow, so smk_status, cigs_day and smk_age_start are -6. Questionnaire ¶8: 'IF NO, GO TO SECTION C.'; the data steward says re…",
@@ -277,6 +327,8 @@
       {
         "row": 25,
         "column": "cigs_day",
+        "field": "cigs_day",
+        "path": "cigs_day",
         "keyword": "const",
         "message": "cigs_day is 10; -6 is required here.",
         "hint": "R002 (Skip pattern) applies to this row: former smokers (smk_status = 2), and people who did not know (-9) whether they smoke now, were not asked how many cigarettes they smoke, so cigs_day is -6. Questionnaire ¶10: 'IF SMOKES NOW:'; dictionary Variables row 11: 'Current smokers only'; a don't-know…",
@@ -286,6 +338,8 @@
       {
         "row": 26,
         "column": "menarche_age",
+        "field": "menarche_age",
+        "path": "menarche_age",
         "keyword": "anyOf",
         "message": "menarche_age is 7, which is not an allowed value.",
         "hint": "Allowed in menarche_age: a whole number from 8 to 20, or one of -6 (Not applicable), -9 (Don't know)."
@@ -293,6 +347,8 @@
       {
         "row": 27,
         "column": "parity",
+        "field": "parity",
+        "path": "parity",
         "keyword": "anyOf",
         "message": "parity is 16, which is not an allowed value.",
         "hint": "Allowed in parity: a whole number from 0 to 15, or one of -6 (Not applicable), -9 (Don't know)."
@@ -300,6 +356,8 @@
       {
         "row": 28,
         "column": "age_first_birth",
+        "field": "age_first_birth",
+        "path": "age_first_birth",
         "keyword": "anyOf",
         "message": "age_first_birth is 51, which is not an allowed value.",
         "hint": "Allowed in age_first_birth: a whole number from 14 to 50, or one of -6 (Not applicable), -9 (Don't know)."
@@ -307,6 +365,8 @@
       {
         "row": 29,
         "column": "breastfed_ever",
+        "field": "breastfed_ever",
+        "path": "breastfed_ever",
         "keyword": "oneOf",
         "message": "breastfed_ever is 3, which is not an allowed value.",
         "hint": "Allowed in breastfed_ever: one of 1 (Yes), 2 (No), -6 (Not applicable), -9 (Don't know)."
@@ -314,6 +374,8 @@
       {
         "row": 30,
         "column": "menarche_age",
+        "field": "menarche_age",
+        "path": "menarche_age",
         "keyword": "const",
         "message": "menarche_age is 13; -6 is required here.",
         "hint": "R003 (Skip pattern) applies to this row: men (sex = 1), and people whose sex was refused (-7), skip the women's-health section, so menarche_age, parity, age_first_birth and breastfed_ever are -6. Questionnaire ¶13: 'ASK SECTION C OF WOMEN ONLY (A2 = 2). MEN: GO TO SECTION D.'; dictionary Variables …",
@@ -323,6 +385,8 @@
       {
         "row": 31,
         "column": "breastfed_ever",
+        "field": "breastfed_ever",
+        "path": "breastfed_ever",
         "keyword": "const",
         "message": "breastfed_ever is 1; -6 is required here.",
         "hint": "R003 (Skip pattern) applies to this row: men (sex = 1), and people whose sex was refused (-7), skip the women's-health section, so menarche_age, parity, age_first_birth and breastfed_ever are -6. Questionnaire ¶13: 'ASK SECTION C OF WOMEN ONLY (A2 = 2). MEN: GO TO SECTION D.'; dictionary Variables …",
@@ -332,6 +396,8 @@
       {
         "row": 32,
         "column": "parity",
+        "field": "parity",
+        "path": "parity",
         "keyword": "not",
         "message": "parity is -6, which is not allowed here.",
         "hint": "R003 (Applicability) applies to this row: women (sex = 2) were asked the age at first period and the number of live births, so menarche_age and parity are never -6. The data steward confirms the rule matches the delivered data (D022).",
@@ -341,6 +407,8 @@
       {
         "row": 33,
         "column": "menarche_age",
+        "field": "menarche_age",
+        "path": "menarche_age",
         "keyword": "not",
         "message": "menarche_age is -6, which is not allowed here.",
         "hint": "R003 (Applicability) applies to this row: women (sex = 2) were asked the age at first period and the number of live births, so menarche_age and parity are never -6. The data steward confirms the rule matches the delivered data (D022).",
@@ -350,6 +418,8 @@
       {
         "row": 34,
         "column": "bmi",
+        "field": "bmi",
+        "path": "bmi",
         "keyword": "anyOf",
         "message": "bmi is 71.5, which is not an allowed value.",
         "hint": "Allowed in bmi: a number from 12.0 to 70.0, or -1 (Not measured)."
@@ -357,6 +427,8 @@
       {
         "row": 35,
         "column": "bmi",
+        "field": "bmi",
+        "path": "bmi",
         "keyword": "anyOf",
         "message": "bmi is -9, which is not an allowed value.",
         "hint": "Allowed in bmi: a number from 12.0 to 70.0, or -1 (Not measured)."
@@ -364,6 +436,8 @@
       {
         "row": 36,
         "column": "diabetes_dx",
+        "field": "diabetes_dx",
+        "path": "diabetes_dx",
         "keyword": "oneOf",
         "message": "diabetes_dx is 3, which is not an allowed value.",
         "hint": "Allowed in diabetes_dx: one of 1 (Yes), 2 (No), -9 (Don't know)."
@@ -371,6 +445,8 @@
       {
         "row": 37,
         "column": "diabetes_age",
+        "field": "diabetes_age",
+        "path": "diabetes_age",
         "keyword": "anyOf",
         "message": "diabetes_age is 86, which is not an allowed value.",
         "hint": "Allowed in diabetes_age: a whole number from 10 to 85, or one of -6 (Not applicable), -9 (Don't know)."
@@ -378,6 +454,8 @@
       {
         "row": 38,
         "column": "diabetes_age",
+        "field": "diabetes_age",
+        "path": "diabetes_age",
         "keyword": "const",
         "message": "diabetes_age is 40; -6 is required here.",
         "hint": "R004 (Skip pattern) applies to this row: people who were not told they have diabetes (diabetes_dx = 2), or who did not know (-9), were not asked the age at diagnosis, so diabetes_age is -6. Questionnaire ¶21: 'IF YES:'; dictionary Variables row 19: 'Asked only if diabetes_dx = 1'; the data steward …",
@@ -387,6 +465,8 @@
       {
         "row": 39,
         "column": "diabetes_age",
+        "field": "diabetes_age",
+        "path": "diabetes_age",
         "keyword": "not",
         "message": "diabetes_age is -6, which is not allowed here.",
         "hint": "R004 (Applicability) applies to this row: people who were told they have diabetes (diabetes_dx = 1) were asked the age at diagnosis, so diabetes_age is never -6. The data steward confirms the rule matches the delivered data (D025).",
@@ -396,6 +476,8 @@
       {
         "row": 40,
         "column": "age_first_birth",
+        "field": "age_first_birth",
+        "path": "age_first_birth",
         "keyword": "const",
         "message": "age_first_birth is 25; -6 is required here.",
         "hint": "R005 (Skip pattern) applies to this row: women with no live births (parity = 0) have no first birth and no children to breastfeed, so age_first_birth and breastfed_ever are -6. The documents do not state this routing; the data steward vouches for it (D020).",
@@ -405,6 +487,8 @@
       {
         "row": 41,
         "column": "breastfed_ever",
+        "field": "breastfed_ever",
+        "path": "breastfed_ever",
         "keyword": "const",
         "message": "breastfed_ever is 1; -6 is required here.",
         "hint": "R005 (Skip pattern) applies to this row: women with no live births (parity = 0) have no first birth and no children to breastfeed, so age_first_birth and breastfed_ever are -6. The documents do not state this routing; the data steward vouches for it (D020).",
@@ -414,6 +498,8 @@
       {
         "row": 42,
         "column": "age_first_birth",
+        "field": "age_first_birth",
+        "path": "age_first_birth",
         "keyword": "not",
         "message": "age_first_birth is -6, which is not allowed here.",
         "hint": "R005 (Applicability) applies to this row: women with at least one live birth (parity 1 to 15) were asked the age at first birth and about breastfeeding, so age_first_birth and breastfed_ever are never -6 (they may still be refused or don't know). The documents do not state this routing; the data st…",
@@ -423,6 +509,8 @@
       {
         "row": 43,
         "column": "breastfed_ever",
+        "field": "breastfed_ever",
+        "path": "breastfed_ever",
         "keyword": "not",
         "message": "breastfed_ever is -6, which is not allowed here.",
         "hint": "R005 (Applicability) applies to this row: women with at least one live birth (parity 1 to 15) were asked the age at first birth and about breastfeeding, so age_first_birth and breastfed_ever are never -6 (they may still be refused or don't know). The documents do not state this routing; the data st…",
@@ -432,6 +520,8 @@
       {
         "row": 44,
         "column": "menarche_age",
+        "field": "menarche_age",
+        "path": "menarche_age",
         "keyword": "const",
         "message": "menarche_age is 13; -6 is required here.",
         "hint": "R003 (Skip pattern) applies to this row: men (sex = 1), and people whose sex was refused (-7), skip the women's-health section, so menarche_age, parity, age_first_birth and breastfed_ever are -6. Questionnaire ¶13: 'ASK SECTION C OF WOMEN ONLY (A2 = 2). MEN: GO TO SECTION D.'; dictionary Variables …",
@@ -441,6 +531,8 @@
       {
         "row": 45,
         "column": "diabetes_age",
+        "field": "diabetes_age",
+        "path": "diabetes_age",
         "keyword": "const",
         "message": "diabetes_age is 40; -6 is required here.",
         "hint": "R004 (Skip pattern) applies to this row: people who were not told they have diabetes (diabetes_dx = 2), or who did not know (-9), were not asked the age at diagnosis, so diabetes_age is -6. Questionnaire ¶21: 'IF YES:'; dictionary Variables row 19: 'Asked only if diabetes_dx = 1'; the data steward …",
