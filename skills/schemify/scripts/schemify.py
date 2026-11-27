@@ -3549,6 +3549,9 @@ def check(ws: Path, validate: bool = True, strict: bool = False) -> dict:
     if "installGit" in prefs and not isinstance(prefs["installGit"], bool):
         f("error", "project-invalid", "preferences.installGit must be true or false",
           "false once the person declined installing git, or their computer does not allow it.")
+    if "useTheirRepo" in prefs and not isinstance(prefs["useTheirRepo"], bool):
+        f("error", "project-invalid", "preferences.useTheirRepo must be true or false",
+          "The person's answer to whether schemify may commit in the repository that holds the workspace.")
     for s in (proj.get("conventions") or {}).get("sentinels") or []:
         if not isinstance(s, dict) or "code" not in s or not s.get("meaning"):
             f("error", "project-invalid", f"conventions.sentinels entry {s!r} needs code and meaning", "See LEDGER-FORMAT.md.")
@@ -3785,13 +3788,15 @@ def install_git_hint() -> dict:
     return {"command": None, "what": "Whoever manages this computer can install git."}
 
 
-def git_cli_snapshot(ws: Path, message: str, first: str | None) -> dict:
+def git_cli_snapshot(ws: Path, message: str, first: str | None, theirs_ok: bool = False) -> dict:
     top = git(ws, "rev-parse", "--show-toplevel")
     root = Path(top.stdout.strip()).resolve() if top and top.returncode == 0 and top.stdout.strip() else None
     if root and root != ws:
         ignored = git(ws.parent, "check-ignore", "-q", ws.name)
         if ignored and ignored.returncode == 0:
             root = None                     # their repository leaves the workspace out: give it one of its own
+        elif not theirs_ok:                 # never a commit in someone's repository before they agree
+            return {"repo": str(root), "own": False, "created": False, "via": "git", "commit": None, "ask": True}
     created = root is None
     if created:
         made = git(ws, "init", "-q")
@@ -3847,16 +3852,30 @@ def git_snapshot(ws: Path, message: str, first: str | None = None) -> dict:
     ws = ws.resolve()
     if not (ws / ".gitignore").exists():
         write_text(ws / ".gitignore", GITIGNORE)
+    prefs = load_project(ws).get("preferences") or {}
+    theirs = prefs.get("useTheirRepo")
     missing = git_unavailable()
     if not missing:
-        return git_cli_snapshot(ws, message, first)
-    res = gitless(ws, "snapshot", "--message", message, *(("--first", first) if first else ()))
-    if "failed" in res:
-        res = {"off": f"{missing}, and its stand-in (dulwich, through uv) could not run: {res['failed']}", "hint": GIT_HINT}
-    elif res.get("error"):
-        res["hint"] = GIT_HINT
-    if (load_project(ws).get("preferences") or {}).get("installGit") is not False:
-        res["install"] = install_git_hint()
+        res = git_cli_snapshot(ws, message, first, theirs is True)
+    else:
+        res = gitless(ws, "snapshot", "--message", message, *(("--first", first) if first else ()),
+                      *(("--their-repo",) if theirs is True else ()))
+        if "failed" in res:
+            res = {"off": f"{missing}, and its stand-in (dulwich, through uv) could not run: {res['failed']}", "hint": GIT_HINT}
+        elif res.get("error"):
+            res["hint"] = GIT_HINT
+        if prefs.get("installGit") is not False:
+            res["install"] = install_git_hint()
+    if res.pop("ask", False):
+        if theirs is False:
+            res = {**{k: v for k, v in res.items() if k == "install"},
+                   "off": f"the person versions this folder in their own repository ({res['repo']}) themselves"}
+        else:
+            res["ask"] = (f"The workspace is inside a Git repository that is already there: {res['repo']}. Nothing is "
+                          "committed in it until the person agrees. Ask them once, in chat, whether schemify may commit "
+                          "its folder there (its own files only, on the branch they have checked out), then set "
+                          "project.json → preferences.useTheirRepo to true or false. If this is not where they meant "
+                          "the workspace to be, ask where it should go instead.")
     return res
 
 
@@ -3945,13 +3964,16 @@ def tell_user_lines(ws: Path, world: World, url: str | None, disk_note: bool = F
     asked = [d for d in world.decisions.values() if awaiting(d) and d["id"] not in sent]
     for_steward = sum(1 for d in asked if d.get("to") == "steward")
     for_you = len(asked) - for_steward
+    optional = sum(1 for d in world.decisions.values() if isinstance(d, dict) and d.get("status") == "asked"
+                   and optional_question(d) and d["id"] not in sent and d.get("to") != "steward")
     lines = [f"Your project website: {where}"]
     if disk_note:
         lines.append("This time it opens straight from your files, so it does not update by itself (reload it when "
                      "I say so), and to send me your answers you press *Review & save*, then *Download as a file*, "
                      "and tell me where the file went.")
-    if for_you:
-        lines.append(f"{for_you} question(s) are waiting for you there.")
+    if for_you:                 # counted as the batch was announced, optional ones too; optional ones alone wait for no one
+        lines.append(f"{for_you + optional} question(s) are waiting for you there"
+                     + (f" ({optional} of them optional)." if optional else "."))
     if for_steward:
         lines.append(f"{for_steward} question(s) wait there for the data steward (the website's *Answering as: data steward*).")
     in_review = [t for tid, t in world.topics.items() if t.get("review") == "in-review" and ("topic", tid) not in sent]

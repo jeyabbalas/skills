@@ -10,14 +10,15 @@ anyway: dulwich, a Git written in Python, writes an ordinary Git repository, whi
 git itself reads once it is installed. Nothing here needs administrator rights.
 
 Usage (schemify.py runs it; agents use schemify.py's commit, history and restore):
-  uv run <skill-dir>/scripts/gitless.py snapshot --ws WS --message M [--first M]
+  uv run <skill-dir>/scripts/gitless.py snapshot --ws WS --message M [--first M] [--their-repo]
   uv run <skill-dir>/scripts/gitless.py history  --ws WS [--file F] [--limit N]
   uv run <skill-dir>/scripts/gitless.py restore  --ws WS --commit C --file F
 Fallback:  Python 3.10+: python3 -m pip install --user "dulwich>=1.0,<2", then python3 <skill-dir>/scripts/gitless.py ...
 
 Each command prints one JSON object. `snapshot` commits everything in the workspace
-and nothing beside it: inside a repository of the user's own, it commits nothing
-while they have other changes staged. Exit codes: 0 ok, 1 error ("error", "hint").
+and nothing beside it. Inside a repository of the user's own it commits only with
+--their-repo (they agreed), and never while they have other changes staged.
+Exit codes: 0 ok, 1 error ("error", "hint").
 """
 
 from __future__ import annotations
@@ -72,10 +73,13 @@ def staged_paths(repo: Repo) -> list[str]:
     return [p.decode() if isinstance(p, bytes) else p for paths in st.staged.values() for p in paths]
 
 
-def snapshot(ws: Path, message: str, first: str | None) -> dict:
+def snapshot(ws: Path, message: str, first: str | None, theirs_ok: bool) -> dict:
     root = find_root(ws)
-    if root and root != ws and IgnoreFilterManager.from_repo(Repo(str(root))).is_ignored(prefix_of(ws, root)):
-        root = None                              # their repository leaves the workspace out: give it its own
+    if root and root != ws:
+        if IgnoreFilterManager.from_repo(Repo(str(root))).is_ignored(prefix_of(ws, root)):
+            root = None                          # their repository leaves the workspace out: give it its own
+        elif not theirs_ok:                      # never a commit in someone's repository before they agree
+            return {"repo": str(root), "own": False, "created": False, "via": "dulwich", "commit": None, "ask": True}
     created = root is None
     if created:
         porcelain.init(str(ws))
@@ -153,6 +157,7 @@ def main() -> None:
     ap.add_argument("--file")
     ap.add_argument("--commit")
     ap.add_argument("--limit", type=int, default=20)
+    ap.add_argument("--their-repo", action="store_true", help="the person agreed to commits in their repository")
     a = ap.parse_args()
     ws = Path(a.ws).expanduser().resolve()
     if not (ws / "state" / "project.json").is_file():
@@ -161,7 +166,7 @@ def main() -> None:
         if a.command == "snapshot":
             if not a.message:
                 out({"ok": False, "error": "snapshot needs --message", "hint": "Say what changed."}, 1)
-            out({"ok": True, **snapshot(ws, a.message, a.first)})
+            out({"ok": True, **snapshot(ws, a.message, a.first, a.their_repo)})
         if a.command == "history":
             out({"ok": True, **history(ws, a.file, max(1, a.limit))})
         if not (a.commit and a.file):

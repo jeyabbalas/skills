@@ -205,7 +205,7 @@ Edited directly (it is small), then `check` validates it. Fields:
 ```
 
 - Paths in `tables` and `topics` are relative to `schemify/package/schemas/`. `topics` order is the reading order: it fixes each mother's `allOf` order and every page's section order.
-- `mode` is `build` or `review`; `inferRules` is `ask`, `yes`, or `no` (set only from a person's answer); `realData` is `yes`, `elsewhere`, or `notyet`; `installGit` is `false` once the person declined installing git or their computer does not allow it (SKILL.md, Version control); `profile` is `steward`, `informed`, or `limited` (INTERVIEW.md).
+- `mode` is `build` or `review`; `inferRules` is `ask`, `yes`, or `no` (set only from a person's answer); `realData` is `yes`, `elsewhere`, or `notyet`; `installGit` is `false` once the person declined installing git or their computer does not allow it; `useTheirRepo` is their answer to whether schemify may commit in the repository that holds the workspace (both: SKILL.md, Version control); `profile` is `steward`, `informed`, or `limited` (INTERVIEW.md).
 - `idBase` is a placeholder namespace that nothing fetches; the package README tells publishers to replace it.
 - `conventions.sentinels` lists every special code the package uses, with the decision that settled it — `null` too, when a `convention` decision adopts it (`{"code": null, "meaning": "Missing (blank cell)", "structural": false, "decision": "D012"}`); the package README's table of codes comes from it. `structural` marks the codes that mean "skipped by design" (SCHEMA-STYLE.md, "Sentinels").
 

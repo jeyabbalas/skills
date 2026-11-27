@@ -1884,6 +1884,8 @@ def test_an_optional_question_left_blank_holds_nothing_up(ws):
                          "question": "Links to public pages about the study (optional)"})
     rec(ws, post("D001", "D002"))
     assert [b["id"] for b in sf.queue_items(ws, "author", None, 20)["openBatches"]] == ["B01"]
+    assert "2 question(s) are waiting for you there (1 of them optional)." in \
+        sf.tell_user_lines(ws, sf.load_world(ws), "http://127.0.0.1:1/")      # as many as the batch announced
     rec(ws, answer("D001"))
     assert sf.queue_items(ws, "author", None, 20)["openBatches"] == []
     assert "wait" not in next_actions(ws)
@@ -2403,6 +2405,7 @@ def test_open_versions_an_older_workspace_and_names_an_abandoned_session(bare, g
 
 
 def test_a_workspace_inside_the_users_repository_commits_only_itself(tmp_path, git_on):
+    # nothing is committed in a repository of the person's own until they agree (preferences.useTheirRepo)
     study = tmp_path / "study"
     study.mkdir()
     git_out(study, "init", "-q")
@@ -2414,8 +2417,18 @@ def test_a_workspace_inside_the_users_repository_commits_only_itself(tmp_path, g
     (study / "exports").mkdir()
     (study / "exports" / "baseline_2024.csv").write_text("id,age\n", encoding="utf-8")   # data beside the workspace
     res = sf.init(str(study / "schemify"), "LARK", None, None, None)
-    assert res["git"]["repo"] == str(study.resolve()) and res["git"]["own"] is False and res["git"]["created"] is False
+    g = res["git"]
+    assert g["repo"] == str(study.resolve()) and (g["own"], g["created"], g["commit"]) == (False, False, None)
+    assert "Ask them once" in g["ask"] and str(study.resolve()) in g["ask"]
     assert not (study / "schemify" / ".git").exists()
+    assert git_out(study, "log", "--format=%s") == "their work"           # untouched until they say yes
+    assert "?? schemify/" in git_out(study, "status", "--porcelain").splitlines()
+    ws = study / "schemify"
+    edit_project(ws, lambda p: p["preferences"].update(useTheirRepo=False))
+    assert sf.commit_cmd(ws, "x") == {"ok": True, "off": f"the person versions this folder in their own repository "
+                                                        f"({study.resolve()}) themselves"}
+    edit_project(ws, lambda p: p["preferences"].update(useTheirRepo=True))
+    assert sf.commit_cmd(ws, "Start the schemify workspace for LARK")["commit"]
     files = git_out(study, "show", "--name-only", "--format=", "HEAD").splitlines()
     assert files and all(f.startswith("schemify/") for f in files)
     assert git_out(study, "diff", "--cached", "--name-only") == "notes.txt"
@@ -2529,6 +2542,34 @@ def test_with_no_way_to_version_the_work_goes_on(bare, git_on, monkeypatch):
     assert out["ok"] is True and "no network" in out["git"]["off"]
     with pytest.raises(sf.Fail, match="No history"):
         sf.history_cmd(bare, None, 5)
+
+
+def test_without_git_the_persons_repository_waits_for_their_yes(tmp_path, git_on, monkeypatch):
+    if not shutil.which("uv"):
+        pytest.skip("the stand-in for git runs through uv")
+    study = tmp_path / "study"
+    study.mkdir()
+    git_out(study, "init", "-q")
+    (study / "notes.txt").write_text("mine\n", encoding="utf-8")
+    git_out(study, "add", "notes.txt")
+    git_out(study, "commit", "-q", "-m", "their work")
+    monkeypatch.setattr(sf, "git_unavailable", lambda: "git is not installed")
+    res = sf.init(str(study / "schemify"), "LARK", None, None, None)
+    g = res["git"]
+    assert (g["via"], g["own"], g["commit"]) == ("dulwich", False, None) and g["ask"] and g["install"]
+    assert git_out(study, "log", "--format=%s") == "their work"
+    ws = study / "schemify"
+    edit_project(ws, lambda p: p["preferences"].update(useTheirRepo=True))
+    (study / "notes.txt").write_text("mine, edited\n", encoding="utf-8")
+    git_out(study, "add", "notes.txt")                   # their staged change: nothing is committed past it
+    with pytest.raises(sf.Fail, match="other changes staged"):
+        sf.commit_cmd(ws, "Start")
+    git_out(study, "commit", "-q", "-m", "their edit")
+    assert sf.commit_cmd(ws, "Start the schemify workspace for LARK")["via"] == "dulwich"
+    files = git_out(study, "show", "--name-only", "--format=", "HEAD").splitlines()
+    assert files and all(f.startswith("schemify/") for f in files)
+    assert git_out(study, "log", "--format=%s").splitlines() == ["Start the schemify workspace for LARK", "their edit",
+                                                                "their work"]
 
 
 @pytest.mark.parametrize("platform, which, command", [
