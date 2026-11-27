@@ -2512,7 +2512,8 @@ def test_without_git_dulwich_keeps_the_history(bare, git_on, monkeypatch, stub_v
     assert git_out(bare, "log", "--format=%s") == "Start versioning the schemify workspace for LARK sleep study"
     changed = subprocess.run(["git", "status", "--porcelain"], cwd=bare, capture_output=True, text=True,  # git, once
                              check=True).stdout.splitlines()                 # installed, reads it as its own: only
-    assert {ln[3:] for ln in changed} <= {"state/ledger.jsonl", "site/data/state.js"}   # what open wrote after the
+    assert {ln[3:] for ln in changed} <= {"state/ledger.jsonl", "site/data/state.js",   # what open wrote after the
+                                          "site/data/activity.js"}   # (timestamped: changes when a second ticks over)
     assert all(ln.startswith(" M") for ln in changed)                                   # snapshot shows as changed
     assert subprocess.run(["git", "fsck", "--no-progress"], cwd=bare, capture_output=True).returncode == 0
     schema = bare / "package/schemas/sleep_diary/categories/sleep.json"
