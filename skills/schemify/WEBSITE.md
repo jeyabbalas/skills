@@ -1,4 +1,4 @@
-The project website: what each part shows, how to point people at it, how it is served, and what to do when it misbehaves. Read this once per session before you first point someone at the website (relaying `open`'s `tell_user` does not count), when a person asks how to use it, and when it misbehaves.
+The project website: what each part shows, how to point people at it, how it is served, and what to do when it misbehaves. Read this once per session before you first point someone at the website (relaying `open`'s `tell_user` does not count), when it is not served, when a person asks how to use it, and when it misbehaves.
 
 Table of contents
 
@@ -7,6 +7,7 @@ Table of contents
 - [How feedback travels](#how-feedback-travels)
 - [Presenting work](#presenting-work)
 - [Serving and offline use](#serving-and-offline-use)
+- [When the server does not start](#when-the-server-does-not-start)
 - [Troubleshooting](#troubleshooting)
 
 ## What it is
@@ -45,11 +46,20 @@ Everything a person does on the page lands in an outbox (kept in their browser, 
 - People can serve it themselves without you: `python3 schemify/tools/serve.py` from the folder that contains `schemify/` (Ctrl-C stops it). START-HERE.md says so too.
 - Semantic search is off until a person turns it on; it then downloads a small model (about 50 MB from huggingface.co and cdn.jsdelivr.net) once. Their schemas and searches never leave the browser.
 
+## When the server does not start
+
+`open` then reports `websiteServed: false` and a `websiteNote` saying why; a server that stopped later shows as `websiteServed: false` in `build` and `status`. Serving is your job: never hand the person a command, or ask whether they want a server or which way to open the page. Try these in order, and stop at the first that works (`schemify.py serve status` tells you):
+
+1. **A sandbox forbids listening on a port** (the note says so): run `schemify.py serve start` again outside the sandbox (Claude Code: the Bash tool's `dangerouslyDisableSandbox`; Codex: escalated permissions). If the person must approve it, say why in their words: "This lets your project website run on this computer only, so it updates as I work and you can send me answers with one click."
+2. **The server starts, then stops** (your harness ends programs that a command leaves running): run `open`'s `serveCommand` (`python3 schemify/tools/serve.py`) as a long-running background command (Claude Code: Bash with `run_in_background`), outside the sandbox if step 1 applied. It lasts only as long as this conversation, so when you close, also give the person the page's file link for answering after it ends; the next `open` tries the lasting way again.
+3. Run `open` again (it keeps the session) and relay its `tell_user`, which now carries the address.
+
+When nothing works, relay `tell_user` as it is: the page opened from disk shows everything, and answers come back as a downloaded file (INBOX.md). Say this once, without technical detail, and note it in the handoff. If the person typed answers on the page opened from disk and serving works later, they send those from that page first, since unsent answers stay with the address they were typed at.
+
 ## Troubleshooting
 
-- **The server did not start** (`open` reports `websiteNote`; some harnesses block background processes or listening ports): do not retry it or try other ports. `tell_user` already gives the person the file link, what changes from disk (reload after each `build`; *Download as a file* instead of sending), and the command `python3 schemify/tools/serve.py` to run in their own terminal — relay it. They pick one way before answering: unsent answers stay with the address they were typed at. A later `open` simply tries again.
 - **You run on another machine** (a server, a cluster) and their browser cannot reach 127.0.0.1 there: they forward the port — `ssh -L <port>:127.0.0.1:<port> <host>`, then open the same address — or open `index.html` from a synced copy and send answers as a downloaded file.
-- **The page says "Not connected"** but you started the server: it stopped, or the port changed. `schemify.py serve status`; `serve start` again and give the new address. Unsent answers are kept in their browser only for the same address — the fixed port keeps it the same.
+- **The page says "Not connected", or the link does not open**: the server stopped. Run `schemify.py serve status`; if it is not running, serve it again ("When the server does not start") and give the address. Unsent answers are kept in their browser only for the same address — the fixed port keeps it the same.
 - **The page shows old data**: run `build`; reload the page.
 - **The page is blank or says its data could not load**: run `build`; if it persists, `refresh-assets`, then `build`.
 - **The dictionary is empty**: no topic is drafted yet, or a schema file does not parse — `check` names it.

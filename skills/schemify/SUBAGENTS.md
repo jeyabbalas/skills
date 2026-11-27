@@ -27,6 +27,7 @@ Paste these into every brief, unchanged:
 > - Never open a data file — anything holding individual records (a header of variable names, then one row per person, visit, or sample), or named like one: an `exports/` or `raw/` folder, `*_data.*`, `*export*`, a dated release, `.sav`, `.dta`, `.sas7bdat`, `.parquet`, `.rds`, or a `.json`/`.jsonl`/`.ndjson` file this brief does not name as documentation. A workbook sheet of records counts: check `manifest.json` → `stats.sheets` before reading any sheet. If you meet one, stop and report it.
 > - Copy codes, labels, and instructions exactly as the source writes them, typos included. Never fill a gap from memory of similar studies — write "not stated" instead.
 > - Every fact carries its locator: `<sheet> row N`, `p.N`, `¶N`, `§heading`, or a URL.
+> - In the files you write, name a file by its path inside the workspace (`sources/S01/…`), never by where it sits on this computer.
 > - Your final message is a short report: what you produced, anything you could not read, and anything surprising — or, when this brief asks for JSON only, that JSON.
 
 ## Brief: digest a source

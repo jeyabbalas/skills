@@ -34,7 +34,7 @@ uv run ../../../skills/schemify/scripts/extract.py schemify/sources/ashgrove_dic
 uv run ../../../skills/schemify/scripts/extract.py schemify/sources/ashgrove_baseline_questionnaire.docx --out schemify/sources/S02/extract --id S02
 ```
 
-The run's machine-specific paths in `START-HERE.md` and the website's data were replaced with repository-relative ones. Rebuilding (`uv run skills/schemify/scripts/schemify.py --ws examples/schemify/workspace/schemify build`) writes your own.
+No file names a folder on the computer the run was made on: schemify writes paths relative to the workspace, or to the folder that holds it. Rebuilding (`uv run skills/schemify/scripts/schemify.py --ws examples/schemify/workspace/schemify build`) regenerates the generated files.
 
 ## How to prompt the agent
 
@@ -44,5 +44,7 @@ The run's machine-specific paths in `START-HERE.md` and the website's data were 
 /schemify the steward says -7 never occurs for sex; drop it
 /schemify review                            (the data steward's review)
 ```
+
+The workspace sits inside this repository, so resuming it in place commits into your clone. To try it on its own, copy `workspace/` somewhere outside the clone first.
 
 One honest note: the person's side of this run was simulated. A second AI agent, working for the skill's author, played the data manager and answered on the website as a person would. Every file here is real output of the skill's scripts and of the agent that ran them.

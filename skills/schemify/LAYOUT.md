@@ -9,6 +9,7 @@ Table of contents
 - [validate.py](#validatepy)
 - [extract.py](#extractpy)
 - [serve.py](#servepy)
+- [gitless.py](#gitlesspy)
 - [migrate.py](#migratepy)
 
 ## The workspace
@@ -33,6 +34,7 @@ schemify/
 ├── inbox/pending/, inbox/done/   ← feedback the website sent (take it with `inbox take`)
 ├── alignment/A01.json …      ← QuaC findings without data (no values)
 ├── tools/serve.py            ← lets people restart the website without an agent
+├── .git/, .gitignore         ← version control (`init` and `open` create it; runtime files and `inbox/pending/` are ignored)
 └── package/                  ← THE DELIVERABLE — stands alone
     ├── README.md, PROVENANCE.md, provenance.json, dictionary.html   (built)
     ├── schemas/              ← only schema files: people drop this folder into QuaC
@@ -43,7 +45,9 @@ schemify/
     └── tools/validate.py, requirements.txt   (shipped)
 ```
 
-Create lazily: `init` makes the skeleton — `state/`, `sources/`, `inbox/`, `alignment/`, `site/`, `tools/`, and `package/` with its `schemas/`, `toy-data/`, `tools/`, and `assets/` folders; everything else appears the first time something is written into it. Never put anything but schema files under `package/schemas/` — QuaC and the dictionary treat every `.json` there as part of the schema set.
+Create lazily: `init` makes the skeleton — `state/`, `sources/`, `inbox/`, `alignment/`, `site/`, `tools/`, and `package/` with its `schemas/`, `toy-data/`, `tools/`, and `assets/` folders, and the Git repository; everything else appears the first time something is written into it. A workspace inside the user's own repository has no `.git/` of its own: theirs versions it, unless it ignores the workspace.
+
+No file in the workspace names a folder on this computer, so a shared repository publishes none: `record` and `inbox take` rewrite paths relative to the folder that holds the workspace (else under `~`, else with `../`), `open` does the same to a ledger an older version wrote, generated files carry folder names only, and the website finds its full path when it loads. `check` warns (`local-path`) when a file you edit names one. Never put anything but schema files under `package/schemas/` — QuaC and the dictionary treat every `.json` there as part of the schema set.
 
 ## Naming
 
@@ -65,17 +69,20 @@ Run commands from the directory the user invoked you in. `schemify.py` finds `sc
 
 | command | does | prints |
 |---|---|---|
-| `init --study NAME [--dir schemify] [--invoke /schemify] [--harness H]` | creates the workspace (idempotent; on an existing one it restores shipped files). `NAME` may be a working name (the folder's or the dictionary file's); `--invoke` is the command alone (`/schemify`, `$schemify`), never its arguments | `workspace`, `id`, `next` |
-| `open [--mode build\|review] [--harness claude-code\|codex\|cursor\|other] [--model M] [--no-serve]` | records the session start (resumes an unclosed one under 12 hours old, closes an older one as unfinished), starts the website, rebuilds its data; without `--mode` the project's mode stays | the `status` payload + `mode`, `website`, `tell_user` |
+| `init --study NAME [--dir schemify] [--invoke /schemify] [--harness H]` | creates the workspace and its first commit (idempotent; on an existing one it restores shipped files). `NAME` may be a working name (the folder's or the dictionary file's); `--invoke` is the command alone (`/schemify`, `$schemify`), never its arguments | `workspace`, `id`, `git`, `next` |
+| `open [--mode build\|review] [--harness claude-code\|codex\|cursor\|other] [--model M] [--no-serve]` | commits changes made since the last commit (creating the repository if there is none), records the session start (resumes an unclosed one under 12 hours old, closes an older one as unfinished), starts the website, rebuilds its data; without `--mode` the project's mode stays | the `status` payload + `mode`, `website`, `websiteServed`, `tell_user`, `git`; when the server did not start, `websiteNote` (why) and `serveCommand` (the server, run in the foreground) |
 | `status` | reads everything, writes nothing | `phase`, `counts`, `topics`, `checks`, `lastSession` (with `handoff`, `next`), `next` (ranked actions: `action`, `why`, `read`, ids) |
 | `record [--file F]` | validates and appends ledger events from stdin; all or nothing | `recorded`: `[{type, event, id}]` |
 | `show ID…` | `S01`, `D014`, `R003`, `B02`, `A01` (with its failing checks and their keys, each check's `field` and its `earlier` verdicts on the same field, `askTo`, and `supersededBy` once a later run of the same file replaced it), `X01` (a dataset a person allowed, with its runs), `topic:<id>`, `variable:<name>` (a field inside a nested value by its path, quoted for the shell: `'variable:household[].age'`); each under `items.<ID>` | current state + history |
 | `queue [--for author\|steward] [--topic T] [--limit N]` | what needs a person, ranked; low-stakes guesses grouped per topic; which of their batches are still unanswered | `items`, `bulkGuesses`, `suspectedRulesUnasked`, `openBatches` (`unanswered` counts the questions still due: an optional one never counts) |
 | `inbox list` · `inbox take ID` · `inbox import FILE` | lists submissions · records everything mechanical in one and moves it to `done/` · brings in a feedback file the user downloaded | `take` prints `recorded` and `todo` — your work list, each item with its decision, kind, question, answer, topic, table, targets, `files` to change, and `do` |
-| `build [--no-validate]` | runs `validate.py summary`, regenerates the website's data and the package's generated files | `written`, `checks` (`ok`, `headline`), `website` |
+| `build [--no-validate]` | runs `validate.py summary`, regenerates the website's data and the package's generated files | `written`, `checks` (`ok`, `headline`), `website`, `websiteServed` |
 | `check [--strict]` | verifies state, inventory coverage, provenance, rules against schemas, unapplied answers, the inbox, staleness, and runs the validator; before any schema exists it has little to check and is green | `ok`, `blocking` (the errors, plus the warnings that stop a topic's presentation or the finish: an answer not yet applied or decided, an inbox not taken in), `counts`, `findings` (each with a `hint`); exit 1 when not ok (`--strict`: also when the website or shipped files are stale) |
 | `activity TEXT` | tells the website what you are doing | — |
-| `close` | stdin `{"summary": "what happened, two sentences at most", "handoff": "a paragraph: what the next agent must know that the files do not say — a half-done step, the person's preferences, parse quirks", "next": "one concrete step, or done"}`; builds, checks, and refuses while `check` has an error, a submission waits in the inbox, or an answer is unapplied (`blockers` lists them). Fix them, or — when the session must end now — resend with `"force": true` and a handoff naming each blocker | `tell_user` |
+| `commit MESSAGE` | commits everything in the workspace, and nothing beside it, to its repository (in the user's own repository, only the workspace's paths; their other staged changes stay staged). Without a git identity configured, commits are authored as `schemify`. Without the git program, gitless.py makes the commit | `repo`, `own`, `created`, `via` (`git` or `dulwich`), `commit` (short hash; `null` when nothing changed); `install` (`command`, `what`) while git is missing and `preferences.installGit` is not `false`; `off` (why) when nothing can version the workspace. `init`, `open`, and `close` print the same under `git` |
+| `history [FILE] [--limit N]` | the commits, newest first (default 20), of the workspace or of one file in it | `via`, `commits` (`commit`, `date`, `message`, `files`) |
+| `restore COMMIT FILE` | writes one workspace file back as it was at COMMIT; refuses the ledger and anything outside the workspace | `restored`, `from`, `next` |
+| `close` | stdin `{"summary": "what happened, two sentences at most", "handoff": "a paragraph: what the next agent must know that the files do not say — a half-done step, the person's preferences, parse quirks", "next": "one concrete step, or done"}`; builds, checks, and refuses while `check` has an error, a submission waits in the inbox, or an answer is unapplied (`blockers` lists them). Fix them, or — when the session must end now — resend with `"force": true` and a handoff naming each blocker. Then commits the session (summary as the message, `next` below it) | `tell_user`, `git` |
 | `data-check X01 [--timeout SECONDS]` | (default 1800 seconds) runs QuaC (Node 24+, through `npx`; or the command in the environment variable `SCHEMIFY_QUAC`, for an installed `quac` on a machine without npm access) on a file a person allowed you to check, against the current schemas, and imports the findings without data as a new run; QuaC's own messages are discarded unread. Refuses a withdrawn file, a file inside the workspace, and a `local-model` permission under another model. For a `browser` dataset it runs nothing itself: it asks the open website to have QuaC re-check, waits for the findings (they arrive as a submission, which it takes), and fails at once, saying what the person must do, when no page is connected or QuaC lacks the dataset | `run`, `records`, `recordsFailing`, `checksFailing`, `notBuiltYet`, `current`, `next`; on failure, `command` for the person to run (agent runs) |
 | `serve start\|stop\|status` | the website server | `url` |
 | `share [--out PATH]` | zips the workspace for a reviewer | `file`, `tell_user` |
@@ -108,7 +115,11 @@ Exit codes: 0 ok, 1 the package fails (read `findings`), 2 bad arguments or miss
 
 ## serve.py
 
-`schemify.py open` and `serve start` run it for you; it listens on 127.0.0.1 only, on a port fixed per workspace (so the browser keeps the user's unsent answers), serves the workspace, and accepts writes only from the website's own page: feedback (into `inbox/pending/`), and whether the page is connected to QuaC (`state/presence.json`, a few words, never data). Builds point the page at the QuaC app in `SCHEMIFY_QUAC_APP` when set (testing, or a self-hosted QuaC), else at the public one. It stops a day after the last page closed. People can run the workspace's copy themselves — `python3 schemify/tools/serve.py` (Ctrl-C stops it) — and the website also works opened straight from disk, minus one-click sending and live updates. When the agent runs on another machine than the user's browser (a server, a cluster), the user forwards the port (`ssh -L <port>:127.0.0.1:<port> <host>`, then opens the same address), or opens `index.html` from a synced copy and sends answers as a downloaded file.
+`schemify.py open` and `serve start` run it for you; it listens on 127.0.0.1 only, on a port fixed per workspace (so the browser keeps the user's unsent answers), serves the workspace, and accepts writes only from the website's own page: feedback (into `inbox/pending/`), and whether the page is connected to QuaC (`state/presence.json`, a few words, never data). Builds point the page at the QuaC app in `SCHEMIFY_QUAC_APP` when set (testing, or a self-hosted QuaC), else at the public one. It stops a day after the last page closed. Where the environment forbids listening on a port (a sandbox), `start` says so rather than reporting the ports busy. People can run the workspace's copy themselves — `python3 schemify/tools/serve.py` (Ctrl-C stops it) — and the website also works opened straight from disk, minus one-click sending and live updates. When the agent runs on another machine than the user's browser (a server, a cluster), the user forwards the port (`ssh -L <port>:127.0.0.1:<port> <host>`, then opens the same address), or opens `index.html` from a synced copy and sends answers as a downloaded file.
+
+## gitless.py
+
+`schemify.py` runs it, never you: when the git program is missing, `commit`, `history`, `restore`, `init`, `open`, and `close` go through it. It uses dulwich, a Git written in Python, which `uv` fetches like any script's packages — no administrator rights, no installer. The repository it writes is an ordinary one: git, once installed, takes over with nothing to convert. Inside the user's own repository it commits nothing while they have other changes staged. Without `uv`: Python 3.10+ and `python3 -m pip install --user "dulwich>=1.0,<2"`; with neither, `git.off` says so and the work goes on unversioned.
 
 ## migrate.py
 

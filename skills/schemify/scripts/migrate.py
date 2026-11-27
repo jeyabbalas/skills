@@ -401,7 +401,7 @@ def main() -> None:
            for tid in confirmed if tid in {t["id"] for t in topics}]
     if tev:
         sf.record_events(ws, tev)
-    sf.write_text(ws / "sources" / "MIGRATION.md", "# Migration from schemify 1.x\n\nFrom `" + str(old) + "`.\n\n| 1.x | 2 |\n|---|---|\n"
+    sf.write_text(ws / "sources" / "MIGRATION.md", "# Migration from schemify 1.x\n\nFrom `" + sf.portable_path(str(old), ws) + "`.\n\n| 1.x | 2 |\n|---|---|\n"
                   + "".join(f"| {k} | {v} |\n" for k, v in idmap.items()) + "\n## Left to do\n\n" + "".join(f"- {x}\n" for x in attention))
     sf.record_events(ws, [{"type": "session", "event": "end", "id": session_id,
                            "summary": f"Converted the schemify 1.x package in {old.name}/ by script: {len(idmap)} decisions, "

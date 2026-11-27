@@ -47,7 +47,7 @@ A source is a document: a file the user gave you, or a web page you found. Peopl
 
 | event | fields | meaning |
 |---|---|---|
-| `add` | `kind` (`document` · `web`), `title`, `what` (one line: what it holds — from the user's words or the file name until you have read it; refine it with `update`), `path` (the workspace copy, `sources/<original file name>`, for documents), `original` (the user's path to the file, as they gave it), `url` (web), `origin` (`user` · `agent`) | registered. A web source the agent found starts `suggested`; everything else starts `active` |
+| `add` | `kind` (`document` · `web`), `title`, `what` (one line: what it holds — from the user's words or the file name until you have read it; refine it with `update`), `path` (the workspace copy, `sources/<original file name>`, for documents), `original` (the user's path to the file, as they gave it; `record` keeps it relative to the folder that holds the workspace, or under `~`), `url` (web), `origin` (`user` · `agent`) | registered. A web source the agent found starts `suggested`; everything else starts `active` |
 | `approve` / `reject` | `by` (a person), `note` | a person's verdict on a suggested web source |
 | `extract` | `dir` (the extract folder, `sources/<id>/extract`), `files` (how many files the manifest lists) | `extract.py` ran on it |
 | `digest` | `path` (its DIGEST.md), `variables` (count, when it defines variables — every field inside a nested value counted by its path, as the inventory lists them), `verified` (spot-checked locators, e.g. `["Variables row 41", "p.6"]`) | a digest exists and you spot-checked it |
@@ -157,7 +157,7 @@ A dataset checked against the schemas without its data reaching you: a file a pe
 
 | event | fields |
 |---|---|
-| `allow` | `by` (`author` · `steward` — never `agent`), `path` (the file as they gave it: absolute, or relative to the folder holding `schemify/`; never inside it), `label` (their name for it), `basis` (`public` · `local-model` · `browser` — the website records this one when they connect QuaC, with no `path`), `text` (their words), `via`, `table` (needed when the package has several), `sheet` (a workbook with several sheets), `model` (`local-model` only: filled in from the open session — the permission covers that model alone) |
+| `allow` | `by` (`author` · `steward` — never `agent`), `path` (the file as they gave it: absolute, or relative to the folder holding `schemify/`; never inside it — `record` keeps it relative, or under `~`), `label` (their name for it), `basis` (`public` · `local-model` · `browser` — the website records this one when they connect QuaC, with no `path`), `text` (their words), `via`, `table` (needed when the package has several), `sheet` (a workbook with several sheets), `model` (`local-model` only: filled in from the open session — the permission covers that model alone) |
 | `withdraw` | `id`, `by` (a person), `via`, `note` |
 
 `inbox take` records both when they come from the website. A file that moved needs a new `allow`, after a `withdraw` of the old one.
@@ -205,7 +205,7 @@ Edited directly (it is small), then `check` validates it. Fields:
 ```
 
 - Paths in `tables` and `topics` are relative to `schemify/package/schemas/`. `topics` order is the reading order: it fixes each mother's `allOf` order and every page's section order.
-- `mode` is `build` or `review`; `inferRules` is `ask`, `yes`, or `no` (set only from a person's answer); `realData` is `yes`, `elsewhere`, or `notyet`; `profile` is `steward`, `informed`, or `limited` (INTERVIEW.md).
+- `mode` is `build` or `review`; `inferRules` is `ask`, `yes`, or `no` (set only from a person's answer); `realData` is `yes`, `elsewhere`, or `notyet`; `installGit` is `false` once the person declined installing git or their computer does not allow it (SKILL.md, Version control); `profile` is `steward`, `informed`, or `limited` (INTERVIEW.md).
 - `idBase` is a placeholder namespace that nothing fetches; the package README tells publishers to replace it.
 - `conventions.sentinels` lists every special code the package uses, with the decision that settled it — `null` too, when a `convention` decision adopts it (`{"code": null, "meaning": "Missing (blank cell)", "structural": false, "decision": "D012"}`); the package README's table of codes comes from it. `structural` marks the codes that mean "skipped by design" (SCHEMA-STYLE.md, "Sentinels").
 

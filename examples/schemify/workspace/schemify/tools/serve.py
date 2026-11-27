@@ -39,6 +39,7 @@ import mimetypes
 import os
 import re
 import secrets
+import shlex
 import signal
 import socket
 import subprocess
@@ -128,13 +129,22 @@ def preferred_port(ws: Path) -> int:
     return PORT_BASE + zlib.crc32(str(ws).encode("utf-8")) % PORT_SPAN
 
 
-def port_free(port: int) -> bool:
+def port_state(port: int) -> str:
+    """"free", "busy", or "denied" (not allowed to listen: a sandbox; on Windows, also a reserved port)."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
             s.bind((HOST, port))
-            return True
+            return "free"
+        except PermissionError:
+            return "denied"
         except OSError:
-            return False
+            return "busy"
+
+
+def fail_denied() -> None:
+    fail("This environment does not allow programs to listen on a port (most likely an agent's sandbox).",
+         "Run the same command outside the sandbox: an agent asks its harness for that permission. "
+         "Meanwhile the website works opened from disk: schemify/index.html.")
 
 
 def probe(port: int, timeout: float = 1.5) -> dict | None:
@@ -362,14 +372,21 @@ def serve_forever(ws: Path, port: int, idle_hours: float) -> None:
 
 def choose_port(ws: Path, requested: int | None) -> int:
     if requested:
-        if not port_free(requested):
+        state = port_state(requested)
+        if state == "denied":
+            fail_denied()
+        if state != "free":
             fail(f"Port {requested} is in use.", "Omit --port to let the server pick a free one.")
         return requested
     first = preferred_port(ws)
+    states = []
     for i in range(PORT_TRIES):
         port = PORT_BASE + (first - PORT_BASE + i) % PORT_SPAN
-        if port_free(port):
+        states.append(port_state(port))
+        if states[-1] == "free":
             return port
+    if all(st == "denied" for st in states):
+        fail_denied()
     fail("No free port between 8700 and 8899.", "Stop another schemify server (serve.py stop) and retry.")
     raise AssertionError
 
@@ -413,8 +430,9 @@ def cmd_start(ws: Path, a) -> None:
             out({"ok": True, "url": f"http://{HOST}:{port}/", "port": port, "pid": proc.pid, "already": False})
         time.sleep(0.2)
     fail(f"The website server did not start (see {log}).",
-         "The page still works opened from disk: open schemify/index.html. "
-         "If this harness blocks background processes, ask the user to run: python3 schemify/tools/serve.py")
+         "If your harness stops programs that a command leaves running, run "
+         f"`python3 {shlex.quote(str(ws / 'tools' / 'serve.py'))}` as a long-running background command instead. "
+         "Meanwhile the website works opened from disk: schemify/index.html.")
 
 
 def cmd_stop(ws: Path, a) -> None:

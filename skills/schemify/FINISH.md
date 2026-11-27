@@ -38,7 +38,7 @@ When the person asks for a review, or a steward is named in `project.json` → `
 4. `schemify.py build`, then `schemify.py share` — it writes a zip next to the workspace and prints `tell_user`: what to send, and what the steward does with it.
 5. Close the session; the handoff says the work is with the steward. One person edits the workspace at a time: the author waits for it to come back (the same folder, or the zip the steward returns).
 
-When it returns, the author's next session finds `review-complete` and continues normally — usually with a few topics to re-confirm.
+When it returns, the author's next session finds `review-complete` and continues normally — usually with a few topics to re-confirm. A returned zip is unpacked over the workspace, not in place of it, so its Git history stays (the zip carries none); `open` commits the steward's changes as one snapshot.
 
 ## Ending B: finished
 

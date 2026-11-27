@@ -1,7 +1,7 @@
 {
   "ok": true,
   "headline": "6 schema files valid · 10 rules · toy data: 15 valid rows pass, 46/46 seeded errors caught · provenance: 15/15 properties traced",
-  "package": "examples/schemify/workspace/schemify/package",
+  "package": "package",
   "counts": {
     "error": 0,
     "warning": 0,
@@ -9,7 +9,7 @@
   },
   "check": {
     "ok": true,
-    "package": "examples/schemify/workspace/schemify/package",
+    "package": "package",
     "files": 6,
     "tables": [
       {
@@ -1155,6 +1155,6 @@
     }
   },
   "ran": true,
-  "at": "2026-10-13T18:39:03Z",
+  "at": "2026-11-27T19:13:36Z",
   "setId": "c547430f04d597a9"
 }

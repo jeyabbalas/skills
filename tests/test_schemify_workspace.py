@@ -15,6 +15,9 @@ sleep-diary package written inline here; the 1.x fixture (tests/fixtures/schemif
 is copied before migrate.py sees it. The package validator, validate.py, has its own
 suite: here a stub report stands in for it (`build(validate=False)`, `check(ws,
 validate=False)`), except in one end-to-end `build` that needs `uv`.
+
+git runs only in the tests that ask for it (the `git_on` fixture) and in the command-line
+tests, always under a throwaway global config, never the developer's own.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import types
@@ -50,6 +54,9 @@ SCHEMIFY = SCRIPTS / "schemify.py"
 SERVE = SCRIPTS / "serve.py"
 MIGRATE = SCRIPTS / "migrate.py"
 FIXTURE_1X = ROOT / "tests" / "fixtures" / "schemify-1x"
+GIT_HOME = Path(tempfile.mkdtemp(prefix="schemify-tests-git-"))
+(GIT_HOME / "gitconfig").write_text("[user]\n\tname = schemify tests\n\temail = tests@example.org\n", encoding="utf-8")
+os.environ.update({"GIT_CONFIG_GLOBAL": str(GIT_HOME / "gitconfig"), "GIT_CONFIG_NOSYSTEM": "1"})
 ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
 
@@ -63,6 +70,7 @@ def _load(name: str, path: Path):
 
 sf = _load("schemify", SCHEMIFY)            # migrate.py's own `import schemify` finds this module
 mg = _load("schemify_migrate", MIGRATE)
+sv = _load("schemify_serve", SERVE)
 
 
 # ====================================================================== the inline package
@@ -358,6 +366,19 @@ def cli(*args, stdin=None, cwd=None, script=SCHEMIFY, timeout=120):
 @pytest.fixture(autouse=True)
 def _in_tmp(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+
+
+@pytest.fixture(autouse=True)
+def _git_off(request, monkeypatch):
+    """git costs a few subprocesses per workspace: on only where a test asks for it."""
+    if "git_on" not in request.fixturenames:
+        monkeypatch.setattr(sf, "GIT_ENABLED", False)
+
+
+@pytest.fixture
+def git_on():
+    if not shutil.which("git"):
+        pytest.skip("git is not installed")
 
 
 @pytest.fixture
@@ -1586,6 +1607,7 @@ def test_take_records_a_dataset_the_person_allows_on_the_website(ws):
     assert [(r["type"], r["id"]) for r in out["recorded"]] == [("dataset", "X01")]
     x = sf.load_world(ws).datasets["X01"]
     assert (x["by"], x["basis"], x["model"], x["via"]) == ("steward", "local-model", "llama-4-local", f"inbox:{sub}")
+    assert x["path"] == "data/export.csv"
     sub2 = submit(ws, [{"kind": "dataset", "withdraw": "X01", "text": "Not any more."}], sub="20260102T030406Z-b2c3d4")
     sf.take_submission(ws, sub2)
     assert sf.load_world(ws).datasets["X01"]["withdrawn"]["by"] == "author"
@@ -2301,8 +2323,287 @@ def test_open_cli(bare):
     assert out["website"].endswith("index.html") and out["websiteServed"] is False
     assert any("start your message with $schemify" in line for line in out["tell_user"])
     assert any("Download as a file" in line for line in out["tell_user"])      # not served: say what changes
+    assert not any("serve.py" in line or "terminal" in line for line in out["tell_user"])   # never a command for them
     assert out["tell_user"][0].startswith("Your project website: file://")
     assert out["next"][0]["action"] == "add-sources"
+    assert out["git"]["created"] is True and out["git"]["commit"]           # the CLI runs git for real
+
+
+def test_open_says_how_to_serve_when_the_server_did_not_start(ws, monkeypatch):
+    denied = "This environment does not allow programs to listen on a port (most likely an agent's sandbox)."
+    monkeypatch.setattr(sf, "run_serve", lambda ws, cmd: {"ok": False, "error": denied, "hint": "outside the sandbox"})
+    out = sf.open_session(ws, None, None, None, serve=True)
+    assert out["websiteServed"] is False and out["website"].endswith("index.html")
+    assert out["websiteNote"].startswith("The website server did not start: " + denied)
+    assert "When the server does not start" in out["websiteNote"]
+    assert out["serveCommand"].endswith(str(ws / "tools" / "serve.py"))
+    assert any("Download as a file" in line for line in out["tell_user"])
+    assert not any("serve.py" in line or "terminal" in line for line in out["tell_user"])
+    assert sf.build(ws, validate=False)["websiteServed"] is False
+    monkeypatch.setattr(sf, "run_serve", lambda ws, cmd: {"ok": True, "url": "http://127.0.0.1:8701/"})
+    again = sf.open_session(ws, None, None, None, serve=True)
+    assert again["sessionReused"] is True and again["websiteServed"] is True
+    assert "websiteNote" not in again and "serveCommand" not in again
+    assert again["tell_user"][0] == "Your project website: http://127.0.0.1:8701/"
+    assert not any("Download as a file" in line for line in again["tell_user"])
+
+
+# ====================================================================== version control
+
+def git_out(cwd: Path, *args) -> str:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
+
+
+def test_init_starts_a_repository_with_a_first_commit(tmp_path, git_on):
+    res = sf.init(str(tmp_path / "schemify"), "LARK sleep study", None, None, None)
+    ws = Path(res["workspace"])
+    assert res["git"] == {"repo": str(ws), "own": True, "created": True, "via": "git",
+                          "commit": git_out(ws, "rev-parse", "--short", "HEAD")}
+    assert git_out(ws, "log", "--format=%s") == "Start the schemify workspace for LARK sleep study"
+    assert git_out(ws, "branch", "--show-current") == "main"
+    assert git_out(ws, "status", "--porcelain") == ""
+    assert (ws / ".gitignore").read_text(encoding="utf-8") == sf.GITIGNORE
+    for runtime in ("state/server.json", "state/server.log", "state/server.log.1", "state/activity.json",
+                    "state/presence.json", "state/recheck.json", "tools/__pycache__/serve.pyc", ".DS_Store",
+                    "inbox/pending/20260102T030405Z-a1b2c3.json"):
+        assert subprocess.run(["git", "check-ignore", "-q", runtime], cwd=ws).returncode == 0, runtime
+    assert "state/ledger.jsonl" in git_out(ws, "ls-files").splitlines()
+
+
+def test_open_commits_what_came_before_and_close_commits_the_session(bare, git_on, stub_validator):
+    assert sf.open_session(bare, None, None, None, serve=False)["git"]["commit"] is None     # nothing new
+    (bare / "sources" / "codebook.txt").write_text("v1", encoding="utf-8")    # work in the session, then a context reset
+    out = sf.open_session(bare, None, None, None, serve=False)
+    sid = out["session"]
+    assert out["sessionReused"] is True and out["git"]["commit"]
+    assert git_out(bare, "log", "-1", "--format=%s") == f"Work in progress in session {sid}"
+    assert "sources/codebook.txt" in git_out(bare, "show", "--name-only", "--format=", "HEAD").splitlines()
+    closed = sf.close_session(bare, {"summary": "Set up.", "handoff": "none", "next": "register the sources"})
+    assert closed["git"]["commit"] == git_out(bare, "rev-parse", "--short", "HEAD")
+    assert git_out(bare, "log", "-1", "--format=%B") == f"Session {sid}: Set up.\n\nNext: register the sources"
+    assert git_out(bare, "status", "--porcelain") == ""
+    (bare / "sources" / "notes.txt").write_text("from the steward", encoding="utf-8")
+    sf.open_session(bare, None, None, None, serve=False)
+    assert git_out(bare, "log", "-1", "--format=%s") == "Changes made between sessions"
+
+
+def test_open_versions_an_older_workspace_and_names_an_abandoned_session(bare, git_on, stub_validator):
+    shutil.rmtree(bare / ".git")                         # a workspace made before schemify used git
+    (bare / ".gitignore").unlink()
+    out = sf.open_session(bare, None, None, None, serve=False)
+    assert out["git"]["created"] is True and out["git"]["commit"] and (bare / ".gitignore").is_file()
+    assert git_out(bare, "log", "--format=%s") == "Start versioning the schemify workspace for LARK sleep study"
+    sf.close_session(bare, {"summary": "s", "handoff": "h", "next": "n"})
+    (bare / "sources" / "codebook.txt").write_text("v1", encoding="utf-8")
+    with open(bare / "state/ledger.jsonl", "a", encoding="utf-8") as fh:      # left open, too old to resume
+        fh.write(json.dumps({"type": "session", "event": "start", "id": "2026-01-02#1", "mode": "build",
+                             "at": "2026-01-02T09:00:00Z", "by": "agent"}) + "\n")
+    sf.open_session(bare, None, None, None, serve=False)
+    assert git_out(bare, "log", "-1", "--format=%s") == "Work of session 2026-01-02#1, which ended without closing"
+
+
+def test_a_workspace_inside_the_users_repository_commits_only_itself(tmp_path, git_on):
+    study = tmp_path / "study"
+    study.mkdir()
+    git_out(study, "init", "-q")
+    (study / "notes.txt").write_text("mine\n", encoding="utf-8")
+    git_out(study, "add", "notes.txt")
+    git_out(study, "commit", "-q", "-m", "their work")
+    (study / "notes.txt").write_text("mine, edited\n", encoding="utf-8")
+    git_out(study, "add", "notes.txt")                   # their staged change must stay theirs
+    (study / "exports").mkdir()
+    (study / "exports" / "baseline_2024.csv").write_text("id,age\n", encoding="utf-8")   # data beside the workspace
+    res = sf.init(str(study / "schemify"), "LARK", None, None, None)
+    assert res["git"]["repo"] == str(study.resolve()) and res["git"]["own"] is False and res["git"]["created"] is False
+    assert not (study / "schemify" / ".git").exists()
+    files = git_out(study, "show", "--name-only", "--format=", "HEAD").splitlines()
+    assert files and all(f.startswith("schemify/") for f in files)
+    assert git_out(study, "diff", "--cached", "--name-only") == "notes.txt"
+    assert "?? exports/" in git_out(study, "status", "--porcelain").splitlines()
+    other = tmp_path / "other"                           # a repository that ignores the workspace: it gets its own
+    other.mkdir()
+    git_out(other, "init", "-q")
+    (other / ".gitignore").write_text("schemify/\n", encoding="utf-8")
+    res = sf.init(str(other / "schemify"), "LARK", None, None, None)
+    assert res["git"]["own"] is True and res["git"]["created"] is True and (other / "schemify" / ".git").is_dir()
+
+
+def test_commit_cli(bare, git_on):
+    (bare / "sources" / "notes.txt").write_text("x", encoding="utf-8")
+    code, out = cli("--ws", bare, "commit", "Registered", "the", "notes")
+    assert code == 0 and out["ok"] is True and out["commit"] and out["own"] is True
+    assert git_out(bare, "log", "-1", "--format=%s") == "Registered the notes"
+    code, out = cli("commit", "Nothing new", "--ws", bare)
+    assert code == 0 and out["commit"] is None
+    code, out = cli("--ws", bare, "commit", "  ")
+    assert code == 1 and "needs a message" in out["error"] and out["hint"]
+
+
+def test_commit_without_a_git_identity_never_sets_one(bare, git_on, tmp_path, monkeypatch):
+    strict = tmp_path / "strict-gitconfig"
+    strict.write_text("[user]\n\tuseConfigOnly = true\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(strict))
+    (bare / "sources" / "notes.txt").write_text("x", encoding="utf-8")
+    assert sf.commit_cmd(bare, "Notes")["commit"]
+    assert git_out(bare, "log", "-1", "--format=%an <%ae>") == "schemify <schemify@localhost>"
+    assert subprocess.run(["git", "config", "user.name"], cwd=bare, capture_output=True).returncode == 1
+
+
+@pytest.mark.skipif(os.name == "nt", reason="a shell-script hook")
+def test_a_failed_commit_is_reported_and_never_stops_a_session(bare, git_on, stub_validator):
+    hook = bare / ".git" / "hooks" / "pre-commit"
+    hook.write_text("#!/bin/sh\necho 'refused by a hook' >&2\nexit 1\n", encoding="utf-8")
+    hook.chmod(0o755)
+    (bare / "sources" / "notes.txt").write_text("x", encoding="utf-8")
+    with pytest.raises(sf.Fail, match="Not committed: refused by a hook") as ei:
+        sf.commit_cmd(bare, "Notes")
+    assert "carry on" in ei.value.hint and ei.value.extra["git"]["commit"] is None
+    out = sf.open_session(bare, None, None, None, serve=False)
+    assert out["ok"] is True and out["git"]["error"] == "refused by a hook"
+    closed = sf.close_session(bare, {"summary": "s", "handoff": "h", "next": "n"})
+    assert closed["ok"] is True and closed["git"]["error"] == "refused by a hook"
+
+
+def test_history_and_restore(bare, git_on):
+    schema = bare / "package/schemas/sleep_diary/categories/sleep.json"
+    write_json(schema, {"title": "Sleep, first draft"})
+    first = sf.commit_cmd(bare, "Sleep drafted")["commit"]
+    write_json(schema, {"title": "Sleep, a slip"})
+    sf.commit_cmd(bare, "Sleep revised")
+    out = sf.history_cmd(bare, None, 20)
+    assert out["via"] == "git" and [c["message"] for c in out["commits"]][:2] == ["Sleep revised", "Sleep drafted"]
+    assert out["commits"][0]["files"] == ["package/schemas/sleep_diary/categories/sleep.json"]
+    assert [c["commit"] for c in sf.history_cmd(bare, "package/schemas/sleep_diary/categories/sleep.json", 20)["commits"]][1] == first
+    res = sf.restore_cmd(bare, first, "package/schemas/sleep_diary/categories/sleep.json")
+    assert res["restored"] == "package/schemas/sleep_diary/categories/sleep.json" and res["from"] == first and res["next"]
+    assert read_json(schema) == {"title": "Sleep, first draft"}
+    for bad in ("state/ledger.jsonl", "../outside.txt", ".git/config"):
+        with pytest.raises(sf.Fail):
+            sf.restore_cmd(bare, first, bad)
+    with pytest.raises(sf.Fail, match="Not restored"):
+        sf.restore_cmd(bare, first, "package/schemas/never.json")
+    code, cl = cli("--ws", bare, "history", "--limit", "1")
+    assert code == 0 and len(cl["commits"]) == 1
+    code, cl = cli("--ws", bare, "restore", first, "state/ledger.jsonl")
+    assert code == 1 and "ledger" in cl["error"]
+
+
+def test_without_git_dulwich_keeps_the_history(bare, git_on, monkeypatch, stub_validator):
+    if not shutil.which("uv"):
+        pytest.skip("the stand-in for git runs through uv")
+    shutil.rmtree(bare / ".git")
+    monkeypatch.setattr(sf, "git_unavailable", lambda: "git is not installed")
+    out = sf.open_session(bare, None, None, None, serve=False)
+    g = out["git"]
+    assert (g["via"], g["own"], g["created"]) == ("dulwich", True, True) and g["commit"] and g["install"]["what"]
+    assert git_out(bare, "log", "--format=%s") == "Start versioning the schemify workspace for LARK sleep study"
+    changed = subprocess.run(["git", "status", "--porcelain"], cwd=bare, capture_output=True, text=True,  # git, once
+                             check=True).stdout.splitlines()                 # installed, reads it as its own: only
+    assert {ln[3:] for ln in changed} <= {"state/ledger.jsonl", "site/data/state.js"}   # what open wrote after the
+    assert all(ln.startswith(" M") for ln in changed)                                   # snapshot shows as changed
+    assert subprocess.run(["git", "fsck", "--no-progress"], cwd=bare, capture_output=True).returncode == 0
+    schema = bare / "package/schemas/sleep_diary/categories/sleep.json"
+    write_json(schema, {"title": "Sleep, first draft"})
+    first = sf.commit_cmd(bare, "Sleep drafted")["commit"]
+    write_json(schema, {"title": "Sleep, a slip"})
+    (bare / "state/server.json").write_text("{}", encoding="utf-8")      # runtime files stay out
+    sf.commit_cmd(bare, "Sleep revised")
+    hist = sf.history_cmd(bare, None, 5)
+    assert hist["via"] == "dulwich" and [c["message"] for c in hist["commits"]][:2] == ["Sleep revised", "Sleep drafted"]
+    assert hist["commits"][0]["files"] == ["package/schemas/sleep_diary/categories/sleep.json"]
+    assert sf.restore_cmd(bare, first, "package/schemas/sleep_diary/categories/sleep.json")["via"] == "dulwich"
+    assert read_json(schema) == {"title": "Sleep, first draft"}
+    assert "state/server.json" not in git_out(bare, "ls-files").splitlines()
+    closed = sf.close_session(bare, {"summary": "s", "handoff": "h", "next": "n"})
+    assert closed["git"]["via"] == "dulwich" and closed["git"]["commit"]
+    edit_project(bare, lambda p: p["preferences"].update(installGit=False))      # declined: never offered again
+    assert "install" not in sf.commit_cmd(bare, "Declined git")
+
+
+def test_with_no_way_to_version_the_work_goes_on(bare, git_on, monkeypatch):
+    monkeypatch.setattr(sf, "git_unavailable", lambda: "git is not installed")
+    monkeypatch.setattr(sf, "gitless", lambda ws, *args: {"failed": "no network"})
+    res = sf.commit_cmd(bare, "x")
+    assert res["ok"] is True and res["off"].startswith("git is not installed, and its stand-in") and res["install"]
+    out = sf.open_session(bare, None, None, None, serve=False)
+    assert out["ok"] is True and "no network" in out["git"]["off"]
+    with pytest.raises(sf.Fail, match="No history"):
+        sf.history_cmd(bare, None, 5)
+
+
+@pytest.mark.parametrize("platform, which, command", [
+    ("darwin", set(), "xcode-select --install"),
+    ("linux", {"apt-get"}, "sudo apt-get install -y git"),
+    ("linux", {"dnf"}, "sudo dnf install -y git"),
+    ("linux", set(), None),
+])
+def test_install_git_hint(monkeypatch, platform, which, command):
+    monkeypatch.setattr(sf.sys, "platform", platform)
+    monkeypatch.setattr(sf.shutil, "which", lambda name, *a, **k: f"/usr/bin/{name}" if name in which else None)
+    hint = sf.install_git_hint()
+    assert hint["command"] == command and hint["what"]
+
+
+# ====================================================================== no path on this computer
+
+def lines_naming(root: Path, *needles: str) -> list:
+    hits = []
+    for f in root.rglob("*"):
+        if f.is_file() and ".git" not in f.parts and f.name not in ("server.json", "server.log", "activity.json"):
+            text = f.read_text(encoding="utf-8", errors="replace")
+            hits += [f"{f.relative_to(root)}: {n}" for n in needles if n in text]
+    return hits
+
+
+def test_portable_paths(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    ws = home / "studies" / "lark" / "schemify"
+    ws.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+    inv = ws.parent
+    assert sf.portable_path(str(inv / "metadata" / "dict.xlsx"), ws) == "metadata/dict.xlsx"
+    assert sf.portable_path(str(home / "Downloads" / "dict.xlsx"), ws) == "~/Downloads/dict.xlsx"
+    assert sf.portable_path(str(tmp_path / "shared" / "x.csv"), ws) == "../../../shared/x.csv"
+    assert sf.portable_path("data/x.csv", ws) == "data/x.csv"
+    for raw in (inv / "metadata" / "dict.xlsx", home / "Downloads" / "dict.xlsx", tmp_path / "shared" / "x.csv"):
+        assert sf.resolve_data_path(ws, sf.portable_path(str(raw), ws)) == raw.resolve()   # still found
+    text = f"Files in {inv}/metadata and {home}/Downloads; the folder {inv}; not {home}x/y."
+    assert sf.scrub_text(text, ws) == f"Files in metadata and ~/Downloads; the folder .; not {home}x/y."
+
+
+def test_no_path_on_this_computer_reaches_the_workspace_files(tmp_path, monkeypatch, stub_validator):
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    inv = home / "lark"
+    inv.mkdir(parents=True)
+    ws = Path(sf.init(str(inv / "schemify"), "LARK", None, None, None)["workspace"])
+    with open(ws / "state/ledger.jsonl", "a", encoding="utf-8") as fh:        # written by an older version
+        fh.write(json.dumps({"type": "source", "event": "add", "id": "S01", "kind": "document", "title": "Dictionary",
+                             "what": "Variables", "path": "sources/dict.csv", "original": str(inv / "metadata/dict.csv"),
+                             "origin": "user", "at": "2026-01-01T09:00:00Z", "by": "agent"}) + "\n")
+    old = {"from": "author", "items": [{"kind": "dataset", "path": str(home / "data/public.csv"), "label": "Public"}]}
+    write_json(ws / "inbox/done/20260101T000000Z-aaaaaa.json", old)
+    sf.open_session(ws, None, "claude-code", None, serve=False)
+    assert sf.load_world(ws).sources["S01"]["original"] == "metadata/dict.csv"
+    assert read_json(ws / "inbox/done/20260101T000000Z-aaaaaa.json")["items"][0]["path"] == "~/data/public.csv"
+    rec(ws, {"type": "source", "event": "add", "kind": "document", "title": "Form", "what": "The form",
+             "path": "sources/form.pdf", "original": str(home / "Downloads/form.pdf"), "origin": "user",
+             "notes": f"Also at {inv}/metadata/form.pdf"})
+    assert sf.load_world(ws).sources["S02"]["original"] == "~/Downloads/form.pdf"
+    sub = submit(ws, [{"kind": "dataset", "path": str(inv / "public/extract.csv"), "label": "Extract", "basis": "public",
+                       "text": "It is the public-use file."}])
+    sf.take_submission(ws, sub)
+    x = sf.load_world(ws).datasets["X01"]
+    assert x["path"] == "public/extract.csv" and sf.resolve_data_path(ws, x["path"]) == (inv / "public/extract.csv").resolve()
+    assert read_json(ws / f"inbox/done/{sub}.json")["items"][0]["path"] == "public/extract.csv"
+    sf.set_activity(ws, f"Reading {inv}/metadata/form.pdf")
+    sf.close_session(ws, {"summary": "Registered the form.", "handoff": f"The originals are in {home}/Downloads.",
+                          "next": "digest S02"})
+    assert lines_naming(ws, str(home), str(home.resolve())) == []
+    (ws / "sources/S01").mkdir()
+    (ws / "sources/S01/DIGEST.md").write_text(f"# S01\n\nRead from {inv}/metadata/dict.csv\n", encoding="utf-8")
+    hit = find(sf.check(ws, validate=False), "local-path")
+    assert hit and "sources/S01/DIGEST.md" in hit[0]["message"] and hit[0]["severity"] == "warning"
 
 
 # ====================================================================== build
@@ -2427,7 +2728,7 @@ def test_build_start_here_says_how_to_continue(ws):
     sf.build(ws, validate=False)
     text = (ws / "START-HERE.md").read_text(encoding="utf-8")
     assert text.startswith("# LARK sleep study — schemify workspace")
-    assert "type `/schemify`." in text and f"`{ws.parent}`" in text
+    assert "type `/schemify`." in text and f"(`{ws.parent.name}`)" in text and str(ws.parent) not in text
     edit_project(ws, lambda p: p.update(harness="codex", invoke="$schemify"))
     sf.build(ws, validate=False)
     assert "start your message with `$schemify`" in (ws / "START-HERE.md").read_text(encoding="utf-8")
@@ -2456,6 +2757,9 @@ def test_build_with_the_real_validator(ws):
                                                             "value": "P12", "reason": "ids are P + 4 digits"}]})
     code, out = cli("--ws", ws, "build", timeout=900)
     assert "checks" in out
+    for f in ("state/checks.json", "state/toy-checks.json", "site/data/state.js", "START-HERE.md"):
+        if (ws / f).exists():
+            assert str(ws.parent) not in (ws / f).read_text(encoding="utf-8"), f
     js = (ws / "site/data/state.js").read_text(encoding="utf-8")
     state = json.loads(js[js.index("=") + 1:js.rindex(";")])
     toy = {e["file"]: e for e in state["toyData"]}
@@ -3255,6 +3559,37 @@ def test_serve_refuses_a_busy_port(ws):
         code, out = cli("start", "--ws", ws, "--port", s.getsockname()[1], script=SERVE, timeout=60)
     assert code == 1 and out["ok"] is False and "in use" in out["error"] and out["hint"]
     assert not (ws / "state/server.json").exists()
+
+
+class DeniedSocket:
+    """A socket in a sandbox that forbids listening."""
+
+    def __init__(self, *args):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def bind(self, addr):
+        raise PermissionError(1, "Operation not permitted")
+
+
+def test_serve_says_when_a_sandbox_forbids_listening(ws, monkeypatch, capsys):
+    monkeypatch.setattr(sv.socket, "socket", DeniedSocket)
+    assert sv.port_state(8700) == "denied"
+    for requested in (None, 8701):
+        with pytest.raises(SystemExit) as ei:
+            sv.choose_port(ws, requested)
+        out = json.loads(capsys.readouterr().out)
+        assert ei.value.code == 1 and "does not allow programs to listen" in out["error"]
+        assert "outside the sandbox" in out["hint"]
+    monkeypatch.setattr(sv, "port_state", lambda port: "denied" if port % 2 else "busy")     # some only busy
+    with pytest.raises(SystemExit):
+        sv.choose_port(ws, None)
+    assert json.loads(capsys.readouterr().out)["error"].startswith("No free port")
 
 
 def test_serve_accepts_feedback_from_its_own_page(server):

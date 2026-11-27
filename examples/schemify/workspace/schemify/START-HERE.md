@@ -12,7 +12,7 @@ To serve the website yourself, without the agent: `python3 tools/serve.py` from 
 
 ## Continue the work
 
-1. Open your coding agent in `examples/schemify/workspace` — the folder that contains this one.
+1. Open your coding agent in the folder that contains this one (`workspace`).
 2. Then type `/schemify`.
 3. The agent reads its notes here, tells you where things stand, and continues. You never need to re-explain anything.
 

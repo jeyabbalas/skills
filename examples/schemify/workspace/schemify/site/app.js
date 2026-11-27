@@ -18,7 +18,7 @@
   var X = {};                 // indexes over S
   var UI = { tab: "overview", qFilter: "waiting", evTab: "sources", dFilter: "review", dSearch: "", dictTable: null,
              openDrawer: null, findingsDraft: null };
-  var CONN = { mode: location.protocol === "file:" ? "disk" : "checking", token: null };
+  var CONN = { mode: location.protocol === "file:" ? "disk" : "checking", token: null, root: null };
   var POLL_MS = 4000;
   var TABS = [
     ["overview", "Overview"], ["questions", "Questions"], ["dictionary", "Dictionary"],
@@ -310,12 +310,30 @@
   }
 
   // ------------------------------------------------------------------ connection and live updates
+  // The workspace's files never hold its full path, which would name this computer in a shared repository:
+  // served, the page learns it from the server; opened from disk, from its own address.
+  function wsPath() {
+    if (CONN.root) return CONN.root;
+    if (location.protocol !== "file:") return null;
+    var p = decodeURIComponent(location.pathname).replace(/\/[^\/]*$/, "");
+    if (/^\/[A-Za-z]:\//.test(p)) p = p.slice(1).replace(/\//g, "\\");
+    return p || null;
+  }
+  function wsParent() {
+    var p = wsPath();
+    return p ? p.replace(/[\/\\][^\/\\]*$/, "") || null : null;
+  }
+  function parentText(fallback) {
+    var name = (S.workspace || {}).parentName;
+    return wsParent() || (name ? fallback + " (" + name + ")" : fallback);
+  }
   function connect() {
     if (location.protocol === "file:") { CONN.mode = "disk"; renderStatus(); return; }
     fetch("api/session", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
-      var was = CONN.mode;
-      if (j && j.ok && j.workspace === S.workspace.id) { CONN.mode = "live"; CONN.token = j.token; }
+      var was = CONN.mode, knew = CONN.root;
+      if (j && j.ok && j.workspace === S.workspace.id) { CONN.mode = "live"; CONN.token = j.token; CONN.root = j.root || null; }
       else CONN.mode = "offline";
+      if (CONN.root && !knew) { renderAll(); return; }        // the paths shown on the page are now known
       renderStatus();
       if (was !== CONN.mode) renderQuacCardAgain();
     }).catch(function () { var was = CONN.mode; CONN.mode = "offline"; renderStatus(); if (was !== "offline") renderQuacCardAgain(); });
@@ -588,7 +606,7 @@
     card.appendChild(h("p", { class: "sf-small" }, "Everything is saved in the folder ", h("code", null, w.folder || "schemify"),
       ". Large dictionaries take several sessions; nothing is lost between them."));
     card.appendChild(h("ol", { class: "sf-steps-numbered sf-small" },
-      h("li", null, "Open your coding agent in ", h("code", null, w.parent || "the folder that contains it"), "."),
+      h("li", null, "Open your coding agent in ", h("code", null, parentText("the folder that contains it")), "."),
       h("li", null, "Then " + continuePhrase() + "."),
       h("li", null, "Your agent reads its notes, tells you where things stand, and carries on.")));
     card.appendChild(h("p", { class: "sf-small" }, CONN.mode === "live" ? "Keep this page open — it updates as your agent works." :
@@ -1907,7 +1925,7 @@
     var form = h("div", null);
     function field(label, el, hint) { form.appendChild(h("label", { class: "sf-label" }, label)); form.appendChild(el); if (hint) form.appendChild(h("div", { class: "sf-small sf-muted" }, hint)); }
     field("Where the file is", h("input", { class: "sf-input", placeholder: "data/public_extract.csv", oninput: function (e) { f.path = e.target.value.trim(); } }),
-      "A full path, or one relative to " + ((S.workspace || {}).parent || "the folder you opened your agent in") + ". Keep it outside the schemify folder.");
+      "A full path, or one relative to " + parentText("the folder you opened your agent in") + ". Keep it outside the schemify folder.");
     field("A name for it", h("input", { class: "sf-input", placeholder: "2024 public-use extract", oninput: function (e) { f.label = e.target.value.trim(); } }));
     if ((S.tables || []).length > 1) {
       var sel = h("select", { class: "sf-input", onchange: function (e) { f.table = e.target.value; } }, h("option", { value: "" }, "Which table is it?"));
@@ -1938,7 +1956,7 @@
     var manual = h("details", { open: !!UI.findingsDraft || !!UI.alignmentDraft }, h("summary", null, "Or check it by hand, one run at a time"));
     s2.appendChild(manual);
     s2 = manual;
-    var folder = (S.workspace.path || "schemify") + "/" + ((S.quac || {}).schemasFolder || "package/schemas");
+    var folder = (wsPath() || S.workspace.folder || "schemify") + "/" + ((S.quac || {}).schemasFolder || "package/schemas");
     var cli = ((S.quac || {}).cli || "npx --yes @jeyabbalas/quac@1.2.0") + " YOUR_DATA.csv --schema \"" + folder + "\" --no-report --findings quac-findings.json";
     s2.appendChild(h("ol", { class: "sf-steps-numbered" },
       h("li", null, btn("Open QuaC ↗", function () { window.open((S.quac || {}).app || "https://jeyabbalas.github.io/quac/", "_blank", "noopener"); }, "sf-btn-primary sf-btn-sm"),

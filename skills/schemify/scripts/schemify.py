@@ -30,6 +30,11 @@ Commands -- each prints one JSON object on stdout:
   check     Verify everything: state, inventory coverage, provenance, rules, the
             validator. Run it before closing a session.
   activity  TEXT  Tell the website what you are doing right now.
+  commit    MESSAGE  Snapshot the workspace in git (only the workspace: never files
+            beside it). `init` and `open` create the repository when there is none;
+            without the git program, gitless.py (dulwich) keeps the same history.
+  history   [FILE] [--limit N]  The commits, newest first, with the files each changed.
+  restore   COMMIT FILE  Put back one workspace file as it was at COMMIT (never the ledger).
   close     JSON {"summary", "handoff", "next"[, "force"]} on stdin. Ends the
             session; refuses while feedback is unprocessed or answers unapplied.
   data-check  X01 [--timeout SECONDS]  Run QuaC on a dataset a person allowed you
@@ -941,6 +946,7 @@ def record_events(ws: Path, raw, by_default: str = "agent") -> dict:
         ev = resolve_locals(ev, labels, errors, n)
         ev.setdefault("at", ts)
         ev.setdefault("by", by_default)
+        ev = portable_event(ev, ws)                 # no path on this computer enters the ledger
         t, e = ev.get("type"), ev.get("event")
         creating = (t in ("source", "rule", "alignment") and e == "add") or (t == "batch" and e == "post") or \
                    (t == "dataset" and e == "allow") or \
@@ -1014,6 +1020,124 @@ def resolve_data_path(ws: Path, raw: str) -> Path:
     """A dataset's path as the person gave it: absolute, or relative to the folder they opened their agent in."""
     p = Path(str(raw).strip()).expanduser()
     return (p if p.is_absolute() else ws.parent / p).resolve()
+
+
+LEDGER_PATH_FIELDS = {("source", "add"): "original", ("dataset", "allow"): "path"}
+
+
+def local_prefixes(ws: Path) -> list[tuple[str, str]]:
+    """The folders that place a path on this computer, longest first, each with what stands for it in the
+    workspace's files: the folder that holds the workspace (paths become relative to it) and the home folder (~)."""
+    found: dict[str, str] = {}
+    for base, stand_in in ((Path.home(), "~"), (ws.parent, "")):
+        for form in {str(base), str(base.resolve())}:
+            if len(form) > 3:                   # never a bare root such as / or C:\
+                found[form] = stand_in
+    return sorted(found.items(), key=lambda kv: -len(kv[0]))
+
+
+def scrub_text(text: str, ws: Path) -> str:
+    """Text with every path on this computer made portable: relative to the folder holding the workspace, or ~/…"""
+    for prefix, stand_in in local_prefixes(ws):
+        if prefix not in text:
+            continue
+        esc = re.escape(prefix)
+        text = re.sub(esc + r"([/\\])", (lambda m: "") if stand_in == "" else (lambda m, s=stand_in: s + m.group(1)), text)
+        text = re.sub(esc + r"(?![\w.\-])", stand_in or ".", text)
+    return text
+
+
+def scrub_paths(obj, ws: Path):
+    """`scrub_text` on every string inside a JSON value (dict keys included)."""
+    if isinstance(obj, str):
+        return scrub_text(obj, ws)
+    if isinstance(obj, list):
+        return [scrub_paths(x, ws) for x in obj]
+    if isinstance(obj, dict):
+        return {scrub_text(k, ws) if isinstance(k, str) else k: scrub_paths(v, ws) for k, v in obj.items()}
+    return obj
+
+
+def portable_path(raw: str, ws: Path) -> str:
+    """A file's location as the ledger keeps it: relative to the folder holding the workspace, else under ~, else
+    relative anyway (../..), so it still resolves (`resolve_data_path`) and names no folder on this computer."""
+    p = Path(str(raw).strip()).expanduser()
+    if not p.is_absolute():
+        return str(raw).strip()
+    full = p.resolve()
+    for base, stand_in in ((ws.parent.resolve(), None), (Path.home().resolve(), "~")):
+        if is_inside(full, base):
+            rel = full.relative_to(base).as_posix()
+            return rel if stand_in is None else f"~/{rel}"
+    try:
+        return Path(os.path.relpath(full, ws.parent.resolve())).as_posix()
+    except ValueError:                          # another drive (Windows): nothing relative reaches it
+        return str(raw).strip()
+
+
+def portable_event(ev: dict, ws: Path) -> dict:
+    field = LEDGER_PATH_FIELDS.get((ev.get("type"), ev.get("event")))
+    if field and isinstance(ev.get(field), str) and ev[field].strip():
+        ev = {**ev, field: portable_path(ev[field], ws)}
+    return scrub_paths(ev, ws)
+
+
+def scrub_workspace_paths(ws: Path) -> list[str]:
+    """Rewrite paths on this computer in the ledger and in the feedback taken in, which older versions kept as given
+    (`record` and `inbox take` make them portable now). Returns the files changed."""
+    changed = []
+    led = ws / "state" / "ledger.jsonl"
+    if led.is_file():
+        lines = led.read_text(encoding="utf-8").splitlines()
+        out_lines, dirty = [], False
+        for line in lines:
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                out_lines.append(line)
+                continue
+            fixed = portable_event(ev, ws) if isinstance(ev, dict) else ev
+            if fixed != ev:
+                dirty = True
+                line = json.dumps(fixed, ensure_ascii=False)
+            out_lines.append(line)
+        if dirty:
+            write_text(led, "\n".join(out_lines) + "\n")
+            changed.append("state/ledger.jsonl")
+    for f in sorted((ws / "inbox" / "done").glob("*.json")):
+        doc = read_json(f, None)
+        if doc is not None and scrub_paths(doc, ws) != doc:
+            write_json(f, portable_submission(doc, ws))
+            changed.append(f"inbox/done/{f.name}")
+    return changed
+
+
+def local_path_files(ws: Path) -> list[str]:
+    """The files you edit (generated ones and the ledger are kept clean by the scripts) that name a folder on this
+    computer."""
+    files = [ws / "state" / "project.json", ws / "state" / "variables.csv", ws / "sources" / "MIGRATION.md",
+             *sorted(ws.glob("sources/*/DIGEST.md")), *sorted(ws.glob("sources/*/variables-found.csv")),
+             *sorted(ws.glob("package/schemas/**/*.json")), *sorted(ws.glob("package/toy-data/**/*.json"))]
+    hits = []
+    for p in files:
+        try:
+            if not p.is_file() or p.stat().st_size > 5_000_000:
+                continue
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if scrub_text(text, ws) != text:
+            hits.append(p.relative_to(ws).as_posix())
+    return hits
+
+
+def portable_submission(doc, ws: Path):
+    items = doc.get("items") if isinstance(doc, dict) else None
+    if isinstance(items, list):
+        doc = {**doc, "items": [{**it, "path": portable_path(it["path"], ws)}
+                                if isinstance(it, dict) and it.get("kind") == "dataset" and isinstance(it.get("path"), str)
+                                and it["path"].strip() else it for it in items]}
+    return scrub_paths(doc, ws)
 
 
 def is_inside(p: Path, root: Path) -> bool:
@@ -1340,14 +1464,14 @@ def run_validator(ws: Path, timeout: int = 900) -> dict | None:
     pkg = pkg_dir(ws)
     attempts = []
     if shutil.which("uv"):
-        attempts.append(["uv", "run", "--quiet", str(script), "summary", str(pkg), "--out", str(out_file)])
-    attempts.append([sys.executable, str(script), "summary", str(pkg), "--out", str(out_file)])
+        attempts.append(["uv", "run", "--quiet", str(script), "summary", "package", "--out", "state/checks.json"])
+    attempts.append([sys.executable, str(script), "summary", "package", "--out", "state/checks.json"])
     last_err = ""
     for cmd in attempts:
         try:
             if out_file.exists():
                 out_file.unlink()
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(ws))   # relative paths in the report
         except (OSError, subprocess.TimeoutExpired) as exc:
             last_err = str(exc)
             continue
@@ -2245,7 +2369,7 @@ def take_submission(ws: Path, sub: str) -> dict:
     doc["recorded"] = result["recorded"]
     if unhandled:
         doc["unhandled"] = unhandled
-    write_json(done_dir / path.name, doc)
+    write_json(done_dir / path.name, portable_submission(doc, ws))
     path.unlink()
     return {"ok": True, "submission": path.stem, "from": who, "recorded": result["recorded"][:LIST_CAP],
             "todo": todo[:LIST_CAP], "todoTotal": len(todo), "unhandled": unhandled[:10],
@@ -2856,14 +2980,15 @@ def run_toy_check(ws: Path, table: str, path: Path) -> dict:
     """`validate.py data` on one toy file (never on real data): findings, per-column wording."""
     script = SKILL_DIR / "scripts" / "validate.py"
     attempts = []
-    base = [str(script), "data", str(pkg_dir(ws)), "--file", str(path), "--table", table, "--max-errors", str(TOY_MAX_ERRORS)]
+    rel = path.resolve().relative_to(ws.resolve()).as_posix() if is_inside(path, ws) else str(path)
+    base = [str(script), "data", "package", "--file", rel, "--table", table, "--max-errors", str(TOY_MAX_ERRORS)]
     if shutil.which("uv"):
         attempts.append(["uv", "run", "--quiet"] + base)
     attempts.append([sys.executable] + base)
     last = "validate.py did not run"
     for cmd in attempts:
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(ws))
             res = json.loads(proc.stdout)
         except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
             last = str(exc)[:200]
@@ -2966,7 +3091,7 @@ def state_payload(ws: Path, world: World, pkg: Pkg, checks: dict | None, topics:
         "workspace": {"id": proj.get("id"), "study": proj.get("study"), "slug": proj.get("slug"),
                       "description": proj.get("description"), "mode": proj.get("mode", "build"),
                       "invoke": proj.get("invoke") or "/schemify", "harness": proj.get("harness"),
-                      "path": str(ws), "folder": ws.name, "parent": str(ws.parent), "idBase": proj.get("idBase"),
+                      "folder": ws.name, "parentName": ws.parent.name, "idBase": proj.get("idBase"),   # the page finds the full paths itself
                       "model": next((x.get("model") for x in reversed(world.sessions) if x.get("model")), None)},
         "phase": phase_steps(world, topics, inv, rules, finished_now(ws, world)),
         "next": acts,
@@ -3072,7 +3197,7 @@ def start_here(ws: Path, payload: dict) -> str:
         "answers are kept in the browser and you can download them as a file for the agent.", "",
         "To serve the website yourself, without the agent: `python3 tools/serve.py` from this folder (Ctrl-C to stop).", "",
         "## Continue the work", "",
-        f"1. Open your coding agent in `{w.get('parent')}` — the folder that contains this one.",
+        f"1. Open your coding agent in the folder that contains this one (`{w.get('parentName') or '..'}`).",
         f"2. Then {harness_line}",
         "3. The agent reads its notes here, tells you where things stand, and continues. You never need to "
         "re-explain anything.", "",
@@ -3119,7 +3244,7 @@ def build(ws: Path, validate: bool = True) -> dict:
     srv = server_info(ws)
     return {"ok": True, "written": written,
             "checks": {k: (checks or {}).get(k) for k in ("ok", "ran", "headline", "hint")} if checks else None,
-            "website": (srv or {}).get("url") or str(ws / "index.html")}
+            "website": (srv or {}).get("url") or str(ws / "index.html"), "websiteServed": bool(srv)}
 
 
 def write_dictionary(ws: Path, world: World, pkg: Pkg, prov: dict) -> str:
@@ -3421,6 +3546,9 @@ def check(ws: Path, validate: bool = True, strict: bool = False) -> dict:
     prefs = proj.get("preferences") or {}
     if prefs.get("inferRules", "ask") not in ("ask", "yes", "no"):
         f("error", "project-invalid", "preferences.inferRules must be ask, yes, or no", "Only a person's answer changes it.")
+    if "installGit" in prefs and not isinstance(prefs["installGit"], bool):
+        f("error", "project-invalid", "preferences.installGit must be true or false",
+          "false once the person declined installing git, or their computer does not allow it.")
     for s in (proj.get("conventions") or {}).get("sentinels") or []:
         if not isinstance(s, dict) or "code" not in s or not s.get("meaning"):
             f("error", "project-invalid", f"conventions.sentinels entry {s!r} needs code and meaning", "See LEDGER-FORMAT.md.")
@@ -3551,6 +3679,11 @@ def check(ws: Path, validate: bool = True, strict: bool = False) -> dict:
             f("info", "source-undigested", f"{s['id']} ({s.get('title')}) has no digest yet", "Digest it (START.md, SUBAGENTS.md).")
         if s.get("status") == "suggested":
             f("info", "source-suggested", f"{s['id']} ({s.get('title')}) awaits a person's approval", "Put it in the next batch.")
+    named = local_path_files(ws)
+    if named:
+        f("warning", "local-path", f"{len(named)} file(s) name a folder on this computer: " + ", ".join(named[:6]),
+          "Write each path relative to the workspace, or to the folder that holds it: a shared repository would "
+          "publish it.")
     drift = asset_drift(ws)
     if drift:
         f("error" if strict else "warning", "assets-stale",
@@ -3580,6 +3713,223 @@ def check(ws: Path, validate: bool = True, strict: bool = False) -> dict:
             "findings": findings[:LIST_CAP * 2], "truncated": len(findings) > LIST_CAP * 2}
 
 
+# ===================================================================== version control
+
+GITIGNORE = """\
+# schemify: runtime files, and website feedback not yet taken in (its paths are made portable when taken), never versioned
+state/server.json
+state/server.log*
+state/activity.json
+state/presence.json
+state/recheck.json
+inbox/pending/
+__pycache__/
+.DS_Store
+*.tmp
+"""
+GIT_TIMEOUT = 60                        # a commit may wait on a signing prompt: never let it hang a command
+GITLESS_TIMEOUT = 300                   # the first run downloads dulwich
+GIT_FALLBACK_ID = ["-c", "user.name=schemify", "-c", "user.email=schemify@localhost"]
+GIT_ENABLED = True                      # tests that are not about git turn it off
+GIT_HINT = ("The files are saved; only the snapshot failed. If a sandbox blocked it, run the command again outside "
+            "the sandbox; otherwise fix what git says if you can, without changing the person's git settings, or "
+            "mention it once and carry on.")
+
+
+def git(cwd: Path, *args: str, binary: bool = False) -> subprocess.CompletedProcess | None:
+    try:
+        return subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=not binary, timeout=GIT_TIMEOUT,
+                              stdin=subprocess.DEVNULL, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def git_said(proc: subprocess.CompletedProcess | None) -> str:
+    if proc is None:
+        return "git did not answer"
+    err = proc.stderr if isinstance(proc.stderr, str) else (proc.stderr or b"").decode("utf-8", "replace")
+    lines = [ln.strip() for ln in (err or (proc.stdout if isinstance(proc.stdout, str) else "")).splitlines() if ln.strip()]
+    return (lines[-1] if lines else f"git exited with {proc.returncode}")[:300]
+
+
+def git_unavailable() -> str | None:
+    """Why the git program cannot be used here, or None."""
+    exe = shutil.which("git")
+    if not exe:
+        return "git is not installed"
+    if sys.platform == "darwin" and Path(exe).resolve() == Path("/usr/bin/git"):
+        try:                                # Apple's stub opens an install dialog when the command line tools are missing
+            tools = subprocess.run(["xcode-select", "-p"], capture_output=True, timeout=10).returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            tools = False
+        if not tools:
+            return "git is not installed (it comes with Apple's command line tools)"
+    return None
+
+
+def install_git_hint() -> dict:
+    """How git gets installed on this computer, for the agent to offer."""
+    if sys.platform == "darwin":
+        return {"command": "xcode-select --install",
+                "what": "Apple's installer opens in a window and the person clicks Install: git comes with Apple's "
+                        "command line tools. It takes a few minutes and may ask for an administrator's password."}
+    if os.name == "nt":
+        return {"command": "winget install --id Git.Git -e --source winget",
+                "what": "Windows may ask for an administrator's permission."}
+    for mgr, cmd in (("apt-get", "sudo apt-get install -y git"), ("dnf", "sudo dnf install -y git"),
+                     ("yum", "sudo yum install -y git"), ("zypper", "sudo zypper install -y git"),
+                     ("pacman", "sudo pacman -S --noconfirm git"), ("apk", "sudo apk add git")):
+        if shutil.which(mgr):
+            return {"command": cmd, "what": "It needs an administrator's (sudo) password, so the person runs it "
+                                            "themselves (in Claude Code, by typing ! and the command)."}
+    return {"command": None, "what": "Whoever manages this computer can install git."}
+
+
+def git_cli_snapshot(ws: Path, message: str, first: str | None) -> dict:
+    top = git(ws, "rev-parse", "--show-toplevel")
+    root = Path(top.stdout.strip()).resolve() if top and top.returncode == 0 and top.stdout.strip() else None
+    if root and root != ws:
+        ignored = git(ws.parent, "check-ignore", "-q", ws.name)
+        if ignored and ignored.returncode == 0:
+            root = None                     # their repository leaves the workspace out: give it one of its own
+    created = root is None
+    if created:
+        made = git(ws, "init", "-q")
+        if not made or made.returncode:
+            return {"off": f"git init failed: {git_said(made)}", "hint": GIT_HINT}
+        branch = git(ws, "config", "--get", "init.defaultBranch")
+        if not (branch and branch.stdout.strip()):
+            git(ws, "symbolic-ref", "HEAD", "refs/heads/main")
+        root = ws
+    info = {"repo": str(root), "own": root == ws, "created": created, "via": "git"}
+    add = git(ws, "add", "-A", "--", ".")
+    if not add or add.returncode:
+        return {**info, "commit": None, "error": git_said(add), "hint": GIT_HINT}
+    staged = git(ws, "diff", "--cached", "--quiet", "--", ".")
+    if staged and staged.returncode == 0:
+        return {**info, "commit": None}
+    who = git(ws, "var", "GIT_AUTHOR_IDENT")
+    ident = [] if who and who.returncode == 0 else GIT_FALLBACK_ID     # no identity set: never set theirs
+    only = [] if info["own"] else ["--", "."]          # in the user's repository: never their other staged work
+    done = git(ws, *ident, "commit", "-q", "-m", first if created and first else message, *only)
+    if not done or done.returncode:
+        return {**info, "commit": None, "error": git_said(done), "hint": GIT_HINT}
+    head = git(ws, "rev-parse", "--short", "HEAD")
+    return {**info, "commit": head.stdout.strip() if head and head.returncode == 0 else "?"}
+
+
+def gitless(ws: Path, *args: str) -> dict:
+    """Run gitless.py (dulwich, a Git written in Python) for a computer without git: through uv, else with this
+    Python when dulwich is installed. Never raises."""
+    script = SKILL_DIR / "scripts" / "gitless.py"
+    attempts = ([["uv", "run", "--quiet", str(script)]] if shutil.which("uv") else []) + [[sys.executable, str(script)]]
+    said = "uv is not installed, and neither is dulwich"
+    for cmd in attempts:
+        try:
+            proc = subprocess.run([*cmd, *args, "--ws", str(ws)], capture_output=True, text=True,
+                                  timeout=GITLESS_TIMEOUT, stdin=subprocess.DEVNULL)
+            res = json.loads(proc.stdout)
+        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
+            said = f"{exc}"[:300]
+            continue
+        if res.get("ok"):
+            return {k: v for k, v in res.items() if k != "ok"}
+        said = res.get("error") or said
+    return {"failed": said}
+
+
+def git_snapshot(ws: Path, message: str, first: str | None = None) -> dict:
+    """Version the workspace and commit everything in it, and nothing beside it, as one snapshot: through git, else
+    through gitless.py. `first` is the message when this creates the repository. Never raises: a failed commit is
+    reported under "error", no history at all under "off"."""
+    if not GIT_ENABLED:
+        return {"off": "turned off"}
+    ws = ws.resolve()
+    if not (ws / ".gitignore").exists():
+        write_text(ws / ".gitignore", GITIGNORE)
+    missing = git_unavailable()
+    if not missing:
+        return git_cli_snapshot(ws, message, first)
+    res = gitless(ws, "snapshot", "--message", message, *(("--first", first) if first else ()))
+    if "failed" in res:
+        res = {"off": f"{missing}, and its stand-in (dulwich, through uv) could not run: {res['failed']}", "hint": GIT_HINT}
+    elif res.get("error"):
+        res["hint"] = GIT_HINT
+    if (load_project(ws).get("preferences") or {}).get("installGit") is not False:
+        res["install"] = install_git_hint()
+    return res
+
+
+def commit_cmd(ws: Path, message: str) -> dict:
+    if not message.strip():
+        raise Fail("commit needs a message.", "Say what changed, in plain words: schemify.py commit \"Smoking drafted\".")
+    res = git_snapshot(ws, message.strip())
+    if res.get("error"):
+        raise Fail(f"Not committed: {res['error']}", res["hint"],
+                   git={k: v for k, v in res.items() if k not in ("error", "hint")})
+    return {"ok": True, **res}
+
+
+def workspace_file(ws: Path, file: str) -> str:
+    """A workspace file's path relative to the workspace, refused when it is outside it or is the ledger."""
+    p = Path(file).expanduser()
+    full = (p if p.is_absolute() else ws / p).resolve()
+    if not is_inside(full, ws) or full == ws.resolve():
+        raise Fail(f"{file} is not a file inside the workspace.", "Give its path relative to schemify/ (package/schemas/…).")
+    rel = full.relative_to(ws.resolve()).as_posix()
+    if rel == "state/ledger.jsonl" or rel.startswith(".git/"):
+        raise Fail(f"{rel} is never restored or rewritten: the ledger only grows.",
+                   "Record a new event that corrects the old one (supersede, cancel, update).")
+    return rel
+
+
+def history_cmd(ws: Path, file: str | None, limit: int) -> dict:
+    rel = workspace_file(ws, file) if file else None
+    if not GIT_ENABLED:
+        return {"ok": True, "off": "turned off", "commits": []}
+    if git_unavailable():
+        res = gitless(ws, "history", "--limit", str(limit), *(("--file", rel) if rel else ()))
+        if "failed" in res:
+            raise Fail(f"No history: {res['failed']}", "Version control is off here; the ledger still records every decision.")
+        return {"ok": True, **res}
+    proc = git(ws, "log", "-n", str(limit), "--format=%x1e%h%x1f%ad%x1f%s", "--date=short", "--name-only",
+               "--relative", "--", rel or ".")
+    if not proc or proc.returncode:
+        said = git_said(proc)
+        if "does not have any commits" in said or "bad default revision" in said or "not a git repository" in said:
+            return {"ok": True, "via": "git", "commits": []}
+        raise Fail(f"No history: {said}", "Run `open`: it creates the repository when there is none.")
+    commits = []
+    for block in proc.stdout.split("\x1e")[1:]:
+        head, _, rest = block.partition("\n")
+        sha, date, subject = (head.split("\x1f") + ["", ""])[:3]
+        files = [ln for ln in rest.splitlines() if ln.strip()]
+        commits.append({"commit": sha, "date": date, "message": subject, "files": files[:20],
+                        **({"moreFiles": len(files) - 20} if len(files) > 20 else {})})
+    return {"ok": True, "via": "git", "commits": commits}
+
+
+def restore_cmd(ws: Path, commit: str, file: str) -> dict:
+    rel = workspace_file(ws, file)
+    after = "Record why (a decision), then build and check."
+    if not GIT_ENABLED:
+        raise Fail("Version control is turned off.", "Nothing to restore from.")
+    if git_unavailable():
+        res = gitless(ws, "restore", "--commit", commit, "--file", rel)
+        if "failed" in res:
+            raise Fail(f"Not restored: {res['failed']}", "`schemify.py history <file>` lists the commits that hold it.")
+        return {"ok": True, **res, "next": after}
+    proc = git(ws, "show", f"{commit}:./{rel}", binary=True)
+    if not proc or proc.returncode:
+        raise Fail(f"Not restored: {git_said(proc)}", "`schemify.py history <file>` lists the commits that hold it.")
+    dest = ws / rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(proc.stdout)
+    full = git(ws, "rev-parse", "--short", commit)
+    return {"ok": True, "via": "git", "restored": rel, "from": full.stdout.strip() if full and full.returncode == 0 else commit,
+            "next": after}
+
+
 # ===================================================================== sessions
 
 def tell_user_lines(ws: Path, world: World, url: str | None, disk_note: bool = False) -> list[str]:
@@ -3597,11 +3947,9 @@ def tell_user_lines(ws: Path, world: World, url: str | None, disk_note: bool = F
     for_you = len(asked) - for_steward
     lines = [f"Your project website: {where}"]
     if disk_note:
-        lines.append("It could not be served here, so open it straight from disk: it does not update by itself "
-                     "(reload it when I say so), and instead of sending answers you press *Review & save*, then "
-                     "*Download as a file*, and tell me where the file is. For live updates instead, run `python3 schemify/tools/serve.py` "
-                     f"in your own terminal from {ws.parent} and open the address it prints — pick one way before "
-                     "you start answering: unsent answers stay with the address you typed them at.")
+        lines.append("This time it opens straight from your files, so it does not update by itself (reload it when "
+                     "I say so), and to send me your answers you press *Review & save*, then *Download as a file*, "
+                     "and tell me where the file went.")
     if for_you:
         lines.append(f"{for_you} question(s) are waiting for you there.")
     if for_steward:
@@ -3618,6 +3966,18 @@ def tell_user_lines(ws: Path, world: World, url: str | None, disk_note: bool = F
 
 def open_session(ws: Path, mode: str | None, harness: str | None, model: str | None, serve: bool) -> dict:
     proj = load_project(ws)
+    cur = load_world(ws).open_session()
+    reused = False
+    if cur:
+        started = parse_ts(cur.get("startedAt"))
+        age_h = (datetime.now(timezone.utc) - started).total_seconds() / 3600 if started else 999
+        reused = age_h < REOPEN_HOURS and cur.get("mode") == (mode or proj.get("mode", "build"))
+    scrub_workspace_paths(ws)                           # first: no commit may name a folder on this computer
+    message = (f"Work in progress in session {cur['id']}" if reused
+               else f"Work of session {cur['id']}, which ended without closing" if cur
+               else "Changes made between sessions")
+    repo = git_snapshot(ws, message,                    # before this session writes anything: it holds what came before
+                        first=f"Start versioning the schemify workspace for {proj.get('study') or ws.name}")
     changed = False
     for key, val in (("mode", mode), ("harness", harness)):
         if val and proj.get(key) != val:
@@ -3625,19 +3985,11 @@ def open_session(ws: Path, mode: str | None, harness: str | None, model: str | N
             changed = True
     if changed:
         save_project(ws, proj)
-    world = load_world(ws)
-    cur = world.open_session()
-    reused = False
-    if cur:
-        started = parse_ts(cur.get("startedAt"))
-        age_h = (datetime.now(timezone.utc) - started).total_seconds() / 3600 if started else 999
-        if age_h < REOPEN_HOURS and cur.get("mode") == proj.get("mode", "build"):
-            reused = True
-        else:
-            record_events(ws, [{"type": "session", "event": "end", "id": cur["id"], "forced": True,
-                                "summary": "(this session ended without its closing checklist)",
-                                "handoff": "Check `status` and the inbox; the previous agent did not close.",
-                                "next": "see status"}])
+    if cur and not reused:
+        record_events(ws, [{"type": "session", "event": "end", "id": cur["id"], "forced": True,
+                            "summary": "(this session ended without its closing checklist)",
+                            "handoff": "Check `status` and the inbox; the previous agent did not close.",
+                            "next": "see status"}])
     if not reused:
         record_events(ws, [{"type": "session", "event": "start", "mode": proj.get("mode", "build"),
                             **({"harness": harness or proj.get("harness")} if (harness or proj.get("harness")) else {}),
@@ -3655,8 +4007,11 @@ def open_session(ws: Path, mode: str | None, harness: str | None, model: str | N
         st["website"] = url
         st["websiteServed"] = True
     if serve_note:
-        st["websiteNote"] = serve_note + " — the page still works opened from disk (schemify/index.html)."
+        st["websiteNote"] = (f"The website server did not start: {serve_note} Serve it yourself before you relay "
+                             "tell_user (WEBSITE.md, \"When the server does not start\").")
+        st["serveCommand"] = f"{'python' if os.name == 'nt' else 'python3'} {shlex.quote(str(ws / 'tools' / 'serve.py'))}"
     st["tell_user"] = tell_user_lines(ws, load_world(ws), url, disk_note=not url)
+    st["git"] = repo
     return st
 
 
@@ -3682,8 +4037,11 @@ def close_session(ws: Path, payload: dict) -> dict:
     build(ws, validate=False)
     world = load_world(ws)
     srv = server_info(ws)
-    return {"ok": True, "closed": world.sessions[-1]["id"], "forced": bool(payload.get("force")),
-            "checks": b.get("checks"), "blockers": blockers[:20] if payload.get("force") else [],
+    sid = world.sessions[-1]["id"]
+    repo = git_snapshot(ws, f"Session {sid}: {payload['summary']}\n\nNext: {payload['next']}"
+                      + ("\n\nClosed early: the handoff names what is unfinished." if payload.get("force") else ""))
+    return {"ok": True, "closed": sid, "forced": bool(payload.get("force")),
+            "checks": b.get("checks"), "blockers": blockers[:20] if payload.get("force") else [], "git": repo,
             "tell_user": ["Everything is saved."] + tell_user_lines(ws, world, (srv or {}).get("url"))}
 
 
@@ -3693,13 +4051,13 @@ def run_serve(ws: Path, cmd: str) -> dict:
         proc = subprocess.run([sys.executable, str(script), cmd, "--ws", str(ws)], capture_output=True, text=True, timeout=30)
         return json.loads(proc.stdout)
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
-        return {"ok": False, "error": f"serve.py {cmd} failed: {exc}",
-                "hint": "Open schemify/index.html directly, or ask the user to run: python3 schemify/tools/serve.py"}
+        return {"ok": False, "error": f"serve.py {cmd} failed: {exc}.",
+                "hint": "Serve it another way: WEBSITE.md, \"When the server does not start\"."}
 
 
 def set_activity(ws: Path, text: str) -> dict:
     world = load_world(ws)
-    act = {"at": now(), "text": text[:300], "session": (world.open_session() or {}).get("id")}
+    act = {"at": now(), "text": scrub_text(text, ws)[:300], "session": (world.open_session() or {}).get("id")}
     prev = read_json(ws / "state" / "activity.json", None) or {}
     act["stateAt"] = prev.get("stateAt")
     write_json(ws / "state" / "activity.json", act)
@@ -3791,7 +4149,8 @@ def init(dirname: str, study: str, slug: str | None, invoke: str | None, harness
     (target / "state" / "ledger.jsonl").touch()
     write_text(target / "state" / "variables.csv", ",".join(INVENTORY_COLUMNS) + "\n")
     build(target, validate=False)
-    return {"ok": True, "workspace": str(target.resolve()), "existing": False, "id": proj["id"],
+    repo = git_snapshot(target, f"Start the schemify workspace for {proj['study']}")
+    return {"ok": True, "workspace": str(target.resolve()), "existing": False, "id": proj["id"], "git": repo,
             "next": "Run `open` (it records the session and starts the website), then continue with START.md."}
 
 
@@ -3843,6 +4202,14 @@ def main(argv=None) -> None:
     s.add_argument("--strict", action="store_true", help="fail (exit 1) also when the website or shipped files are stale")
     s = sub.add_parser("activity")
     s.add_argument("text", nargs="+")
+    s = sub.add_parser("commit")
+    s.add_argument("message", nargs="+")
+    s = sub.add_parser("history")
+    s.add_argument("file", nargs="?")
+    s.add_argument("--limit", type=int, default=20)
+    s = sub.add_parser("restore")
+    s.add_argument("commit")
+    s.add_argument("file")
     s = sub.add_parser("close")
     s.add_argument("--file")
     s = sub.add_parser("data-check")
@@ -3896,6 +4263,12 @@ def main(argv=None) -> None:
             emit(res, 0 if res["ok"] else 1)
         if a.cmd == "activity":
             emit(set_activity(ws, " ".join(a.text)))
+        if a.cmd == "commit":
+            emit(commit_cmd(ws, " ".join(a.message)))
+        if a.cmd == "history":
+            emit(history_cmd(ws, a.file, max(1, min(a.limit, LIST_CAP))))
+        if a.cmd == "restore":
+            emit(restore_cmd(ws, a.commit, a.file))
         if a.cmd == "close":
             emit(close_session(ws, stdin_json(a.file)))
         if a.cmd == "data-check":
