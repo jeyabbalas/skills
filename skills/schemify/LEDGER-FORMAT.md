@@ -129,7 +129,7 @@ A topic is one category file — the user-facing name for a group of variables. 
 | `approve` | `by` (a person), `via`, `note` | `confirmed` — while the file is what they approved |
 | `changes` | `by`, `via`, `text` | `changes requested` — until the next `present` |
 
-Only a person's `approve` confirms a topic. Never record one for them. `record` stamps it with the topic file's `hash` (the website sends the hash of the page the person read): once the file's content differs, the topic is back to `tested` or `drafted`, and `next` says to present it again — except where an `apply` of an answer to a question they had already been asked carries the approval over (`record` stamps that `apply` with `approvedHashes`; INBOX.md).
+Only a person's `approve` confirms a topic. Never record one for them. `record` stamps it with the topic file's `hash` (the website sends the hash of the page the person read): once the file's content differs, the topic is back to `tested` or `drafted`, and `next` says to present it again — except where an `apply` of an answer to a question they had already been asked carries the approval over (`record` stamps that `apply` with `approvedHashes`; INBOX.md). An approval recorded before approvals carried a `hash` counts as changed when an `apply` the ledger holds changed its file and does not carry it over; for the others, `open` records a `fingerprint` event (`hash`: the file as it stands then), and a later change sends the topic back. Never record a `fingerprint` yourself.
 
 ## Sessions
 
@@ -164,7 +164,7 @@ A dataset checked against the schemas without its data reaching you: a file a pe
 
 ## Milestones
 
-`{"type": "milestone", "event": "reach", "id": "<milestone>", "note": "…"}` — `migrated` (a 1.x migration's *Left to do* is worked through and `check` is green: MIGRATE.md; `record` stamps the topic files' hashes, so the approvals carried over from 1.x cover the files as they stand then), `ready-for-review` (the author handed the package to the steward: FINISH.md), `review-complete` (the steward's review is done: REVIEW-MODE.md), `finished` (the package is final: FINISH.md; `record` stamps it with the schema files' `setId`, and a later change to them makes `next` offer `finish` again). The website's progress line reads them.
+`{"type": "milestone", "event": "reach", "id": "<milestone>", "note": "…"}` — `migrated` (a 1.x migration's *Left to do* is worked through and `check` is green: MIGRATE.md; `record` stamps the topic files' hashes, so the approvals carried over from 1.x cover the files as they stand then), `ready-for-review` (the author handed the package to the steward: FINISH.md), `review-complete` (the steward's review is done: REVIEW-MODE.md), `finished` (the package is final: FINISH.md; `record` stamps it with the schema files' `setId`, and a later change to them makes `next` offer `finish` again — `open` stamps a finish recorded before that with a `fingerprint` event, `{"type": "milestone", "event": "fingerprint", "id": "finished", "setId": …}`). The website's progress line reads them.
 
 ## project.json
 

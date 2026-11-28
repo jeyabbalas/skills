@@ -2,6 +2,14 @@
 
 Changes to [`schemify`](../skills/schemify/SKILL.md), newest first. What major, minor, and patch mean: [README → Versions](../README.md#versions).
 
+## 2.2.1 — 2026-11-27
+
+- Fixed: a topic approved with an early 2.0 build stayed approved however its file changed later. If an answer you gave after approving it changed the file, the topic now comes back to you for review. Otherwise the next session records the file as you approved it, and any later change sends it back. A package finished with those builds is offered for finishing again once its schemas change.
+- Fixed: when the package failed `check` outside the topic the agent was building (after an edit to the toy data or the shared definitions, say), `status` gave the agent nothing to do next and could still say the work was finished. It now says to fix the check first, and never offers to finish while the check fails.
+- Fixed: an agent that reads your documents itself, without helpers, is now pointed to the digest format the helpers use: the same sections, and a variable list with the same columns.
+- Fixed: every commit carried files that had changed only because the website was rebuilt. They were the agent's live status line and the timestamps in the website's data, the provenance file, the data dictionary, and the validator's report. A rebuild that changes nothing now changes no file, and the live status line is no longer versioned. In a workspace versioned by 2.2.0, it leaves the history at the next commit, and `.gitignore` gains the line it needs; your own lines stay.
+- Fixed: with dulwich standing in for Git, the history did not list the files a commit deleted.
+
 ## 2.2.0 — 2026-11-27
 
 - New: the workspace is a Git repository. The first session creates one in `schemify/`. If you invoke schemify inside a repository of your own, the agent asks first whether it may commit there, and nothing is committed until you agree. Then only `schemify/` is committed, and your other staged changes stay as they are. Each session's start commits anything changed since the last one, its close commits the session's work with its summary as the message, and the agent commits after each finished step: a source read, a topic drafted or tested, a batch of answers applied. Files beside the workspace, such as a dataset, never enter a commit. Workspaces made with earlier versions get their repository at the next session.

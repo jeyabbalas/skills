@@ -16,11 +16,11 @@ jobs:
     steps:
       # Full history and every tag: the release checks compare each skill
       # with its tagged version and with the commit this push or PR builds on.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.4.0   # setup-uv publishes no major tags since v8: pin a release
 
       # Frontmatter, cross-manifest, and layout invariants. A SKILL.md whose
       # YAML does not parse is dropped silently by installers, so this is the
@@ -71,7 +71,7 @@ jobs:
     # Reads the published repo, so it only means anything once main has moved.
     if: github.event_name != 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Asserts every skill directory on this commit actually shows up in
       # `skills add --list` against the published repo -- the end-to-end check
@@ -112,11 +112,11 @@ jobs:
       group: release
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.4.0   # setup-uv publishes no major tags since v8: pin a release
 
       - name: Tag and publish
         env:

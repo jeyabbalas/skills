@@ -288,7 +288,9 @@ class World:
         self.datasets: dict[str, dict] = {}
         self.milestones: dict[str, str] = {}
         self.finished_set: str | None = None
+        self.finished_seq = 0
         self.migrated_hashes: dict[str, str] = {}
+        self.applies: list[dict] = []    # every decision.apply: what changed which files, and when (ledger position)
         self.seq = 0                 # ledger position: what came after what (`at` ties within a second)
         for ev in events:
             self.apply(ev)
@@ -377,6 +379,7 @@ class World:
             rec["appliedAt"] = ev.get("at")
             rec["appliedFiles"] = ev.get("files") or []
             order["applied"] = self.seq
+            self.applies.append({"id": did, "seq": self.seq, "files": [str(f) for f in ev.get("files") or []]})
             for tid, h in (ev.get("approvedHashes") or {}).items():
                 approvals = (self.topics.get(tid) or {}).get("approvals") or []
                 if approvals:
@@ -435,6 +438,8 @@ class World:
         elif e == "changes":
             rec["review"] = "changes-requested"
             rec["changes"].append({"by": ev.get("by"), "at": ev.get("at"), "via": ev.get("via"), "text": ev.get("text")})
+        elif e == "fingerprint" and rec["approvals"] and not rec["approvals"][-1].get("hash"):
+            rec["approvals"][-1]["hash"] = ev.get("hash")    # an approval from before approvals were fingerprinted
         self._hist(rec, ev)
 
     # -- sessions, alignment, milestones
@@ -468,10 +473,13 @@ class World:
             self.datasets[xid]["withdrawn"] = {k: ev.get(k) for k in ("by", "via", "note", "at")}
 
     def _milestone(self, e: str, ev: dict) -> None:
+        if e == "fingerprint" and ev.get("id") == "finished" and "finished" in self.milestones and not self.finished_set:
+            self.finished_set = ev.get("setId")          # a finish from before finishes were fingerprinted
         if e == "reach":
             self.milestones[ev.get("id")] = ev.get("at")
             if ev.get("id") == "finished":
                 self.finished_set = ev.get("setId")      # the schema files the person was told were finished
+                self.finished_seq = self.seq
             elif ev.get("id") == "migrated":
                 self.migrated_hashes = ev.get("topicHashes") or {}   # what approvals carried over from 1.x now cover
 
@@ -792,6 +800,10 @@ def validate_event(ev: dict, world: World, pending: dict, n: int, creating_hint:
             person()
             if e == "changes":
                 need("text")
+        elif e == "fingerprint":
+            bare = bare_approval(world, ev.get("id"))
+            if not bare or changed_after(world, topic_file(world, ev.get("id")), bare.get("seq") or 0):
+                errs.append(f"{where}: `open` records fingerprints, only for an approval that predates them — never record one")
         elif e != "present":
             errs.append(f"{where}: unknown topic event (present, approve, changes)")
     elif t == "session":
@@ -858,7 +870,11 @@ def validate_event(ev: dict, world: World, pending: dict, n: int, creating_hint:
         else:
             errs.append(f"{where}: unknown dataset event (allow, withdraw)")
     elif t == "milestone":
-        if e != "reach" or ev.get("id") not in MILESTONES:
+        if e == "fingerprint":
+            if ev.get("id") != "finished" or "finished" not in world.milestones or world.finished_set or \
+                    changed_after(world, None, world.finished_seq):
+                errs.append(f"{where}: `open` records fingerprints, only for a finish that predates them — never record one")
+        elif e != "reach" or ev.get("id") not in MILESTONES:
             errs.append(f"{where}: write {{\"type\": \"milestone\", \"event\": \"reach\", \"id\": one of {sorted(MILESTONES)}}}")
     else:
         errs.append(f"{where}: unknown type {t!r} (source, decision, rule, batch, topic, session, alignment, dataset, milestone)")
@@ -966,6 +982,10 @@ def record_events(ws: Path, raw, by_default: str = "agent") -> dict:
         if t == "topic" and e == "approve" and not ev.get("hash") and ev.get("via") != "migration":
             rel = next((tp.get("file") for tp in world.project.get("topics", []) if tp.get("id") == ev.get("id")), None)
             ev["hash"] = doc_hash(Pkg(ws, world.project).docs.get(rel))   # what they approved: a later change reopens it
+        if t == "topic" and e == "fingerprint":
+            ev["hash"] = doc_hash(Pkg(ws, world.project).docs.get(topic_file(world, ev.get("id"))))   # the file as it stands
+        if t == "milestone" and e == "fingerprint":
+            ev["setId"] = quac_set_id(schemas_dir(ws))
         if creating:
             if ev.get("id") not in (None, "new"):
                 if ev["id"] in used[t]:
@@ -1467,6 +1487,7 @@ def run_validator(ws: Path, timeout: int = 900) -> dict | None:
         attempts.append(["uv", "run", "--quiet", str(script), "summary", "package", "--out", "state/checks.json"])
     attempts.append([sys.executable, str(script), "summary", "package", "--out", "state/checks.json"])
     last_err = ""
+    prev = earlier_json(out_file)
     for cmd in attempts:
         try:
             if out_file.exists():
@@ -1489,7 +1510,7 @@ def run_validator(ws: Path, timeout: int = 900) -> dict | None:
         full["ran"] = True
         full["at"] = now()
         full["setId"] = quac_set_id(schemas_dir(ws))     # which schema files these results are for (QuaC's fingerprint)
-        write_json(out_file, full)
+        write_json(out_file, keep_stamp(full, prev, "at"))   # `at`: when the validator first gave these results
         return full
     return {"ok": False, "ran": False, "at": now(), "headline": "The validator could not run.",
             "error": last_err[-400:],
@@ -1522,7 +1543,8 @@ def topic_statuses(world: World, pkg: Pkg, checks: dict | None) -> list[dict]:
         rev, cur = rec.get("review"), doc_hash(pkg.docs.get(rel))
         last = (rec.get("approvals") or [{}])[-1] if rev == "confirmed" else {}
         approved = last.get("hash") or (world.migrated_hashes.get(tid) if last.get("via") == "migration" else None)
-        changed = bool(approved and approved != cur)
+        bare = bare_approval(world, tid)        # no fingerprint: what the ledger shows changed since
+        changed = bool(approved and approved != cur) or bool(bare and changed_after(world, rel, bare.get("seq") or 0))
         if changed:
             rev = None                  # the file is no longer what the person approved: present it again (BUILD.md)
         if rev and status != "planned":
@@ -1545,7 +1567,7 @@ def topic_statuses(world: World, pkg: Pkg, checks: dict | None) -> list[dict]:
 
 def inventory_summary(rows: list[dict], pkg: Pkg) -> dict:
     total = len(rows)
-    by = {s: sum(1 for r in rows if r.get("status") == s) for s in INVENTORY_STATUSES}
+    by = {s: sum(1 for r in rows if r.get("status") == s) for s in sorted(INVENTORY_STATUSES)}
     in_schema = sum(1 for r in rows if r.get("status") in ("include", "added")
                     and f"{r.get('table')}.{r.get('variable')}" in pkg.properties)
     return {"total": total, "inSchemas": in_schema, **by}
@@ -1579,7 +1601,11 @@ def suspected_unasked(world: World) -> list[str]:
 
 def finished_now(ws: Path, world: World) -> bool:
     """Finished, and the schema files are still the ones it finished with (FINISH.md, After the end)."""
-    return "finished" in world.milestones and (not world.finished_set or world.finished_set == quac_set_id(schemas_dir(ws)))
+    if "finished" not in world.milestones:
+        return False
+    if world.finished_set:
+        return world.finished_set == quac_set_id(schemas_dir(ws))
+    return not changed_after(world, None, world.finished_seq)    # a finish from before finishes were fingerprinted
 
 
 def phase_steps(world: World, topics: list[dict], inv: dict, rules: dict, finished: bool | None = None) -> list[dict]:
@@ -1655,6 +1681,11 @@ def next_actions(ws: Path, world: World, pkg: Pkg, topics: list[dict], rules: di
         if t["status"] in ("planned", "drafted"):
             add("build-topic", f"'{t['title']}' is {t['status']}", "BUILD.md", topic=t["id"])
             break
+    checks = checks_report(ws) or {}
+    red = checks.get("ok") is False             # the validator's last report on the package
+    if red and not any(a["action"] in ("build-topic", "revise-topic", "migrate") for a in acts):
+        add("fix-check", f"the package fails `check` ({checks.get('headline') or 'see its findings'}), and no topic you are "
+            "building explains it — run `check`, fix every error, then `build`", "BUILD.md")
     due = datasets_due(ws, world, topics)        # real data before presenting: a slip it finds changes the topic
     for a in world.alignment.values():
         if a.get("dataset") and (a["id"] != superseding_run(world, a) or a["dataset"] in due):
@@ -1695,7 +1726,7 @@ def next_actions(ws: Path, world: World, pkg: Pkg, topics: list[dict], rules: di
         audit_open = any(r.get("status") in ("suspected", "waiting") for r in world.rules.values()) or rules["ready"]
         if audit_open:
             add("skip-audit", "every topic is confirmed; the skip-logic audit is next", "SKIP-LOGIC.md")
-        elif not finished_now(ws, world) and not migrating and not blocking and not [
+        elif not finished_now(ws, world) and not migrating and not blocking and not red and not [
                 x for x in due if (world.datasets.get(x) or {}).get("basis") != "browser"]:
             add("finish", "the schemas changed since you finished — finish again" if "finished" in world.milestones
                 else "every topic is confirmed and the skip-logic audit is clean", "FINISH.md")
@@ -1753,6 +1784,59 @@ def approval_covers(ws: Path, world: World, ev: dict) -> dict[str, str]:
             pkg = pkg or Pkg(ws, world.project)
             out[tp["id"]] = doc_hash(pkg.docs.get(tp["file"]))
     return out
+
+
+def changed_after(world: World, rel: str | None, seq: int) -> bool:
+    """Whether an `apply` after ledger position `seq` changed the schema file `rel` (None: any schema file) — for an
+    approval at `seq`, by an answer it does not carry over (approval_covers' rule). This is what the ledger can still tell
+    about an approval or a finish recorded before they were fingerprinted; edits with no `apply` leave no trace."""
+    for a in world.applies:
+        if a["seq"] <= seq:
+            continue
+        files = {f.split("package/schemas/", 1)[-1] for f in a["files"] if "package/schemas/" in f}
+        if not files or (rel is not None and rel not in files):
+            continue
+        if rel is None:
+            return True
+        d = world.decisions.get(a["id"]) or {}
+        ans = d.get("answer") or {}
+        seen = min([x for x in (d.get("askedSeq"), ans.get("seq")) if isinstance(x, int)] or [0])
+        if not (ans.get("by") in PEOPLE and ans.get("choice") not in (None, "unsure") and 0 < seen < seq):
+            return True
+    return False
+
+
+def bare_approval(world: World, tid: str) -> dict | None:
+    """The approval a confirmed topic stands on, when nothing fingerprints it: one recorded before approvals were
+    fingerprinted. A 1.x approval a migration carried over is not one: the `migrated` milestone stamps it."""
+    rec = world.topics.get(tid) or {}
+    last = (rec.get("approvals") or [None])[-1]
+    if rec.get("review") != "confirmed" or not last or last.get("hash"):
+        return None
+    if last.get("via") == "migration" and ("migrated" not in world.milestones or world.migrated_hashes.get(tid)):
+        return None
+    return last
+
+
+def topic_file(world: World, tid: str) -> str | None:
+    return next((tp.get("file") for tp in world.project.get("topics", []) if tp.get("id") == tid), None)
+
+
+def fingerprint_events(ws: Path, world: World) -> list[dict]:
+    """Fingerprints for approvals and a finish recorded before schemify fingerprinted them, taken from the files as they
+    stand, so that a later change sends the topic back to its reviewer or offers `finish` again. One the ledger shows was
+    changed since gets none: it goes back to the person instead."""
+    events, pkg = [], None
+    for tp in world.project.get("topics", []):
+        bare = bare_approval(world, tp.get("id"))
+        if not bare or changed_after(world, tp.get("file"), bare.get("seq") or 0):
+            continue
+        pkg = pkg or Pkg(ws, world.project)
+        if pkg.docs.get(tp.get("file")) is not None:
+            events.append({"type": "topic", "event": "fingerprint", "id": tp["id"]})
+    if "finished" in world.milestones and not world.finished_set and not changed_after(world, None, world.finished_seq):
+        events.append({"type": "milestone", "event": "fingerprint", "id": "finished"})
+    return events
 
 
 def doc_hash(doc) -> str | None:
@@ -2674,6 +2758,32 @@ def fill(template: str, slots: dict[str, str]) -> str:
     return re.sub(r"\{\{([A-Z_]+)\}\}", sub, template)
 
 
+def keep_stamp(new: dict, old, key: str) -> dict:
+    """A rebuild that changes nothing but the time keeps the earlier time: the file stays as it was, and no commit
+    records a rebuild alone."""
+    if isinstance(old, dict) and isinstance(old.get(key), str) and \
+            json.dumps({**old, key: None}, sort_keys=True, default=str) == json.dumps({**new, key: None}, sort_keys=True, default=str):
+        new[key] = old[key]
+    return new
+
+
+def earlier_json(path: Path) -> dict | None:
+    """A generated file's earlier version, when it is readable: a rebuild replaces it anyway."""
+    try:
+        return read_json(path, None)
+    except Fail:
+        return None
+
+
+def read_state_js(ws: Path) -> dict | None:
+    """The website data the last build wrote."""
+    try:
+        text = (ws / "site" / "data" / "state.js").read_text(encoding="utf-8")
+        return json.loads(text[text.index("=") + 1:].strip().rstrip(";"))
+    except (OSError, ValueError):
+        return None
+
+
 def inline_json(data) -> str:
     return json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
 
@@ -2747,10 +2857,10 @@ def md_cell(text) -> str:
     return str(text if text is not None else "").replace("|", "\\|").replace("\n", " ").strip()
 
 
-def tree_lines(root: Path, base: Path, depth: int = 0, limit: int = 60) -> list[str]:
+def tree_lines(root: Path, base: Path, depth: int = 0, limit: int = 60, also: tuple[str, ...] = ()) -> list[str]:
     out = []
     try:
-        entries = sorted(p for p in root.iterdir() if not p.name.startswith("."))
+        entries = sorted({p for p in root.iterdir() if not p.name.startswith(".")} | {root / n for n in also})
     except OSError:
         return out
     for p in entries:
@@ -2763,7 +2873,7 @@ def tree_lines(root: Path, base: Path, depth: int = 0, limit: int = 60) -> list[
     return out
 
 
-def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict], prov: dict) -> str:
+def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict], prov: dict, day: str | None = None) -> str:
     proj = world.project
     study = proj.get("study") or "This study"
     lines = [f"# {study} — JSON Schema package", ""]
@@ -2798,7 +2908,7 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
         "Open `dictionary.html` — a searchable data dictionary that works offline. Its **Semantic search** switch "
         "downloads a small text model once (about 50 MB, from huggingface.co and cdn.jsdelivr.net) and then also finds "
         "variables by meaning; your schemas never leave the browser.", "",
-        "## Files", "", "```text", *tree_lines(pkg_dir_from(pkg), pkg_dir_from(pkg)), "```", "",
+        "## Files", "", "```text", *tree_lines(pkg_dir_from(pkg), pkg_dir_from(pkg), also=("README.md",)), "```", "",
         "## How the schemas are written", "",
         "- Each table's mother schema is an array of records; a record is the `allOf` of its topic files, and "
         "`unevaluatedProperties: false` rejects any column the topics do not declare.",
@@ -2881,7 +2991,7 @@ def render_readme(world: World, pkg: Pkg, checks: dict | None, topics: list[dict
         lines.append(f"- {len(flagged) - 20} more agent decision(s) await a person's review — PROVENANCE.md marks them ⚑.")
     for r in deferred[:50]:
         lines.append(f"- {r['id']} ({r.get('status')}): {md_cell(r.get('reading'))}")
-    lines += ["", "---", "", f"Generated {now()[:10]} by [schemify](https://github.com/jeyabbalas/skills) from its "
+    lines += ["", "---", "", f"Generated {day or now()[:10]} by [schemify](https://github.com/jeyabbalas/skills) from its "
               "working record. Edit the schemas, not this file — it is regenerated."]
     return "\n".join(lines) + "\n"
 
@@ -3140,6 +3250,7 @@ def field_list(pkg: Pkg, proj: dict) -> list[dict]:
 
 def write_site(ws: Path, payload: dict) -> list[str]:
     written = []
+    payload = keep_stamp(payload, read_state_js(ws), "generatedAt")
     data_js = "window.SCHEMIFY_STATE = " + inline_json(payload) + ";\n"
     write_text(ws / "site" / "data" / "state.js", data_js)
     written.append("site/data/state.js")
@@ -3219,7 +3330,7 @@ def build(ws: Path, validate: bool = True) -> dict:
     ensure_dirs(ws)
     world = load_world(ws)
     pkg = Pkg(ws, world.project)
-    prov = provenance_doc(world, pkg)
+    prov = keep_stamp(provenance_doc(world, pkg), earlier_json(pkg_dir(ws) / "provenance.json"), "generatedAt")
     written = []
     if pkg.docs or world.project.get("tables"):
         write_json(pkg_dir(ws) / "provenance.json", prov)       # before the validator, which reads it
@@ -3232,12 +3343,13 @@ def build(ws: Path, validate: bool = True) -> dict:
     topics = topic_statuses(world, pkg, checks)
     if pkg.docs or world.project.get("tables"):
         write_text(pkg_dir(ws) / "PROVENANCE.md", render_provenance_md(world, prov))
-        write_text(pkg_dir(ws) / "README.md", render_readme(world, pkg, checks, topics, prov))
         written += ["package/PROVENANCE.md", "package/README.md"]
         write_text(pkg_dir(ws) / "tools" / "requirements.txt", REQUIREMENTS)
     if pkg.docs:
         written.append(write_dictionary(ws, world, pkg, prov))
         written += toy_csv_twins(ws, pkg, world)
+    if pkg.docs or world.project.get("tables"):        # last: its list of files shows everything this build wrote
+        write_dated(pkg_dir(ws) / "README.md", lambda day: render_readme(world, pkg, checks, topics, prov, day))
     payload = state_payload(ws, world, pkg, checks, topics, prov)
     payload["toyData"] = toy_data_view(ws, world, validate and bool(pkg.docs) and bool(checks and checks.get("ran")))
     written += write_site(ws, payload)
@@ -3260,14 +3372,25 @@ def write_dictionary(ws: Path, world: World, pkg: Pkg, prov: dict) -> str:
             mounts.append({"table": tb.get("name"), "title": tb.get("title") or tb.get("name"),
                            "rootUri": mother.get("$id") or base + tb.get("mother")})
     study = proj.get("study") or "Data dictionary"
-    page = fill(tpl, {
+    slots = {
         "TITLE": html.escape(f"{study} — data dictionary"), "STUDY": html.escape(study),
-        "LOGO": logo_svg(), "FAVICON": favicon_uri(), "GENERATED": now()[:10],
+        "LOGO": logo_svg(), "FAVICON": favicon_uri(),
         "SCHEMAS_JSON": inline_json(docs), "CONFIG_JSON": inline_json({"package": proj.get("id") or proj.get("slug"), "mounts": mounts}),
         "PROVENANCE_JSON": inline_json(prov), "SKILL_VERSION": html.escape(skill_version()),
-    })
-    write_text(pkg_dir(ws) / "dictionary.html", page)
+    }
+    write_dated(pkg_dir(ws) / "dictionary.html", lambda day: fill(tpl, {**slots, "GENERATED": day}))
     return "package/dictionary.html"
+
+
+def write_dated(path: Path, render) -> None:
+    """Write a page that says the day it was generated (`render(day)` makes it) — unless only that day would change."""
+    try:
+        before = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        before = ""
+    m = re.search(r"Generated (\d{4}-\d{2}-\d{2}) by", before)
+    if not (m and render(m.group(1)) == before):
+        write_text(path, render(now()[:10]))
 
 
 def ensure_dirs(ws: Path) -> None:
@@ -3723,6 +3846,7 @@ GITIGNORE = """\
 state/server.json
 state/server.log*
 state/activity.json
+site/data/activity.js
 state/presence.json
 state/recheck.json
 inbox/pending/
@@ -3807,6 +3931,10 @@ def git_cli_snapshot(ws: Path, message: str, first: str | None, theirs_ok: bool 
             git(ws, "symbolic-ref", "HEAD", "refs/heads/main")
         root = ws
     info = {"repo": str(root), "own": root == ws, "created": created, "via": "git"}
+    tracked = git(ws, "ls-files", "-z", "--cached", "--ignored", "--exclude-standard", "--", ".")
+    gone = [f for f in (tracked.stdout if tracked and tracked.returncode == 0 else "").split("\0") if f]
+    if gone:                                            # files a later version ignores: they leave the history
+        git(ws, "rm", "-q", "--cached", "--", *gone)
     add = git(ws, "add", "-A", "--", ".")
     if not add or add.returncode:
         return {**info, "commit": None, "error": git_said(add), "hint": GIT_HINT}
@@ -3843,6 +3971,19 @@ def gitless(ws: Path, *args: str) -> dict:
     return {"failed": said}
 
 
+def ensure_gitignore(ws: Path) -> None:
+    """Write .gitignore, or add the lines a later version needs to the one there, keeping the person's own."""
+    p = ws / ".gitignore"
+    if not p.is_file():
+        write_text(p, GITIGNORE)
+        return
+    text = p.read_text(encoding="utf-8", errors="replace")
+    have = {line.strip() for line in text.splitlines()}
+    missing = [line for line in GITIGNORE.splitlines() if line and not line.startswith("#") and line not in have]
+    if missing:
+        write_text(p, text + ("\n" if text and not text.endswith("\n") else "") + "\n".join(missing) + "\n")
+
+
 def git_snapshot(ws: Path, message: str, first: str | None = None) -> dict:
     """Version the workspace and commit everything in it, and nothing beside it, as one snapshot: through git, else
     through gitless.py. `first` is the message when this creates the repository. Never raises: a failed commit is
@@ -3850,8 +3991,7 @@ def git_snapshot(ws: Path, message: str, first: str | None = None) -> dict:
     if not GIT_ENABLED:
         return {"off": "turned off"}
     ws = ws.resolve()
-    if not (ws / ".gitignore").exists():
-        write_text(ws / ".gitignore", GITIGNORE)
+    ensure_gitignore(ws)
     prefs = load_project(ws).get("preferences") or {}
     theirs = prefs.get("useTheirRepo")
     missing = git_unavailable()
@@ -4016,6 +4156,9 @@ def open_session(ws: Path, mode: str | None, harness: str | None, model: str | N
         record_events(ws, [{"type": "session", "event": "start", "mode": proj.get("mode", "build"),
                             **({"harness": harness or proj.get("harness")} if (harness or proj.get("harness")) else {}),
                             **({"model": model} if model else {})}])
+    prints = fingerprint_events(ws, load_world(ws))     # approvals from before fingerprints: a later change now shows
+    if prints:
+        record_events(ws, prints)
     url, serve_note = None, None
     if serve:
         res = run_serve(ws, "start")

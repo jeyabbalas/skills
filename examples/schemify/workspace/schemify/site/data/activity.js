@@ -1,1 +1,0 @@
-window.SCHEMIFY_ACTIVITY = {"stateAt":"2026-11-27T19:13:36Z"};

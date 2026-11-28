@@ -51,7 +51,7 @@ Right after registering, look at the first lines of each extract for the study's
 
 ## 4. Digest every source
 
-A digest (`schemify/sources/<id>/DIGEST.md`) is what a later session reads instead of the source: what the source holds, how to read it, and every variable and rule it states — with locators, and codes and labels copied exactly. Delegate in one message: one digest subagent per source and the research subagent (step 5), all in parallel, with SUBAGENTS.md's briefs. Without subagents, digest sources yourself, one at a time, largest last; split a large source into chunks (sheet by sheet, 20 pages at a time) and write each chunk's part before reading the next.
+A digest (`schemify/sources/<id>/DIGEST.md`) is what a later session reads instead of the source: what the source holds, how to read it, and every variable and rule it states — with locators, and codes and labels copied exactly. Delegate in one message: one digest subagent per source and the research subagent (step 5), all in parallel, with SUBAGENTS.md's briefs. Without subagents, digest sources yourself with the same brief (SUBAGENTS.md, "Brief: digest a source": DIGEST.md's six sections and `variables-found.csv`'s columns), one at a time, largest last; split a large source into chunks (sheet by sheet, 20 pages at a time) and write each chunk's part before reading the next.
 
 When each digest returns:
 

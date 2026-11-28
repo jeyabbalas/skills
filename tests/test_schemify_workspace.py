@@ -1684,6 +1684,77 @@ def test_present_topic_says_when_it_changed_after_approval(ws, monkeypatch):
                 if t["id"] == "participant")["presentNote"] == "Age now accepts don't know."
 
 
+def append_raw(ws: Path, *events) -> None:
+    """Append events as an earlier schemify build wrote them, without `record` and its stamps."""
+    with open(ws / "state" / "ledger.jsonl", "a", encoding="utf-8") as fh:
+        for ev in events:
+            fh.write(json.dumps({"at": "2026-01-02T09:00:00Z", "by": "agent", **ev}) + "\n")
+
+
+def fingerprints(ws: Path) -> list:
+    return [e for e in ledger_events(ws) if e.get("event") == "fingerprint"]
+
+
+def test_approvals_from_before_fingerprints_go_back_when_their_file_changes(ws):
+    rec(ws, *[{"type": "topic", "event": "present", "id": t} for t in ("participant", "sleep")])
+    append_raw(ws, *[{"type": "topic", "event": "approve", "id": t, "by": "author", "via": "inbox:20260102T090000Z-a1b2c3"}
+                     for t in ("participant", "sleep")])                 # no hash: an early 2.0 build
+    assert topic_status(ws, "sleep")["status"] == topic_status(ws, "participant")["status"] == "confirmed"
+    rec(ws, post(question()), answer("D001", "b"))                       # asked after they approved
+    edit(ws, SLEEP, lambda d: d["properties"]["nap_minutes"]["anyOf"][0].update(minimum=5))
+    rec(ws, apply_("D001"))
+    sleep = topic_status(ws, "sleep")                                    # the ledger shows the change
+    assert sleep["changedSinceApproval"] and sleep["status"] not in ("confirmed", "in-review")
+    assert topic_status(ws, "participant")["status"] == "confirmed"
+    sf.open_session(ws, None, None, None, serve=False)                   # the rest get a fingerprint
+    assert [(e["type"], e["id"], e["hash"]) for e in fingerprints(ws)] == [
+        ("topic", "participant", topic_status(ws, "participant")["hash"])]
+    assert "never record one" in refused(ws, {"type": "topic", "event": "fingerprint", "id": "participant"})
+    assert "never record one" in refused(ws, {"type": "topic", "event": "fingerprint", "id": "sleep"})
+    sf.open_session(ws, None, None, None, serve=False)
+    assert len(fingerprints(ws)) == 1                                    # once
+    edit(ws, PARTICIPANT, lambda d: d["properties"]["age"].update(description="Age in whole years"))   # no `apply`
+    participant = topic_status(ws, "participant")
+    assert participant["changedSinceApproval"] and participant["status"] not in ("confirmed", "in-review")
+
+
+def test_a_finish_from_before_fingerprints_is_offered_again_after_a_change(ws):
+    rec(ws, *[{"type": "topic", "event": "approve", "id": t, "by": "author"} for t in ("participant", "sleep")])
+    append_raw(ws, {"type": "milestone", "event": "reach", "id": "finished"})        # no setId: an early 2.0 build
+    assert next_actions(ws) == []
+    sf.open_session(ws, None, None, None, serve=False)
+    assert [(e["type"], e["id"], e["setId"]) for e in fingerprints(ws)] == [
+        ("milestone", "finished", sf.quac_set_id(sf.schemas_dir(ws)))]
+    assert next_actions(ws) == [] and sf.status_payload(ws)["phase"] == "Finished"
+    assert "never record one" in refused(ws, {"type": "milestone", "event": "fingerprint", "id": "finished"})
+    edit(ws, DEFS, lambda d: d["$defs"]["dont_know"].update(description="Said they did not know"))
+    assert next_actions(ws) == ["finish"]
+
+
+def test_a_finish_from_before_fingerprints_that_the_ledger_shows_changed_is_not_finished(ws):
+    rec(ws, {"type": "topic", "event": "approve", "id": "participant", "by": "author"})
+    append_raw(ws, {"type": "milestone", "event": "reach", "id": "finished"})
+    assert sf.finished_now(ws, sf.load_world(ws))
+    rec(ws, guess(), apply_("D001"))                                     # a schema file changed after the finish
+    assert not sf.finished_now(ws, sf.load_world(ws))
+    sf.open_session(ws, None, None, None, serve=False)
+    assert fingerprints(ws) == []
+
+
+def test_next_says_to_fix_a_red_check_that_no_topic_explains(ws):
+    rec(ws, *[{"type": "topic", "event": "approve", "id": t, "by": "author"} for t in ("participant", "sleep")])
+    write_json(ws / "state" / "checks.json", {"ok": False, "ran": True, "headline": "toy data: 3/15 valid rows pass"})
+    nxt = sf.status_payload(ws)["next"]                                  # a toy-data edit broke confirmed topics
+    assert [a["action"] for a in nxt] == ["fix-check"] and nxt[0]["read"] == "BUILD.md"
+    assert "3/15 valid rows pass" in nxt[0]["why"]
+    rec(ws, {"type": "milestone", "event": "reach", "id": "finished"})
+    assert next_actions(ws) == ["fix-check"]                             # finished, then broken: never an empty `next`
+    rec(ws, {"type": "topic", "event": "changes", "id": "sleep", "by": "author", "text": "Allow naps over 8 hours."})
+    assert next_actions(ws) == ["revise-topic"]                          # the topic's own loop runs `check`
+    write_json(ws / "state" / "checks.json", {"ok": True, "ran": True, "headline": STUB_HEADLINE})
+    assert "fix-check" not in next_actions(ws)
+
+
 def test_check_warns_when_a_property_drops_a_code_its_dictionary_row_lists(ws):
     ext = ws / "sources" / "S01" / "extract"
     ext.mkdir(parents=True)
@@ -2441,6 +2512,49 @@ def test_a_workspace_inside_the_users_repository_commits_only_itself(tmp_path, g
     assert res["git"]["own"] is True and res["git"]["created"] is True and (other / "schemify" / ".git").is_dir()
 
 
+def test_files_a_later_version_ignores_leave_the_history(bare, git_on):
+    gi = bare / ".gitignore"
+    gi.write_text(gi.read_text(encoding="utf-8").replace("site/data/activity.js\n", "") + "my-notes.txt\n",
+                  encoding="utf-8")                                      # as 2.2.0 wrote it, plus a line of their own
+    git_out(bare, "add", "-A")
+    git_out(bare, "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "As 2.2.0 left it")
+    assert "site/data/activity.js" in git_out(bare, "ls-files").splitlines()
+    res = sf.commit_cmd(bare, "Upgraded")
+    assert res["commit"] and git_out(bare, "show", "--name-status", "--format=", "HEAD").splitlines() == [
+        "M\t.gitignore", "D\tsite/data/activity.js"]
+    assert (bare / "site/data/activity.js").is_file() and "site/data/activity.js" not in git_out(bare, "ls-files")
+    assert gi.read_text(encoding="utf-8").splitlines()[-2:] == ["my-notes.txt", "site/data/activity.js"]
+    sf.set_activity(bare, "Drafting the sleep topic")                   # the website's live line is never versioned
+    assert sf.commit_cmd(bare, "Nothing new")["commit"] is None
+
+
+def test_a_rebuild_that_changes_nothing_changes_no_file(ws, git_on, monkeypatch):
+    sf.build(ws, validate=False)
+    assert sf.commit_cmd(ws, "Built")["commit"]
+    before, stamp = snapshot(ws, skip=(".git",)), sf.read_state_js(ws)["generatedAt"]
+    monkeypatch.setattr(sf, "now", lambda: "2099-01-02T03:04:05Z")      # another day: the pages say when they were made
+    sf.build(ws, validate=False)
+    assert snapshot(ws, skip=(".git",)) == before and sf.commit_cmd(ws, "Rebuilt")["commit"] is None
+    rec(ws, question())
+    sf.build(ws, validate=False)
+    assert sf.read_state_js(ws)["generatedAt"] > stamp and sf.commit_cmd(ws, "Asked")["commit"]
+
+
+def test_the_validators_report_keeps_its_time_while_its_results_stay_the_same(ws, monkeypatch):
+    report = {"ok": True, "headline": STUB_HEADLINE, "topics": {}}
+
+    def fake_run(cmd, **kw):
+        write_json(ws / "state" / "checks.json", report)
+        return subprocess.CompletedProcess(cmd, 0, json.dumps(report), "")
+
+    monkeypatch.setattr(sf.subprocess, "run", fake_run)
+    first = sf.run_validator(ws)["at"]
+    monkeypatch.setattr(sf, "now", lambda: "2099-01-02T03:04:05Z")
+    assert sf.run_validator(ws)["at"] == first == read_json(ws / "state" / "checks.json")["at"]
+    report["headline"] = "a different result"
+    assert sf.run_validator(ws)["at"] > first
+
+
 def test_commit_cli(bare, git_on):
     (bare / "sources" / "notes.txt").write_text("x", encoding="utf-8")
     code, out = cli("--ws", bare, "commit", "Registered", "the", "notes")
@@ -2512,13 +2626,19 @@ def test_without_git_dulwich_keeps_the_history(bare, git_on, monkeypatch, stub_v
     assert git_out(bare, "log", "--format=%s") == "Start versioning the schemify workspace for LARK sleep study"
     changed = subprocess.run(["git", "status", "--porcelain"], cwd=bare, capture_output=True, text=True,  # git, once
                              check=True).stdout.splitlines()                 # installed, reads it as its own: only
-    assert {ln[3:] for ln in changed} <= {"state/ledger.jsonl", "site/data/state.js",   # what open wrote after the
-                                          "site/data/activity.js"}   # (timestamped: changes when a second ticks over)
+    assert {ln[3:] for ln in changed} <= {"state/ledger.jsonl", "site/data/state.js"}   # what open wrote after the
     assert all(ln.startswith(" M") for ln in changed)                                   # snapshot shows as changed
     assert subprocess.run(["git", "fsck", "--no-progress"], cwd=bare, capture_output=True).returncode == 0
+    gi = bare / ".gitignore"                                             # a workspace 2.2.0 versioned: activity.js in it
+    gi.write_text(gi.read_text(encoding="utf-8").replace("site/data/activity.js\n", ""), encoding="utf-8")
+    assert sf.gitless(bare, "snapshot", "--message", "As 2.2.0 committed it")["commit"]
+    assert "site/data/activity.js" in git_out(bare, "ls-files").splitlines()
     schema = bare / "package/schemas/sleep_diary/categories/sleep.json"
     write_json(schema, {"title": "Sleep, first draft"})
     first = sf.commit_cmd(bare, "Sleep drafted")["commit"]
+    assert "site/data/activity.js" not in git_out(bare, "ls-files").splitlines()          # it leaves the history,
+    assert (bare / "site/data/activity.js").is_file() and "site/data/activity.js" in gi.read_text(encoding="utf-8")
+    assert "site/data/activity.js" in sf.history_cmd(bare, None, 1)["commits"][0]["files"]    # and the history says so
     write_json(schema, {"title": "Sleep, a slip"})
     (bare / "state/server.json").write_text("{}", encoding="utf-8")      # runtime files stay out
     sf.commit_cmd(bare, "Sleep revised")
@@ -3842,6 +3962,8 @@ def test_migrated_approvals_cover_the_files_as_the_migration_leaves_them(migrate
     statuses = lambda: {t["id"]: t["status"] for t in sf.topic_statuses(sf.load_world(ws), sf.Pkg(ws, sf.load_project(ws)), None)}
     edit(ws, SLEEP, lambda d: d["properties"]["nap_minutes"].update(description="Minutes napped"))  # a house-style fix
     assert statuses() == {"participant": "confirmed", "sleep": "confirmed"}
+    sf.open_session(ws, None, None, None, serve=False)                 # the milestone stamps these, not `open`
+    assert fingerprints(ws) == [] and statuses() == {"participant": "confirmed", "sleep": "confirmed"}
     rec(ws, {"type": "milestone", "event": "reach", "id": "migrated", "note": "Left to do is done"})
     edit(ws, SLEEP, lambda d: d["properties"]["nap_minutes"].update(description="Nap length"))     # later work
     assert statuses()["participant"] == "confirmed" and statuses()["sleep"] not in ("confirmed", "in-review")

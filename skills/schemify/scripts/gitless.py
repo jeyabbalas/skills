@@ -91,6 +91,10 @@ def snapshot(ws: Path, message: str, first: str | None, theirs_ok: bool) -> dict
     if prefix and any(not p.startswith(prefix) for p in staged_paths(repo)):
         return {**info, "commit": None,
                 "error": "the repository has other changes staged; to leave them alone, nothing was committed"}
+    ignore = IgnoreFilterManager.from_repo(repo)
+    gone = [p.decode() for p in repo.open_index() if p.decode().startswith(prefix) and ignore.is_ignored(p.decode())]
+    if gone:                                     # files a later version ignores: they leave the history
+        porcelain.remove(repo, paths=[str(root / p) for p in gone], cached=True)
     porcelain.add(repo, paths=[str(ws)])
     if not staged_paths(repo):
         return {**info, "commit": None}
@@ -117,8 +121,9 @@ def history(ws: Path, file: str | None, limit: int) -> dict:
         c = entry.commit
         changes = entry.changes()
         flat = [x for ch in changes for x in (ch if isinstance(ch, list) else [ch])]
-        files = sorted({(x.new or x.old).path.decode()[len(prefix):] for x in flat
-                        if (x.new or x.old) and (x.new or x.old).path and (x.new or x.old).path.decode().startswith(prefix)})
+        paths = [next((side.path.decode() for side in (x.new, x.old) if side is not None and side.path), None)
+                 for x in flat]                   # a deletion's new side is an empty entry, not None
+        files = sorted({p[len(prefix):] for p in paths if p and p.startswith(prefix)})
         commits.append({"commit": c.id.decode()[:7],
                         "date": datetime.fromtimestamp(c.commit_time, timezone.utc).date().isoformat(),
                         "message": c.message.decode("utf-8", "replace").splitlines()[0] if c.message else "",

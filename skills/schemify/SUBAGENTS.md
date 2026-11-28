@@ -1,4 +1,4 @@
-Briefs for delegating the token-heavy work — reading sources, researching the study on the web, drafting large topics — to subagents, and how to check what comes back. Read this before delegating anything. You remain the only writer of the ledger: subagents write the files their brief names and report to you; you verify and `record`.
+Briefs for delegating the token-heavy work — reading sources, researching the study on the web, drafting large topics — to subagents, and how to check what comes back. Read this before delegating anything, and before digesting a source yourself: the digest brief sets the format of `DIGEST.md` and `variables-found.csv` either way. You remain the only writer of the ledger: subagents write the files their brief names and report to you; you verify and `record`.
 
 Table of contents
 

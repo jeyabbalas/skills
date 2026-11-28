@@ -21,9 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.4.0   # setup-uv publishes no major tags since v8: pin a release
 
       # One recheck after a pause, so a site that is briefly down does not
       # raise the alarm; a link that is really broken fails both passes and

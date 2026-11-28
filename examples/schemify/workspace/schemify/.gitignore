@@ -1,0 +1,11 @@
+# schemify: runtime files, and website feedback not yet taken in (its paths are made portable when taken), never versioned
+state/server.json
+state/server.log*
+state/activity.json
+site/data/activity.js
+state/presence.json
+state/recheck.json
+inbox/pending/
+__pycache__/
+.DS_Store
+*.tmp

@@ -1,4 +1,4 @@
-The topic loop: one topic carried from its sources to a person's confirmation. Read this when `next` says `build-topic`, `present-topic`, or `revise-topic`. It sends you to SCHEMA-STYLE.md (the JSON), SKIP-LOGIC.md (rules), DATA-CHECK.md (toy data), and QUESTIONS.md (asking).
+The topic loop: one topic carried from its sources to a person's confirmation. Read this when `next` says `build-topic`, `present-topic`, `revise-topic`, or `fix-check`. It sends you to SCHEMA-STYLE.md (the JSON), SKIP-LOGIC.md (rules), DATA-CHECK.md (toy data), and QUESTIONS.md (asking).
 
 Table of contents
 
@@ -59,6 +59,7 @@ Extend `package/toy-data/<table>/valid.json`, `invalid.json`, and `invalid-ledge
 
 1. `schemify.py build` — it runs the validator. Read `checks.headline`, then `schemify.py check`; fix every error before going on. Common findings and their fixes are in each finding's `hint`.
 2. `schemify.py status` shows the topic as `tested` once its file is clean and the toy data covers it. Still `drafted`? `state/checks.json` → `topics` → `<table>/<topic>` → `coverage` says what the toy data misses.
+3. `next` says `fix-check` when the package fails `check` and no topic you are building explains it: a change to the toy data, `common/defs.json`, or a mother broke a topic that is in review or confirmed. Fix it as in 1 before you present, post, or finish anything; when the fix changes an approved topic's file, it goes back to the person (Revising a topic).
 
 ## 6. Present
 
