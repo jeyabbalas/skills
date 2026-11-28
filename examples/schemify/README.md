@@ -9,13 +9,15 @@ A complete schemify workspace, committed as it stood at the end of a run. The st
 
 ## What happened in the run
 
-Seven sessions, each closed with a written handoff (`state/ledger.jsonl` → `session` events). The simulated person was the study's data manager, who is also its data steward. They answered 35 questions in 8 batches on the website and approved the four topics one by one. Along the way they volunteered what the 2024 cleaning changed — ages above 85 top-coded, implausible smoking-start ages recoded to don't-know, BMI rounded to one decimal — and each fact is a decision cited where it applies.
+Eight sessions, each closed with a written handoff (`state/ledger.jsonl` → `session` events). The simulated person was the study's data manager, who is also its data steward. They answered 35 questions in 8 batches on the website and approved the four topics one by one. Along the way they volunteered what the 2024 cleaning changed — ages above 85 top-coded, implausible smoking-start ages recoded to don't-know, BMI rounded to one decimal — and each fact is a decision cited where it applies.
 
 They then checked a 40-row extract of their "real" data in QuaC, in the browser. That extract was synthetic, built to test the agent, and is not included here. The agent saw only QuaC's findings — counts and column names, no values (`alignment/A01.json`). It never opened the file, asking about it only by name. The 13 failed checks became four questions:
 
 - every ID failed the pattern the person had confirmed: they explained the 2024 release adds a hyphen, so the pattern changed and the earlier decision is superseded;
 - five ages were data-entry errors, a data issue, so the schema stayed;
 - the 10 missing variables (a partial extract) and an extra quality-control column were recorded as expected.
+
+The eighth session came later, with schemify 2.2.1. The new ID format had changed *About you* after the person approved it, a change the build that made the run had missed. The agent presented the topic again, naming that one change, and it was approved in chat. The session also gave the other approvals and the finish their fingerprints, so any later change to them shows.
 
 ## Look around
 
@@ -47,4 +49,4 @@ No file names a folder on the computer the run was made on: schemify writes path
 
 The workspace sits inside this repository, so resuming it in place commits into your clone. To try it on its own, copy `workspace/` somewhere outside the clone first.
 
-One honest note: the person's side of this run was simulated. A second AI agent, working for the skill's author, played the data manager and answered on the website as a person would. Every file here is real output of the skill's scripts and of the agent that ran them.
+One honest note: the person's side of this run was simulated. A second AI agent, working for the skill's author, played the data manager and answered on the website as a person would. In the eighth session, the skill's author answered for them. Every file here is real output of the skill's scripts and of the agent that ran them.

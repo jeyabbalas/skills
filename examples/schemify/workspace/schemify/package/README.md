@@ -116,4 +116,4 @@ Each mother schema's own `$comment`, for readers of the schema files:
 
 ---
 
-Generated 2026-11-27 by [schemify](https://github.com/jeyabbalas/skills) from its working record. Edit the schemas, not this file — it is regenerated.
+Generated 2026-11-28 by [schemify](https://github.com/jeyabbalas/skills) from its working record. Edit the schemas, not this file — it is regenerated.
